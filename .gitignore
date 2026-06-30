@@ -1,0 +1,46 @@
+# --- LabButler ignores ---
+
+# Local sample / real-data exports (contain PII — never commit)
+sample_data/
+
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Django
+*.log
+local_settings.py
+/staticfiles/
+/media/
+db.sqlite3
+db.sqlite3-journal
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Node / Tailwind
+node_modules/
+/labbutler/static/css/dist.css
+
+# Test / coverage / tooling caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Local Postgres helper data dir
+/.pgdata/
+
+# Editors / OS
+.idea/
+.DS_Store
+*.swp
