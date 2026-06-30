@@ -18,8 +18,10 @@ Spec: [Buildv1.MD](Buildv1.MD) · Stack: Django 5 / Postgres 17 / Celery+Redis /
       (`tenancy`, `inventory`, `procurement`, `imports`, `audit`), `manage.py`. Runnable empty skeleton.
       Custom `tenancy.User` (email login). `scripts/pg.sh` project-local Postgres (port 55432).
       Verified: migrate OK, runserver serves home/login/admin, ruff clean.
-- [ ] **3. Tooling & infra** — `.env.example`, settings via env, pytest + ruff config, Docker Compose
-      (`web`/`db`/`worker`/`broker` + media volume), Tailwind/HTMX wiring, Celery app.
+- [x] **3. Tooling & infra** — `.env.example`, settings via env, pytest + ruff config, Docker Compose
+      (`web`/`db`/`worker`/`broker` + media volume), multistage `Dockerfile`, Tailwind/HTMX wiring,
+      Celery app. Tailwind builds; pytest (2 tests) + ruff green. _Docker build unverified locally
+      (no daemon)._
 - [ ] **4. CLAUDE.md commands** — fill the `[bracketed]` command placeholders (uv run pytest/ruff/migrate…).
 - [ ] **5. Data models** — tenancy (Lab/Membership/Role/Permission), inventory (Item/Location/Tag/
       FieldDefinition/FieldPreset/HazardStatement), procurement (Request/Budget/Vendor/ShippingAddress),

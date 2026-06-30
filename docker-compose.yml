@@ -1,0 +1,54 @@
+# LabButler production stack.
+#   docker compose up -d --build
+#   docker compose run --rm web python manage.py migrate
+#   docker compose run --rm web python manage.py bootstrap_lab
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-labbutler}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-labbutler}
+      POSTGRES_DB: ${POSTGRES_DB:-labbutler}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labbutler}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  broker:
+    image: redis:7
+    restart: unless-stopped
+
+  web:
+    build: .
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_started
+    volumes:
+      - media:/data/media
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: celery -A labbutler worker -l info
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_started
+    volumes:
+      - media:/data/media
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  media:

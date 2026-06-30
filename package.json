@@ -1,0 +1,13 @@
+{
+  "name": "labbutler",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tailwind CSS build for LabButler.",
+  "scripts": {
+    "dev": "tailwindcss -i ./labbutler/static/css/input.css -o ./labbutler/static/css/dist.css --watch",
+    "build": "tailwindcss -i ./labbutler/static/css/input.css -o ./labbutler/static/css/dist.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}
