@@ -1,0 +1,37 @@
+[project]
+name = "labbutler"
+version = "0.1.0"
+description = "Self-hosted lab inventory and procurement (a free LabSuit alternative)."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "django>=5.0,<5.2",
+    "psycopg[binary]>=3.2",
+    "django-environ>=0.11",
+    "celery>=5.4",
+    "redis>=5.0",
+    "django-htmx>=1.19",
+    "openpyxl>=3.1",
+    "gunicorn>=23.0",
+    "whitenoise>=6.7",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-django>=4.9",
+    "ruff>=0.7",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["**/migrations/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "DJ"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "labbutler.settings"
+python_files = ["test_*.py", "tests.py"]
+addopts = "--reuse-db"

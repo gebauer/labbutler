@@ -13,9 +13,11 @@ Spec: [Buildv1.MD](Buildv1.MD) · Stack: Django 5 / Postgres 17 / Celery+Redis /
 ## Steps
 
 - [x] **0. Repo hygiene** — `.gitignore` (exclude sample_data, venv, secrets). _(commit: b718e9c)_
-- [ ] **1. Baseline docs committed** — Buildv1.MD, README.md, CLAUDE.md.
-- [ ] **2. Project scaffold** — `pyproject.toml` (uv), Django project `labbutler/`, settings, the 5 apps
+- [x] **1. Baseline docs committed** — Buildv1.MD, README.md, CLAUDE.md. _(commit: e97505e)_
+- [x] **2. Project scaffold** — `pyproject.toml` (uv), Django project `labbutler/`, settings, the 5 apps
       (`tenancy`, `inventory`, `procurement`, `imports`, `audit`), `manage.py`. Runnable empty skeleton.
+      Custom `tenancy.User` (email login). `scripts/pg.sh` project-local Postgres (port 55432).
+      Verified: migrate OK, runserver serves home/login/admin, ruff clean.
 - [ ] **3. Tooling & infra** — `.env.example`, settings via env, pytest + ruff config, Docker Compose
       (`web`/`db`/`worker`/`broker` + media volume), Tailwind/HTMX wiring, Celery app.
 - [ ] **4. CLAUDE.md commands** — fill the `[bracketed]` command placeholders (uv run pytest/ruff/migrate…).

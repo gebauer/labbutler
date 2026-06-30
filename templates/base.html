@@ -1,0 +1,30 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}LabButler{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/dist.css' %}">
+  <script src="https://unpkg.com/htmx.org@2.0.3" defer></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="border-b bg-white">
+    <div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+      <a href="/" class="font-semibold">LabButler</a>
+      <nav class="text-sm">
+        {% if user.is_authenticated %}
+          <span class="text-gray-500">{{ user.email }}</span>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+  <main class="mx-auto max-w-6xl px-4 py-6">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="mb-3 rounded border px-3 py-2 text-sm">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
