@@ -22,7 +22,7 @@ Spec: [Buildv1.MD](Buildv1.MD) · Stack: Django 5 / Postgres 17 / Celery+Redis /
       (`web`/`db`/`worker`/`broker` + media volume), multistage `Dockerfile`, Tailwind/HTMX wiring,
       Celery app. Tailwind builds; pytest (2 tests) + ruff green. _Docker build unverified locally
       (no daemon)._
-- [ ] **4. CLAUDE.md commands** — fill the `[bracketed]` command placeholders (uv run pytest/ruff/migrate…).
+- [x] **4. CLAUDE.md commands** — filled command placeholders + real project-structure section.
 - [ ] **5. Data models** — tenancy (Lab/Membership/Role/Permission), inventory (Item/Location/Tag/
       FieldDefinition/FieldPreset/HazardStatement), procurement (Request/Budget/Vendor/ShippingAddress),
       audit (AuditEntry). Migrations. `user.can(lab, perm)` helper. `bootstrap_lab` command.

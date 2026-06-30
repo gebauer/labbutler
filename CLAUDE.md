@@ -18,23 +18,33 @@ This is a general engineering baseline; fill in the `[bracketed]` placeholders p
 
 > Fill these in so the assistant can verify its own work.
 
-- Install deps: `[e.g. make install]`
-- Run (dev): `[e.g. make dev]`
-- Run tests: `[e.g. make test]`
-- Lint / format: `[e.g. make lint]` / `[e.g. make fmt]`
-- Type check: `[e.g. make typecheck]`
-- Build: `[e.g. make build]`
+- Install deps: `uv sync` (Python) · `npm install` (Tailwind build only)
+- Local Postgres: `scripts/pg.sh init` once, then `scripts/pg.sh start` / `stop`
+- Run (dev): `uv run python manage.py runserver` · CSS watch: `npm run dev` · worker: `uv run celery -A labbutler worker -l info`
+- Run tests: `uv run pytest`
+- Lint / format: `uv run ruff check .` / `uv run ruff format .`
+- Type check: _(none configured yet — no type checker in the toolchain)_
+- Migrations: `uv run python manage.py makemigrations` / `migrate`
+- CSS build (prod): `npm run build`
+- Build (prod image): `docker compose build`
 
-Always run the test, lint, and type-check commands before considering a change done.
+Always run the tests and linter before considering a change done. (No type checker is
+configured yet; if one is added, wire it in here and run it too.)
 
 ## Project structure
 
-> Replace with the real layout.
+- `labbutler/` — Django project: `settings.py` (env-driven), `urls.py`, `celery.py`, `wsgi`/`asgi`, `static/`.
+- `apps/` — application code, one Django app per domain:
+  - `tenancy/` — `User`, `Lab`, `Membership`, `Role`, `Permission` (multi-lab scoping & auth).
+  - `inventory/` — `Item`, `Location`, `Tag`, `FieldDefinition`/`FieldPreset`, `HazardStatement`.
+  - `procurement/` — `Request` workflow, `Budget`, `Vendor`, `ShippingAddress`.
+  - `imports/` — LabSuit profile + generic mapper, parsers, dry-run preview.
+  - `audit/` — append-only `AuditEntry`.
+- Tests live in each app under `<app>/tests/`, mirroring the module under test.
+- `templates/` — project-level Django templates (HTMX + Tailwind). `scripts/` — dev helpers (`pg.sh`).
+- Config and tooling (`pyproject.toml`, `package.json`, `docker-compose.yml`, `.env.example`) live at the repo root.
 
-- `[src/]` — application code
-- `[tests/]` — tests, mirroring the source tree
-- `[docs/]` — documentation
-- Config and tooling live at the repo root.
+> Models/UI for inventory & procurement are landing incrementally; see [TODO.md](TODO.md) for status.
 
 ## Code style & conventions
 
