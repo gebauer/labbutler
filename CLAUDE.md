@@ -1,0 +1,100 @@
+# CLAUDE.md
+
+Guidance for AI coding assistants (and humans) working in this repository.
+This is a general engineering baseline; fill in the `[bracketed]` placeholders per project and delete what doesn't apply.
+
+---
+
+## How to work here
+
+- **Understand before changing.** Read the relevant code and nearby tests before editing. Match existing patterns over introducing new ones.
+- **Plan non-trivial work.** For anything beyond a small fix, outline the approach first, then implement. Prefer the smallest change that fully solves the problem.
+- **Ask when genuinely ambiguous; otherwise proceed.** State the assumption you're making inline rather than stopping for trivial confirmations.
+- **Keep diffs focused.** One logical change per commit/PR. Don't bundle unrelated refactors, reformatting, or dependency bumps into a feature change.
+- **Don't invent.** No fabricated APIs, file paths, config keys, or library behaviour. If unsure whether something exists, check the code or say so.
+- **Leave it runnable.** Never end on a state that doesn't build, with broken imports, or with failing tests you introduced.
+
+## Commands
+
+> Fill these in so the assistant can verify its own work.
+
+- Install deps: `[e.g. make install]`
+- Run (dev): `[e.g. make dev]`
+- Run tests: `[e.g. make test]`
+- Lint / format: `[e.g. make lint]` / `[e.g. make fmt]`
+- Type check: `[e.g. make typecheck]`
+- Build: `[e.g. make build]`
+
+Always run the test, lint, and type-check commands before considering a change done.
+
+## Project structure
+
+> Replace with the real layout.
+
+- `[src/]` — application code
+- `[tests/]` — tests, mirroring the source tree
+- `[docs/]` — documentation
+- Config and tooling live at the repo root.
+
+## Code style & conventions
+
+- Follow the language's standard style guide and the configured linter/formatter. The formatter is the source of truth — don't hand-format against it.
+- **Naming:** descriptive, intention-revealing names. No single-letter names except trivial loop indices. Functions are verbs, variables/types are nouns.
+- **Functions small and single-purpose.** Prefer early returns over deep nesting. Keep cyclomatic complexity low.
+- **Explicit over clever.** Optimize for readability and the next maintainer, not brevity.
+- **Comments explain _why_, not _what_.** The code shows what; comment intent, trade-offs, and non-obvious constraints. Remove commented-out code.
+- **Immutability by default;** mutate only when there's a reason. Avoid shared mutable global state.
+- **Pure core, effectful edges.** Push I/O, network, and side effects to the boundaries; keep business logic pure and testable.
+- **Match existing import ordering, file organization, and module boundaries.**
+
+## Testing
+
+- Add or update tests with every behavioural change. A bug fix starts with a failing test that reproduces it.
+- Test behaviour and public contracts, not implementation details. Cover the happy path, edge cases, and error cases.
+- Tests must be deterministic and independent — no reliance on ordering, wall-clock time, network, or shared state. Inject clocks/randomness; mock external services.
+- Keep them fast; reserve slow/integration tests for a separate suite or marker.
+
+## Git & commits
+
+- **Conventional Commits:** `type(scope): summary` (`feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `build`, `ci`). Imperative mood, ~50-char summary.
+- Explain the _why_ in the body when it isn't obvious. Reference issues where relevant.
+- Small, atomic commits that each leave the tree green.
+- Never commit secrets, credentials, large binaries, or generated artifacts. Don't commit directly to the protected/main branch unless asked.
+
+## Dependencies
+
+- Prefer the standard library and what's already in the project. Justify any new dependency (maintenance, size, security, license).
+- Pin/lock versions via the project's lockfile. Don't upgrade unrelated dependencies inside a feature change.
+- Avoid adding a library for something trivial you can write in a few lines.
+
+## Security
+
+- **Never hardcode secrets.** Use environment variables / a secrets manager. Don't print, log, or commit secrets, tokens, or PII.
+- Validate and sanitize all external input. Treat anything from users, files, or the network as untrusted.
+- Use parameterized queries; never build SQL/shell/HTML by string concatenation of untrusted input.
+- Apply least privilege. Fail closed on auth/permission checks.
+- Keep error messages user-safe; put diagnostic detail in logs, not in responses.
+
+## Errors, logging & observability
+
+- Handle errors explicitly; don't swallow them. Fail fast on programmer errors, recover gracefully from expected runtime errors.
+- Raise/return errors with enough context to debug. Don't use exceptions for normal control flow.
+- Use structured logging with appropriate levels. No `print`-debugging left in committed code. Never log secrets or PII.
+
+## Performance & data
+
+- Make it correct and clear first; optimize only with a measurement showing it matters. Note real hot paths.
+- Watch for N+1 queries and unbounded loops/allocations over user-controlled input. Paginate large result sets.
+- Treat database migrations as append-only and reversible; review destructive changes carefully.
+
+## Documentation
+
+- Update the README and relevant docs when behaviour, setup, commands, or public APIs change.
+- Document public functions/modules with their contract: purpose, params, returns, errors, side effects.
+- Keep this file current as conventions evolve.
+
+## Do / Don't (quick reference)
+
+**Do:** read first · match existing patterns · small focused diffs · test every change · run lint+tests+types before finishing · ask when truly blocked.
+
+**Don't:** invent APIs or paths · commit secrets · bundle unrelated changes · leave the build broken · disable/skip tests to make them pass · reformat files you aren't otherwise touching.
