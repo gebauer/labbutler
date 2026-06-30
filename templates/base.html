@@ -9,11 +9,33 @@
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
   <header class="border-b bg-white">
-    <div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-      <a href="/" class="font-semibold">LabButler</a>
-      <nav class="text-sm">
+    <div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-6">
+        <a href="/" class="font-semibold">LabButler</a>
         {% if user.is_authenticated %}
-          <span class="text-gray-500">{{ user.email }}</span>
+          <a href="{% url 'inventory:item_list' %}" class="text-sm text-gray-600 hover:text-gray-900">Inventory</a>
+        {% endif %}
+      </div>
+      <nav class="flex items-center gap-3 text-sm">
+        {% if user.is_authenticated %}
+          {% if available_labs|length > 1 %}
+            <form method="post" action="{% url 'inventory:switch_lab' current_lab.slug %}" class="flex items-center">
+              {% csrf_token %}
+              <select name="lab" class="rounded border border-gray-300 px-2 py-1 text-sm"
+                      onchange="this.form.action='/inventory/switch-lab/'+this.value+'/'; this.form.submit();">
+                {% for lab in available_labs %}
+                  <option value="{{ lab.slug }}" {% if lab == current_lab %}selected{% endif %}>{{ lab.name }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          {% elif current_lab %}
+            <span class="text-gray-500">{{ current_lab.name }}</span>
+          {% endif %}
+          <span class="text-gray-400">{{ user.email }}</span>
+          <form method="post" action="{% url 'logout' %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="text-gray-500 hover:text-gray-900">Sign out</button>
+          </form>
         {% endif %}
       </nav>
     </div>

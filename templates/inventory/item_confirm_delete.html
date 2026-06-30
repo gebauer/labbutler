@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Delete {{ item.human_id }} · LabButler{% endblock %}
+
+{% block content %}
+  <h1 class="text-xl font-semibold">Delete item</h1>
+  <p class="mt-3 text-sm text-gray-700">
+    Permanently delete <span class="font-mono">{{ item.human_id }}</span> — <strong>{{ item.name }}</strong>?
+    This cannot be undone.
+  </p>
+  <form method="post" class="mt-6 flex gap-2">
+    {% csrf_token %}
+    <button type="submit" class="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Delete</button>
+    <a href="{% url 'inventory:item_detail' item.pk %}" class="rounded border px-4 py-2 text-sm hover:bg-gray-50">Cancel</a>
+  </form>
+{% endblock %}

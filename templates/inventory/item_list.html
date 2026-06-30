@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory · LabButler{% endblock %}
+
+{% block content %}
+  <div class="flex items-center justify-between gap-4">
+    <h1 class="text-xl font-semibold">Inventory</h1>
+    {% if can_manage %}
+      <a href="{% url 'inventory:item_create' %}"
+         class="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-700">
+        New item
+      </a>
+    {% endif %}
+  </div>
+
+  <form class="mt-4 flex flex-wrap items-center gap-3"
+        hx-get="{% url 'inventory:item_list' %}"
+        hx-target="#item-results"
+        hx-select="#item-results"
+        hx-swap="outerHTML"
+        hx-trigger="input changed delay:300ms from:input[name='q'], change from:select[name='tag'], submit"
+        hx-push-url="true">
+    <input type="search" name="q" value="{{ query }}" placeholder="Search name, ID, CAS…"
+           autocomplete="off"
+           class="w-64 rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500">
+    <select name="tag"
+            class="rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500">
+      <option value="">All tags</option>
+      {% for tag in tags %}
+        <option value="{{ tag.pk }}" {% if tag_id == tag.pk|stringformat:'s' %}selected{% endif %}>{{ tag.name }}</option>
+      {% endfor %}
+    </select>
+    <noscript><button type="submit" class="rounded border px-3 py-2 text-sm">Search</button></noscript>
+  </form>
+
+  {% include "inventory/_item_table.html" %}
+{% endblock %}

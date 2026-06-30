@@ -34,7 +34,11 @@ Spec: [Buildv1.MD](Buildv1.MD) · Stack: Django 5 / Postgres 17 / Celery+Redis /
       **1,889 OK, 33 warnings, 0 errors**. 43 tests green, ruff clean.
       _Generic column-mapper (non-LabSuit sources) still TODO — Phase: see step 6b._
 - [ ] **6b. Generic import mapper** — column-mapper UI/profile for non-LabSuit spreadsheets.
-- [ ] **7. Inventory UI** — list/detail/edit, responsive (HTMX + Tailwind), search.
+- [x] **7. Inventory UI** — list/detail/edit/delete + free-text & tag search (HTMX live partial),
+      lab scoping via session (`tenancy.scoping`, permission decorator, context processor +
+      nav lab-switcher). Create allocates a frozen `human_id`; edits/deletes write audit entries.
+      Custom fields shown read-only on detail (editing deferred). 14 view tests; 56 total green,
+      ruff clean. _Done before 6b (UI foundation first, per decision)._
 - [ ] **8. Procurement UI** — request workflow state machine, approvals, ordering, check-in→creates item.
 - [ ] **9. Notifications** — SMTP: status changes + expiry digest (Celery beat).
 
