@@ -23,9 +23,11 @@ Spec: [Buildv1.MD](Buildv1.MD) · Stack: Django 5 / Postgres 17 / Celery+Redis /
       Celery app. Tailwind builds; pytest (2 tests) + ruff green. _Docker build unverified locally
       (no daemon)._
 - [x] **4. CLAUDE.md commands** — filled command placeholders + real project-structure section.
-- [ ] **5. Data models** — tenancy (Lab/Membership/Role/Permission), inventory (Item/Location/Tag/
+- [x] **5. Data models** — tenancy (Lab/Membership/Role/Permission), inventory (Item/Location/Tag/
       FieldDefinition/FieldPreset/HazardStatement), procurement (Request/Budget/Vendor/ShippingAddress),
-      audit (AuditEntry). Migrations. `user.can(lab, perm)` helper. `bootstrap_lab` command.
+      audit (AuditEntry). Migrations + seeded permission catalog & template roles. `user.can(lab, perm)`,
+      `Lab.allocate_item_id()` (frozen IDs), `Request.recalculate_totals()` (auto-VAT), append-only audit.
+      `create_lab` (clones template roles) + `bootstrap_lab` command. Admin registered. 11 tests green.
 - [ ] **6. LabSuit importer** — LabSuit profile + generic mapper, parsers (price/date/location/TAGS→hazard),
       dry-run preview, dedup on legacy serial. Tested against `sample_data/`.
 - [ ] **7. Inventory UI** — list/detail/edit, responsive (HTMX + Tailwind), search.
