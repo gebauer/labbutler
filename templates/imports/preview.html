@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Preview import · LabButler{% endblock %}
+
+{% block content %}
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="text-xl font-semibold">Preview import</h1>
+      <p class="mt-1 text-sm text-gray-500">{{ filename }}</p>
+    </div>
+    <a href="{% url 'imports:mapping' %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Back to mapping</a>
+  </div>
+
+  <div class="mt-4 flex flex-wrap gap-3 text-sm">
+    <span class="rounded bg-green-100 px-3 py-1 text-green-800">{{ counts.ok }} ready</span>
+    {% if counts.warnings %}<span class="rounded bg-amber-100 px-3 py-1 text-amber-800">{{ counts.warnings }} with warnings</span>{% endif %}
+    {% if counts.errors %}<span class="rounded bg-red-100 px-3 py-1 text-red-800">{{ counts.errors }} skipped (errors)</span>{% endif %}
+  </div>
+
+  <div class="mt-4 overflow-x-auto rounded border bg-white">
+    <table class="min-w-full divide-y divide-gray-200 text-sm">
+      <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+        <tr>
+          <th class="px-3 py-2 font-medium">Row</th>
+          <th class="px-3 py-2 font-medium">Name</th>
+          <th class="px-3 py-2 font-medium">Location</th>
+          <th class="px-3 py-2 font-medium">Tags</th>
+          <th class="px-3 py-2 font-medium">Notes</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for row in sample %}
+          <tr class="{% if row.errors %}bg-red-50{% endif %}">
+            <td class="px-3 py-2 text-gray-400">{{ row.row_number }}</td>
+            <td class="px-3 py-2 font-medium text-gray-900">{{ row.fields.name|default:"—" }}</td>
+            <td class="px-3 py-2 text-gray-600">
+              {% for level in row.location_path %}{{ level.name }}{% if not forloop.last %} › {% endif %}{% empty %}—{% endfor %}
+            </td>
+            <td class="px-3 py-2 text-gray-600">{{ row.tag_names|join:", "|default:"—" }}</td>
+            <td class="px-3 py-2 text-xs">
+              {% for error in row.errors %}<div class="text-red-600">{{ error }}</div>{% endfor %}
+              {% for warning in row.warnings %}<div class="text-amber-600">{{ warning }}</div>{% endfor %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if truncated %}<p class="mt-2 text-xs text-gray-500">Showing the first rows only — all ready rows will be imported.</p>{% endif %}
+
+  <form method="post" class="mt-6 flex items-center gap-2">
+    {% csrf_token %}
+    <button type="submit" {% if not counts.ok %}disabled{% endif %}
+            class="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+      Import {{ counts.ok }} item{{ counts.ok|pluralize }}
+    </button>
+    <a href="{% url 'imports:cancel' %}" class="rounded border px-4 py-2 text-sm hover:bg-gray-50">Cancel</a>
+  </form>
+{% endblock %}

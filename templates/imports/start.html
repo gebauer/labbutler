@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Import spreadsheet · LabButler{% endblock %}
+
+{% block content %}
+  <div class="max-w-2xl">
+    <h1 class="text-xl font-semibold">Import a spreadsheet</h1>
+    <p class="mt-2 text-sm text-gray-600">
+      Upload any .xlsx spreadsheet of items. You'll map its columns to inventory fields
+      and preview the result before anything is saved. (For LabSuit exports, the dedicated
+      <code class="rounded bg-gray-100 px-1">import_labsuit</code> command is a better fit.)
+    </p>
+
+    <form method="post" enctype="multipart/form-data" class="mt-6 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label for="spreadsheet" class="block text-sm font-medium text-gray-700">Spreadsheet file</label>
+        <input id="spreadsheet" type="file" name="spreadsheet" accept=".xlsx,.xlsm" required
+               class="mt-1 block w-full text-sm text-gray-700 file:mr-3 file:rounded file:border-0
+                      file:bg-gray-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white
+                      hover:file:bg-gray-700">
+        <p class="mt-1 text-xs text-gray-500">.xlsx or .xlsm, up to 10 MB.</p>
+      </div>
+      <div class="flex gap-2">
+        <button type="submit" class="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700">
+          Continue
+        </button>
+        <a href="{% url 'inventory:item_list' %}" class="rounded border px-4 py-2 text-sm hover:bg-gray-50">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

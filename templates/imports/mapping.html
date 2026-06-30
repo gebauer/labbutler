@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Map columns · LabButler{% endblock %}
+
+{% block content %}
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="text-xl font-semibold">Map columns</h1>
+      <p class="mt-1 text-sm text-gray-500">{{ filename }}</p>
+    </div>
+    <a href="{% url 'imports:cancel' %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Cancel</a>
+  </div>
+
+  {% if sheet_names|length > 1 %}
+    <form method="get" class="mt-4 flex items-center gap-2 text-sm">
+      <label for="sheet" class="text-gray-600">Sheet</label>
+      <select id="sheet" name="sheet" onchange="this.form.submit()"
+              class="rounded border border-gray-300 px-2 py-1">
+        {% for name in sheet_names %}
+          <option value="{{ name }}" {% if name == sheet %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  {% endif %}
+
+  <form method="post" class="mt-4">
+    {% csrf_token %}
+    <input type="hidden" name="sheet" value="{{ sheet }}">
+    <p class="text-sm text-gray-600">Map at least one column to <strong>Name</strong>. Unmapped columns are ignored.</p>
+    <div class="mt-3 overflow-x-auto rounded border bg-white">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+          <tr>
+            <th class="px-3 py-2 font-medium">Column</th>
+            <th class="px-3 py-2 font-medium">Sample values</th>
+            <th class="px-3 py-2 font-medium">Maps to</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for col in columns %}
+            <tr>
+              <td class="px-3 py-2 font-medium text-gray-900">{{ col.header }}</td>
+              <td class="px-3 py-2 text-gray-500">
+                {% for sample in col.samples %}
+                  {% if sample %}<div class="truncate max-w-xs">{{ sample }}</div>{% endif %}
+                {% endfor %}
+              </td>
+              <td class="px-3 py-2">
+                <select name="col-{{ col.index }}"
+                        class="rounded border border-gray-300 px-2 py-1 text-sm">
+                  {% for value, label in choices %}
+                    <option value="{{ value }}" {% if value == col.selected %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="mt-4 flex gap-2">
+      <button type="submit" class="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700">
+        Preview import
+      </button>
+      <a href="{% url 'imports:start' %}" class="rounded border px-4 py-2 text-sm hover:bg-gray-50">Back</a>
+    </div>
+  </form>
+{% endblock %}

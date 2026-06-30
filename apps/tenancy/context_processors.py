@@ -10,4 +10,9 @@ def labs(request: HttpRequest) -> dict:
     if user is None or not user.is_authenticated:
         return {}
     available = list(user_labs(user))
-    return {"current_lab": get_current_lab(request), "available_labs": available}
+    current = get_current_lab(request)
+    return {
+        "current_lab": current,
+        "available_labs": available,
+        "can_import": bool(current and user.can(current, "import_inventory")),
+    }

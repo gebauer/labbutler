@@ -33,7 +33,14 @@ Spec: [Buildv1.MD](Buildv1.MD) · Stack: Django 5 / Postgres 17 / Celery+Redis /
       custom-field pool, tags/hazards/vendor/owner). `import_labsuit` command. Verified on real export:
       **1,889 OK, 33 warnings, 0 errors**. 43 tests green, ruff clean.
       _Generic column-mapper (non-LabSuit sources) still TODO — Phase: see step 6b._
-- [ ] **6b. Generic import mapper** — column-mapper UI/profile for non-LabSuit spreadsheets.
+- [x] **6b. Generic import mapper** — pure core (`imports/generic.py`: column reader,
+      target registry, header guesser, mapping-driven `build_generic_plan`) reusing the
+      LabSuit `ParsedRow`/`ImportPlan`/`commit`. `commit` now mints a fresh frozen
+      `human_id` for serial-less generic rows (LabSuit upsert path unchanged). 4-step
+      web wizard (upload → map columns → dry-run preview → commit), session-backed,
+      gated on `import_inventory`, isolated-MEDIA upload. 10 new tests; 66 total green.
+      _CSV input still TODO (openpyxl is xlsx-only); generic imports always create (no
+      serial-based dedup)._
 - [x] **7. Inventory UI** — list/detail/edit/delete + free-text & tag search (HTMX live partial),
       lab scoping via session (`tenancy.scoping`, permission decorator, context processor +
       nav lab-switcher). Create allocates a frozen `human_id`; edits/deletes write audit entries.

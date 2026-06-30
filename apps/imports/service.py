@@ -227,9 +227,11 @@ def _hazard_kind(code: str) -> str:
 def commit(plan: ImportPlan, *, lab: Lab, actor: User | None = None) -> ImportResult:
     """Persist the OK rows of a plan into ``lab`` within a single transaction.
 
-    Upserts on (lab, human_id): re-importing the same workbook updates rather than
-    duplicates. Builds the location hierarchy, registers extra columns in the custom-field
-    pool, and links tags, hazards, vendor, and a (stub if needed) owner user.
+    Rows that carry a ``human_id`` (LabSuit imports) upsert on (lab, human_id), so
+    re-importing the same workbook updates rather than duplicates; serial-less rows
+    (generic imports) get a freshly allocated frozen ID and always create. Builds the
+    location hierarchy, registers extra columns in the custom-field pool, and links tags,
+    hazards, vendor, and a (stub if needed) owner user.
     """
     result = ImportResult()
     for row in plan.rows:
@@ -262,9 +264,15 @@ def commit(plan: ImportPlan, *, lab: Lab, actor: User | None = None) -> ImportRe
             owner=owner,
             custom_fields=row.custom_fields,
         )
-        item, created = Item.objects.update_or_create(
-            lab=lab, human_id=row.human_id, defaults=defaults
-        )
+        if row.human_id:
+            # Sourced rows (LabSuit) carry a stable ID: upsert so re-import updates.
+            item, created = Item.objects.update_or_create(
+                lab=lab, human_id=row.human_id, defaults=defaults
+            )
+        else:
+            # Generic rows have no stable identifier: mint a fresh frozen ID and create.
+            item = Item.objects.create(lab=lab, human_id=lab.allocate_item_id(), **defaults)
+            created = True
 
         tags = [Tag.objects.get_or_create(lab=lab, name=name)[0] for name in row.tag_names]
         item.tags.set(tags)
