@@ -28,8 +28,12 @@ Spec: [Buildv1.MD](Buildv1.MD) · Stack: Django 5 / Postgres 17 / Celery+Redis /
       audit (AuditEntry). Migrations + seeded permission catalog & template roles. `user.can(lab, perm)`,
       `Lab.allocate_item_id()` (frozen IDs), `Request.recalculate_totals()` (auto-VAT), append-only audit.
       `create_lab` (clones template roles) + `bootstrap_lab` command. Admin registered. 11 tests green.
-- [ ] **6. LabSuit importer** — LabSuit profile + generic mapper, parsers (price/date/location/TAGS→hazard),
-      dry-run preview, dedup on legacy serial. Tested against `sample_data/`.
+- [x] **6. LabSuit importer** — parsers (price/date/location/TAGS→hazard), LabSuit workbook profile,
+      two-phase `build_plan` (dry-run preview) + `commit` (upsert on legacy serial, location hierarchy,
+      custom-field pool, tags/hazards/vendor/owner). `import_labsuit` command. Verified on real export:
+      **1,889 OK, 33 warnings, 0 errors**. 43 tests green, ruff clean.
+      _Generic column-mapper (non-LabSuit sources) still TODO — Phase: see step 6b._
+- [ ] **6b. Generic import mapper** — column-mapper UI/profile for non-LabSuit spreadsheets.
 - [ ] **7. Inventory UI** — list/detail/edit, responsive (HTMX + Tailwind), search.
 - [ ] **8. Procurement UI** — request workflow state machine, approvals, ordering, check-in→creates item.
 - [ ] **9. Notifications** — SMTP: status changes + expiry digest (Celery beat).
