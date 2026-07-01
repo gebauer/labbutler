@@ -89,9 +89,7 @@ def test_unknown_kind_is_404(client, lab):
 @pytest.mark.django_db
 def test_settings_update(client, lab):
     client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
-    resp = client.post(
-        reverse("manage:settings"), {"name": "AG B New", "default_vat_rate": "0.07"}
-    )
+    resp = client.post(reverse("manage:settings"), {"name": "AG B New", "default_vat_rate": "0.07"})
     assert resp.status_code == 302
     lab.refresh_from_db()
     assert lab.name == "AG B New"
@@ -105,3 +103,78 @@ def test_settings_rejects_out_of_range_vat(client, lab):
     assert resp.status_code == 200  # re-rendered with an error
     lab.refresh_from_db()
     assert lab.default_vat_rate == Decimal("0.19")  # unchanged
+
+
+@pytest.mark.django_db
+def test_members_and_roles_require_manage_lab(client, lab):
+    client.force_login(_user(lab, "member@x.de", ["Member"]))
+    assert client.get(reverse("manage:members")).status_code == 403
+    assert client.get(reverse("manage:roles")).status_code == 403
+
+
+@pytest.mark.django_db
+def test_add_member_creates_user_and_membership(client, lab):
+    from apps.tenancy.models import Membership, Role
+
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    viewer = Role.objects.get(lab=lab, name="Viewer")
+    resp = client.post(reverse("manage:member_add"), {"email": "New@x.de", "roles": [viewer.pk]})
+    assert resp.status_code == 302
+    membership = Membership.objects.get(user__email="new@x.de", lab=lab)  # normalised
+    assert set(membership.roles.values_list("name", flat=True)) == {"Viewer"}
+
+
+@pytest.mark.django_db
+def test_member_edit_roles(client, lab):
+    from apps.tenancy.models import Membership, Role
+
+    boss = _user(lab, "boss@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Viewer"])
+    membership = Membership.objects.get(user=member, lab=lab)
+    manager_role = Role.objects.get(lab=lab, name="Lab manager")
+    client.force_login(boss)
+    client.post(reverse("manage:member_edit", args=[membership.pk]), {"roles": [manager_role.pk]})
+    assert set(membership.roles.values_list("name", flat=True)) == {"Lab manager"}
+
+
+@pytest.mark.django_db
+def test_cannot_remove_self_but_can_remove_others(client, lab):
+    from apps.tenancy.models import Membership
+
+    boss = _user(lab, "boss@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Viewer"])
+    own = Membership.objects.get(user=boss, lab=lab)
+    other = Membership.objects.get(user=member, lab=lab)
+    client.force_login(boss)
+    client.post(reverse("manage:member_remove", args=[own.pk]))
+    assert Membership.objects.filter(pk=own.pk).exists()  # self kept
+    client.post(reverse("manage:member_remove", args=[other.pk]))
+    assert not Membership.objects.filter(pk=other.pk).exists()
+
+
+@pytest.mark.django_db
+def test_create_edit_delete_role_permissions(client, lab):
+    from apps.tenancy.models import Permission, Role
+
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    perms = list(
+        Permission.objects.filter(code__in=["view_inventory", "view_requests"]).values_list(
+            "pk", flat=True
+        )
+    )
+    client.post(reverse("manage:role_add"), {"name": "Auditor", "permissions": perms})
+    role = Role.objects.get(lab=lab, name="Auditor")
+    assert set(role.permissions.values_list("code", flat=True)) == {
+        "view_inventory",
+        "view_requests",
+    }
+
+    only = Permission.objects.get(code="view_inventory")
+    client.post(
+        reverse("manage:role_edit", args=[role.pk]), {"name": "Auditor", "permissions": [only.pk]}
+    )
+    role.refresh_from_db()
+    assert set(role.permissions.values_list("code", flat=True)) == {"view_inventory"}
+
+    client.post(reverse("manage:role_delete", args=[role.pk]))
+    assert not Role.objects.filter(pk=role.pk).exists()

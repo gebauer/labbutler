@@ -13,7 +13,7 @@ from django import forms
 from apps.inventory.models import FieldDefinition
 from apps.procurement.models import Budget, ShippingAddress, Vendor
 
-from .models import Lab, User
+from .models import Lab, Permission, Role, User
 
 _INPUT = (
     "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm "
@@ -98,3 +98,54 @@ class LabSettingsForm(forms.ModelForm):
         if rate < 0 or rate > 1:
             raise forms.ValidationError("VAT rate must be between 0 and 1.")
         return rate
+
+
+def _lab_roles(lab: Lab):
+    return Role.objects.filter(lab=lab, is_template=False).order_by("name")
+
+
+class MemberAddForm(forms.Form):
+    """Add (or re-invite) a member by email and assign their lab roles."""
+
+    email = forms.EmailField()
+    roles = forms.ModelMultipleChoiceField(
+        queryset=Role.objects.none(), required=False, widget=forms.CheckboxSelectMultiple
+    )
+
+    def __init__(self, *args, lab: Lab, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.lab = lab
+        self.fields["roles"].queryset = _lab_roles(lab)
+        self.fields["roles"].label_from_instance = lambda role: role.name
+        self.fields["email"].widget.attrs.setdefault("class", _INPUT)
+
+    def clean_email(self) -> str:
+        return self.cleaned_data["email"].strip().lower()
+
+
+class MemberRolesForm(forms.Form):
+    """Edit the roles on an existing membership."""
+
+    roles = forms.ModelMultipleChoiceField(
+        queryset=Role.objects.none(), required=False, widget=forms.CheckboxSelectMultiple
+    )
+
+    def __init__(self, *args, lab: Lab, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["roles"].queryset = _lab_roles(lab)
+        self.fields["roles"].label_from_instance = lambda role: role.name
+
+
+class RoleForm(forms.ModelForm):
+    class Meta:
+        model = Role
+        fields = ["name", "permissions"]
+        widgets = {"permissions": forms.CheckboxSelectMultiple}
+
+    def __init__(self, *args, lab: Lab, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.lab = lab
+        self.instance.lab = lab  # bind lab for the (lab, name) uniqueness check + save
+        self.fields["permissions"].queryset = Permission.objects.all()
+        self.fields["permissions"].label_from_instance = lambda perm: perm.label
+        self.fields["name"].widget.attrs.setdefault("class", _INPUT)

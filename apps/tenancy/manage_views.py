@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from django.contrib import messages
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
 from apps.inventory.models import FieldDefinition
@@ -22,9 +23,13 @@ from .manage_forms import (
     BudgetForm,
     FieldDefinitionForm,
     LabSettingsForm,
+    MemberAddForm,
+    MemberRolesForm,
+    RoleForm,
     ShippingAddressForm,
     VendorForm,
 )
+from .models import Membership, Role, User
 from .scoping import require_permission
 
 
@@ -146,3 +151,140 @@ def settings(request: HttpRequest) -> HttpResponse:
     else:
         form = LabSettingsForm(instance=lab)
     return render(request, "manage/settings.html", {"form": form, "lab": lab})
+
+
+# --- Members ---------------------------------------------------------------------------
+
+
+@require_permission("manage_lab")
+def members(request: HttpRequest) -> HttpResponse:
+    memberships = (
+        Membership.objects.filter(lab=request.lab)
+        .select_related("user")
+        .prefetch_related("roles")
+        .order_by("user__email")
+    )
+    return render(
+        request,
+        "manage/members.html",
+        {"memberships": memberships, "add_form": MemberAddForm(lab=request.lab)},
+    )
+
+
+@require_permission("manage_lab")
+@require_POST
+def member_add(request: HttpRequest) -> HttpResponse:
+    form = MemberAddForm(request.POST, lab=request.lab)
+    if not form.is_valid():
+        messages.error(request, "Enter a valid email address.")
+        return redirect("manage:members")
+
+    email = form.cleaned_data["email"]
+    user, _ = User.objects.get_or_create(email=email, defaults={"username": email})
+    membership, created = Membership.objects.get_or_create(user=user, lab=request.lab)
+    membership.roles.set(form.cleaned_data["roles"])
+    AuditEntry.record(
+        lab=request.lab,
+        actor=request.user,
+        action="lab.member_added" if created else "lab.member_updated",
+        target=membership,
+        changes={"email": email, "roles": [r.name for r in form.cleaned_data["roles"]]},
+    )
+    messages.success(request, f"{'Added' if created else 'Updated'} {email}.")
+    return redirect("manage:members")
+
+
+@require_permission("manage_lab")
+def member_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    membership = get_object_or_404(
+        Membership.objects.select_related("user"), pk=pk, lab=request.lab
+    )
+    if request.method == "POST":
+        form = MemberRolesForm(request.POST, lab=request.lab)
+        if form.is_valid():
+            membership.roles.set(form.cleaned_data["roles"])
+            AuditEntry.record(
+                lab=request.lab,
+                actor=request.user,
+                action="lab.member_updated",
+                target=membership,
+                changes={"roles": [r.name for r in form.cleaned_data["roles"]]},
+            )
+            messages.success(request, f"Updated {membership.user.email}.")
+            return redirect("manage:members")
+    else:
+        form = MemberRolesForm(lab=request.lab, initial={"roles": membership.roles.all()})
+    return render(request, "manage/member_form.html", {"form": form, "membership": membership})
+
+
+@require_permission("manage_lab")
+@require_POST
+def member_remove(request: HttpRequest, pk: int) -> HttpResponse:
+    membership = get_object_or_404(Membership, pk=pk, lab=request.lab)
+    if membership.user_id == request.user.pk:
+        messages.error(request, "You can't remove yourself from the lab.")
+        return redirect("manage:members")
+    email = membership.user.email
+    AuditEntry.record(
+        lab=request.lab,
+        actor=request.user,
+        action="lab.member_removed",
+        target=("Membership", membership.pk),
+        changes={"email": email},
+    )
+    membership.delete()
+    messages.success(request, f"Removed {email}.")
+    return redirect("manage:members")
+
+
+# --- Roles -----------------------------------------------------------------------------
+
+
+@require_permission("manage_lab")
+def role_list(request: HttpRequest) -> HttpResponse:
+    roles = (
+        Role.objects.filter(lab=request.lab, is_template=False)
+        .prefetch_related("permissions")
+        .order_by("name")
+    )
+    return render(request, "manage/roles.html", {"roles": roles})
+
+
+@require_permission("manage_lab")
+def role_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
+    instance = (
+        get_object_or_404(Role, pk=pk, lab=request.lab, is_template=False) if pk else None
+    )
+    if request.method == "POST":
+        form = RoleForm(request.POST, instance=instance, lab=request.lab)
+        if form.is_valid():
+            role = form.save()
+            AuditEntry.record(
+                lab=request.lab,
+                actor=request.user,
+                action="lab.role_updated" if instance else "lab.role_created",
+                target=role,
+                changes={"name": role.name},
+            )
+            messages.success(request, f"Saved role “{role.name}”.")
+            return redirect("manage:roles")
+    else:
+        form = RoleForm(instance=instance, lab=request.lab)
+    return render(request, "manage/role_form.html", {"form": form, "role": instance})
+
+
+@require_permission("manage_lab")
+@require_POST
+def role_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    role = get_object_or_404(Role, pk=pk, lab=request.lab, is_template=False)
+    name = role.name
+    AuditEntry.record(
+        lab=request.lab,
+        actor=request.user,
+        action="lab.role_deleted",
+        target=("Role", role.pk),
+        changes={"name": name},
+    )
+    role.delete()
+    messages.success(request, f"Deleted role “{name}”.")
+    return redirect("manage:roles")

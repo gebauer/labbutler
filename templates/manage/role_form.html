@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}{% if role %}Edit role{% else %}New role{% endif %} · Admin · LabButler{% endblock %}
+
+{% block content %}
+  <a href="{% url 'manage:roles' %}" class="text-sm text-teal-700 hover:underline">← Roles</a>
+  <h1 class="mt-1 text-2xl font-semibold tracking-tight">{% if role %}Edit role{% else %}New role{% endif %}</h1>
+
+  <form method="post" class="mt-6 max-w-xl">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div>
+      <label for="{{ form.name.id_for_label }}" class="block text-sm font-medium text-gray-700">Name</label>
+      <div class="mt-1">{{ form.name }}</div>
+      {% for error in form.name.errors %}<p class="mt-1 text-xs text-red-600">{{ error }}</p>{% endfor %}
+    </div>
+    <div class="mt-5">
+      <span class="block text-sm font-medium text-gray-700">Permissions</span>
+      <div class="mt-2 grid grid-cols-1 gap-1 text-sm text-gray-700 sm:grid-cols-2 [&_label]:flex [&_label]:items-center [&_label]:gap-2 [&_input]:h-4 [&_input]:w-4 [&_input]:rounded [&_input]:text-teal-600">{{ form.permissions }}</div>
+    </div>
+    <div class="mt-6 flex gap-2">
+      <button type="submit" class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Save role</button>
+      <a href="{% url 'manage:roles' %}" class="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

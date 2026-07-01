@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Roles · Admin · LabButler{% endblock %}
+
+{% block content %}
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <a href="{% url 'manage:index' %}" class="text-sm text-teal-700 hover:underline">← Admin</a>
+      <h1 class="mt-1 text-2xl font-semibold tracking-tight">Roles</h1>
+    </div>
+    <a href="{% url 'manage:role_add' %}" class="rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-teal-700">+ New role</a>
+  </div>
+
+  <div class="mt-5 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <ul class="divide-y divide-gray-100">
+      {% for role in roles %}
+        <li class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+          <div>
+            <span class="font-medium text-gray-900">{{ role.name }}</span>
+            <span class="ml-2 text-xs text-gray-500">{{ role.permissions.count }} permission{{ role.permissions.count|pluralize }}</span>
+          </div>
+          <div class="flex gap-2">
+            <a href="{% url 'manage:role_edit' role.pk %}" class="rounded border border-gray-300 px-2.5 py-1 text-xs hover:bg-gray-50">Edit</a>
+            <form method="post" action="{% url 'manage:role_delete' role.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="rounded border border-red-300 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50">Delete</button>
+            </form>
+          </div>
+        </li>
+      {% empty %}
+        <li class="px-4 py-8 text-center text-sm text-gray-500">No roles yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endblock %}
