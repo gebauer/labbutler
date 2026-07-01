@@ -79,9 +79,16 @@ class ItemForm(forms.ModelForm):
             self.fields["human_id"] = forms.CharField(
                 label="Item ID",
                 required=False,
-                help_text=f"Pick a free preprinted ID, or leave blank for {self.id_suggestions[0]}",
-                widget=forms.TextInput(attrs={"list": "id-options", "autocomplete": "off"}),
-                initial=self.id_suggestions[0],
+                help_text="Open the ▾ to pick a free ID, or type your own; blank uses the next free.",
+                # Left empty on purpose: a prefilled value makes the browser filter the
+                # datalist down to that one match, so the dropdown would look empty.
+                widget=forms.TextInput(
+                    attrs={
+                        "list": "id-options",
+                        "autocomplete": "off",
+                        "placeholder": self.id_suggestions[0],
+                    }
+                ),
             )
 
         # One input per lab custom-field definition, pre-filled from the item's values.
