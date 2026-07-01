@@ -46,7 +46,14 @@ Spec: [Buildv1.MD](Buildv1.MD) · Stack: Django 5 / Postgres 17 / Celery+Redis /
       nav lab-switcher). Create allocates a frozen `human_id`; edits/deletes write audit entries.
       Custom fields shown read-only on detail (editing deferred). 14 view tests; 56 total green,
       ruff clean. _Done before 6b (UI foundation first, per decision)._
-- [ ] **8. Procurement UI** — request workflow state machine, approvals, ordering, check-in→creates item.
+- [x] **8. Procurement UI** — request workflow as a single-source state machine
+      (`procurement/services.py`: `TRANSITIONS` table + `may_perform`/`available_transitions`/
+      `perform_transition`). Moves: approve/reject → order → deliver → check-in (creates the
+      inventory item, links `created_item`, redirects to it); cancel by requester or manager.
+      Each move re-checks its permission and fails closed; audit entry per transition.
+      Filterable list, detail with contextual action buttons (+optional PO#), create/edit
+      (edit only while 'Requested'), auto VAT/total via `recalculate_totals`. Requests nav
+      link gated on `view_requests`. 11 new tests; 77 total green, ruff clean.
 - [ ] **9. Notifications** — SMTP: status changes + expiry digest (Celery beat).
 
 ## Notes / open spec items (defer until relevant)

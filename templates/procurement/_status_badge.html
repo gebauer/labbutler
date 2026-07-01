@@ -1,0 +1,6 @@
+{% comment %}Expects: value (status code), label (display text).{% endcomment %}
+<span class="inline-block rounded px-2 py-0.5 text-xs font-medium
+  {% if value == 'approved' or value == 'checked_in' %}bg-green-100 text-green-800
+  {% elif value == 'rejected' or value == 'cancelled' %}bg-red-100 text-red-700
+  {% elif value == 'ordered' or value == 'delivered' %}bg-blue-100 text-blue-800
+  {% else %}bg-gray-100 text-gray-700{% endif %}">{{ label }}</span>

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}{{ req.item_name }} · Requests · LabButler{% endblock %}
+
+{% block content %}
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2">
+        <h1 class="text-xl font-semibold">{{ req.item_name }}</h1>
+        {% include "procurement/_status_badge.html" with value=req.status label=req.get_status_display %}
+        {% if req.is_urgent %}<span class="rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">urgent</span>{% endif %}
+      </div>
+      <p class="mt-1 text-sm text-gray-500">Request #{{ req.pk }} · raised by {{ req.requested_by.email|default:"—" }} on {{ req.created_at|date:"Y-m-d" }}</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="{% url 'procurement:request_list' %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Back</a>
+      {% if editable %}<a href="{% url 'procurement:request_edit' req.pk %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Edit</a>{% endif %}
+    </div>
+  </div>
+
+  {% if transitions %}
+    <div class="mt-4 flex flex-wrap gap-2 rounded border bg-white p-3">
+      {% for t in transitions %}
+        <form method="post" action="{% url 'procurement:request_action' req.pk t.action %}" class="flex items-center gap-2">
+          {% csrf_token %}
+          {% if t.action == 'order' %}
+            <input type="text" name="po_number" placeholder="PO # (optional)"
+                   class="rounded border border-gray-300 px-2 py-1.5 text-sm">
+          {% endif %}
+          <button type="submit"
+                  class="rounded px-3 py-2 text-sm font-medium
+                  {% if t.danger %}border border-red-300 text-red-700 hover:bg-red-50{% else %}bg-gray-900 text-white hover:bg-gray-700{% endif %}">
+            {{ t.label }}
+          </button>
+        </form>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <dl class="mt-6 grid grid-cols-1 gap-x-8 gap-y-4 rounded border bg-white p-4 sm:grid-cols-2">
+    {% include "inventory/_detail_row.html" with label="Vendor" value=req.vendor.name %}
+    {% include "inventory/_detail_row.html" with label="Budget" value=req.budget %}
+    {% include "inventory/_detail_row.html" with label="Ships to" value=req.shipping_address.label %}
+    {% include "inventory/_detail_row.html" with label="Catalog no." value=req.catalog_number %}
+    {% include "inventory/_detail_row.html" with label="CAS no." value=req.cas_number %}
+    {% include "inventory/_detail_row.html" with label="Approver" value=req.approver.email %}
+    {% include "inventory/_detail_row.html" with label="PO #" value=req.po_number %}
+    {% include "inventory/_detail_row.html" with label="Expected delivery" value=req.expected_delivery|date:"Y-m-d" %}
+    <div>
+      <dt class="text-xs uppercase tracking-wide text-gray-500">Product link</dt>
+      <dd class="mt-1 text-sm">
+        {% if req.product_url %}<a href="{{ req.product_url }}" class="text-blue-700 hover:underline" rel="noopener" target="_blank">open ↗</a>{% else %}—{% endif %}
+      </dd>
+    </div>
+  </dl>
+
+  <h2 class="mt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">Costs</h2>
+  <dl class="mt-2 grid grid-cols-2 gap-x-8 gap-y-4 rounded border bg-white p-4 sm:grid-cols-4">
+    <div><dt class="text-xs uppercase tracking-wide text-gray-500">Unit price</dt><dd class="mt-1 text-sm">{{ req.unit_price }} {{ req.currency }}</dd></div>
+    <div><dt class="text-xs uppercase tracking-wide text-gray-500">Packs</dt><dd class="mt-1 text-sm">{{ req.pack_count }}</dd></div>
+    <div><dt class="text-xs uppercase tracking-wide text-gray-500">Shipping</dt><dd class="mt-1 text-sm">{{ req.shipping_cost }} {{ req.currency }}</dd></div>
+    <div><dt class="text-xs uppercase tracking-wide text-gray-500">VAT {% if req.includes_taxes %}(incl.){% endif %}</dt><dd class="mt-1 text-sm">{{ req.tax }} {{ req.currency }}</dd></div>
+    <div class="sm:col-span-4"><dt class="text-xs uppercase tracking-wide text-gray-500">Total</dt><dd class="mt-1 text-base font-semibold">{{ req.total }} {{ req.currency }}</dd></div>
+  </dl>
+
+  {% if req.tags.all %}
+    <div class="mt-4 flex flex-wrap items-center gap-1">
+      <span class="text-xs uppercase tracking-wide text-gray-500">Tags:</span>
+      {% for tag in req.tags.all %}<span class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{{ tag.name }}</span>{% endfor %}
+    </div>
+  {% endif %}
+
+  {% if req.comment %}
+    <div class="mt-4 rounded border bg-white p-4">
+      <dt class="text-xs uppercase tracking-wide text-gray-500">Comment</dt>
+      <dd class="mt-1 whitespace-pre-line text-sm text-gray-800">{{ req.comment }}</dd>
+    </div>
+  {% endif %}
+
+  {% if req.created_item %}
+    <div class="mt-4 rounded border border-green-200 bg-green-50 p-4 text-sm">
+      Checked in as inventory item
+      <a href="{% url 'inventory:item_detail' req.created_item.pk %}" class="font-medium text-green-800 hover:underline">{{ req.created_item.human_id }} · {{ req.created_item.name }}</a>.
+    </div>
+  {% endif %}
+{% endblock %}

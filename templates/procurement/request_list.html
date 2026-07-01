@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Requests · LabButler{% endblock %}
+
+{% block content %}
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <h1 class="text-xl font-semibold">Requests</h1>
+    {% if can_create %}
+      <a href="{% url 'procurement:request_create' %}"
+         class="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-700">
+        New request
+      </a>
+    {% endif %}
+  </div>
+
+  <form method="get" class="mt-4 flex items-center gap-2 text-sm">
+    <label for="status" class="text-gray-600">Status</label>
+    <select id="status" name="status" onchange="this.form.submit()"
+            class="rounded border border-gray-300 px-3 py-2 text-sm">
+      <option value="">All</option>
+      {% for value, label in statuses %}
+        <option value="{{ value }}" {% if value == status %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </form>
+
+  <p class="mt-4 text-sm text-gray-500">{{ page.paginator.count }} request{{ page.paginator.count|pluralize }}</p>
+
+  {% if page.object_list %}
+    <div class="mt-2 overflow-x-auto rounded border bg-white">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+          <tr>
+            <th class="px-3 py-2 font-medium">Item</th>
+            <th class="px-3 py-2 font-medium">Status</th>
+            <th class="px-3 py-2 font-medium">Vendor</th>
+            <th class="px-3 py-2 font-medium">Total</th>
+            <th class="px-3 py-2 font-medium">Requested by</th>
+            <th class="px-3 py-2 font-medium">Raised</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for req in page.object_list %}
+            <tr class="hover:bg-gray-50">
+              <td class="px-3 py-2">
+                <a href="{% url 'procurement:request_detail' req.pk %}" class="font-medium text-gray-900 hover:underline">{{ req.item_name }}</a>
+                {% if req.is_urgent %}<span class="ml-1 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">urgent</span>{% endif %}
+              </td>
+              <td class="px-3 py-2">{% include "procurement/_status_badge.html" with value=req.status label=req.get_status_display %}</td>
+              <td class="px-3 py-2 text-gray-600">{{ req.vendor.name|default:"—" }}</td>
+              <td class="whitespace-nowrap px-3 py-2 text-gray-600">{{ req.total }} {{ req.currency }}</td>
+              <td class="px-3 py-2 text-gray-600">{{ req.requested_by.email|default:"—" }}</td>
+              <td class="whitespace-nowrap px-3 py-2 text-gray-500">{{ req.created_at|date:"Y-m-d" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page.has_other_pages %}
+      <div class="mt-3 flex items-center justify-between text-sm text-gray-600">
+        <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+        <div class="flex gap-2">
+          {% if page.has_previous %}<a href="?status={{ status }}&page={{ page.previous_page_number }}" class="rounded border px-3 py-1 hover:bg-gray-50">Previous</a>{% endif %}
+          {% if page.has_next %}<a href="?status={{ status }}&page={{ page.next_page_number }}" class="rounded border px-3 py-1 hover:bg-gray-50">Next</a>{% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="mt-4 rounded border border-dashed bg-white px-4 py-10 text-center text-sm text-gray-500">No requests yet.</div>
+  {% endif %}
+{% endblock %}

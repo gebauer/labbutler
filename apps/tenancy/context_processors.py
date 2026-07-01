@@ -15,4 +15,5 @@ def labs(request: HttpRequest) -> dict:
         "current_lab": current,
         "available_labs": available,
         "can_import": bool(current and user.can(current, "import_inventory")),
+        "can_view_requests": bool(current and user.can(current, "view_requests")),
     }
