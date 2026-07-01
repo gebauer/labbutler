@@ -121,6 +121,37 @@ docker compose run --rm web python manage.py bootstrap_lab   # first run: superu
 All configuration is via environment variables (`.env`) — **no secrets in the repo**.
 Database migrations are append-only and reversible.
 
+### On Coolify
+
+LabButler drops into [Coolify](https://coolify.io) cleanly — it's 12-factor and
+proxy-ready, and Coolify's Traefik terminates TLS and forwards `X-Forwarded-Proto` /
+`X-Forwarded-For`, which the app already trusts.
+
+1. **New Resource → Docker Compose**, pointed at this repo (uses `docker-compose.yml`:
+   `web`, `db`, `broker`, `worker`, `beat`). Assign your domain to the **`web`** service.
+2. Set these **environment variables** in Coolify (it injects them into the compose):
+
+   | Variable | Value |
+   |---|---|
+   | `DJANGO_SECRET_KEY` | long random (`python -c "import secrets;print(secrets.token_urlsafe(50))"`) |
+   | `DJANGO_DEBUG` | `false` |
+   | `DJANGO_ALLOWED_HOSTS` | `labbutler.your.domain` |
+   | `DJANGO_CSRF_TRUSTED_ORIGINS` | `https://labbutler.your.domain` |
+   | `LABBUTLER_BASE_URL` | `https://labbutler.your.domain` |
+   | `POSTGRES_PASSWORD` / `DATABASE_URL` | a **strong** password (used in both) |
+   | `AXES_IPWARE_PROXY_COUNT` | `1` — Coolify's proxy is the one hop; required so lockouts use the real client IP |
+   | `EMAIL_*`, `DEFAULT_FROM_EMAIL` | your SMTP details |
+
+3. **Deploy.** `web` migrates on start; static assets are already in the image.
+4. **First run only:** open the `web` container's terminal in Coolify and run
+   `python manage.py bootstrap_lab` (creates the superuser + first lab).
+5. Coolify persists the `pgdata` and `media` volumes across redeploys — **back up `pgdata`**.
+
+Notes: if you ever hit an HTTPS **redirect loop**, set `DJANGO_SECURE_SSL_REDIRECT=false`
+(Coolify already redirects http→https at the edge). To use Coolify's **managed** Postgres/
+Redis instead, point `DATABASE_URL` / `CELERY_BROKER_URL` at them and drop the `db` /
+`broker` services.
+
 ---
 
 ## Importing LabSuit data
