@@ -1,7 +1,9 @@
 # LabButler production stack.
+#   cp .env.example .env   # then edit secrets/hosts
 #   docker compose up -d --build
-#   docker compose run --rm web python manage.py migrate
-#   docker compose run --rm web python manage.py bootstrap_lab
+#   docker compose run --rm web python manage.py bootstrap_lab   # first run only
+#
+# The web service migrates on start; collectstatic runs at image build time.
 services:
   db:
     image: postgres:17
@@ -24,6 +26,9 @@ services:
 
   web:
     build: .
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             exec gunicorn labbutler.wsgi:application --bind 0.0.0.0:8000 --workers 3"
     env_file: .env
     depends_on:
       db:
@@ -34,6 +39,12 @@ services:
       - media:/data/media
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 
   worker:
@@ -47,6 +58,17 @@ services:
         condition: service_started
     volumes:
       - media:/data/media
+    restart: unless-stopped
+
+  beat:
+    build: .
+    command: celery -A labbutler beat -l info --schedule /tmp/celerybeat-schedule
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_started
     restart: unless-stopped
 
 volumes:

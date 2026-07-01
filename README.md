@@ -4,7 +4,7 @@ A free, self-hosted, Docker-deployable alternative to LabSuit for **lab inventor
 **order procurement**. Built for a single research institute that wants to leave LabSuit,
 keep its data, and run everything locally — no per-seat fees, no vendor shop.
 
-> Status: **early development (MVP in progress).** The conceptual design lives in
+> Status: **v1.0 — first release.** The conceptual design lives in
 > [`Buildv1.MD`](Buildv1.MD); this README covers what the software is and how to run it.
 
 ---
@@ -39,7 +39,7 @@ See [`Buildv1.MD`](Buildv1.MD) for the full design rationale and data model.
 | Async / scheduled | **Celery** + **Redis** (expiry digests, email, large imports) |
 | Frontend | Server-rendered Django templates + **HTMX**, styled with **Tailwind CSS** (mobile-first, responsive) |
 | Packaging / env | **uv** (`pyproject.toml` + `uv.lock`) |
-| Deployment | **Docker Compose** (`web`, `db`, `worker`, `broker`, media volume) |
+| Deployment | **Docker Compose** (`web`, `db`, `worker`, `beat`, `broker`, media volume) |
 
 The UI is **responsive and mobile-first**: phones/tablets at the bench (check-in/out,
 lookups, scanning), full-width monitors for management, import, and reporting. Tables
@@ -96,15 +96,23 @@ App is then at <http://localhost:8000>.
 ## Deploying (production)
 
 Production runs the whole stack via **Docker Compose**: `web` (Django/Gunicorn), `db`
-(Postgres), `worker` (Celery), `broker` (Redis), and a **media volume** for attachments.
-Email is sent over SMTP.
+(Postgres), `worker` + `beat` (Celery for status emails and the daily expiry digest),
+`broker` (Redis), and a **media volume**. Email is sent over SMTP.
 
 ```bash
-cp .env.example .env        # set SECRET_KEY, DB creds, SMTP, ALLOWED_HOSTS
+cp .env.example .env        # set SECRET_KEY, DB creds, SMTP, ALLOWED_HOSTS, CSRF origins
 docker compose up -d --build
-docker compose run --rm web manage.py migrate
-docker compose run --rm web manage.py bootstrap_lab
+docker compose run --rm web python manage.py bootstrap_lab   # first run: superuser + lab
 ```
+
+- The `web` service **runs migrations on start**, and static assets (Tailwind CSS plus
+  the vendored htmx/Sortable) are **built and collected at image build time** and served
+  by WhiteNoise — no separate static step, no CDN.
+- Put a TLS-terminating reverse proxy in front and forward `X-Forwarded-Proto`; the app
+  then enforces HTTPS redirect, HSTS and secure cookies (tunable via `DJANGO_SECURE_*`).
+  Set `DJANGO_ALLOWED_HOSTS` and `DJANGO_CSRF_TRUSTED_ORIGINS` to your domain.
+- Health probe: `GET /healthz` returns `200 ok` when the database is reachable (the `web`
+  container's health check uses it).
 
 All configuration is via environment variables (`.env`) — **no secrets in the repo**.
 Database migrations are append-only and reversible.
@@ -145,10 +153,10 @@ labbutler/
     ├── inventory/        # Item, Location, Tag, FieldDefinition, HazardStatement
     ├── procurement/      # Request workflow, Budget, Vendor, ShippingAddress
     ├── imports/          # LabSuit profile + generic mapper, dry-run preview
+    ├── notifications/    # status emails + daily expiry digest (Celery)
+    ├── comments/         # generic comment threads on items & requests
     └── audit/            # immutable AuditEntry
 ```
-
-*(Layout is provisional until the scaffold lands; it follows the data model in the spec.)*
 
 ---
 

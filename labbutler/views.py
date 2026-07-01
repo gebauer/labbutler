@@ -1,3 +1,4 @@
+from django.db import connection
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -5,6 +6,12 @@ from django.utils import timezone
 from apps.tenancy.scoping import get_current_lab
 
 from . import dashboard
+
+
+def healthz(request: HttpRequest) -> HttpResponse:
+    """Liveness/readiness probe: 200 only if the database is reachable."""
+    connection.ensure_connection()
+    return HttpResponse("ok", content_type="text/plain")
 
 
 def home(request: HttpRequest) -> HttpResponse:

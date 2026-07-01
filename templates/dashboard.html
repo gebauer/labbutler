@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Dashboard · LabButler{% endblock %}
 
@@ -94,7 +95,7 @@
       {% endfor %}
     </div>
 
-    <script src="https://unpkg.com/sortablejs@1.15.2/Sortable.min.js" defer></script>
+    <script src="{% static 'vendor/sortable.min.js' %}" defer></script>
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         var grid = document.getElementById('dashboard-grid');

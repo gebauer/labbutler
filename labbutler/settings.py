@@ -156,6 +156,12 @@ EXPIRY_DIGEST_DAYS = env.int("EXPIRY_DIGEST_DAYS", default=30)
 # --- Security (prod-friendly defaults, relaxed when DEBUG) -----------------------------
 CSRF_TRUSTED_ORIGINS = env("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
 if not DEBUG:
+    # Assumes TLS is terminated at a reverse proxy that sets X-Forwarded-Proto.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)
+    SECURE_REDIRECT_EXEMPT = [r"^healthz$"]  # let the container health check use plain HTTP
+    SECURE_HSTS_SECONDS = env.int("DJANGO_SECURE_HSTS_SECONDS", default=31536000)  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
