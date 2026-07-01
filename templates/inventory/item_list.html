@@ -22,8 +22,7 @@
     </div>
   </div>
 
-  {# One HTMX form: the search box, tag combobox and facet selects all narrow the list.
-     Controls live outside #item-results, so they keep their state across partial swaps. #}
+  {# One HTMX form (search, tag combobox, facet selects) — controls live outside #item-results, so state survives partial swaps. #}
   <form class="mt-5 flex flex-wrap items-center gap-2"
         hx-get="{% url 'inventory:item_list' %}"
         hx-target="#item-results" hx-select="#item-results" hx-swap="outerHTML"
