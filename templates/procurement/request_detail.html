@@ -81,7 +81,7 @@
 
   {% if req.comment %}
     <div class="mt-4 rounded border bg-white p-4">
-      <dt class="text-xs uppercase tracking-wide text-gray-500">Comment</dt>
+      <dt class="text-xs uppercase tracking-wide text-gray-500">Note</dt>
       <dd class="mt-1 whitespace-pre-line text-sm text-gray-800">{{ req.comment }}</dd>
     </div>
   {% endif %}
@@ -92,6 +92,8 @@
       <a href="{% url 'inventory:item_detail' req.created_item.pk %}" class="font-medium text-green-800 hover:underline">{{ req.created_item.human_id }} · {{ req.created_item.name }}</a>.
     </div>
   {% endif %}
+
+  {% include "comments/_thread.html" with comments=comments target=req comment_model="request" %}
 
   {% include "_audit_trail.html" %}
 {% endblock %}

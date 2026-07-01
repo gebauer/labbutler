@@ -19,6 +19,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
+from apps.comments.models import Comment
 from apps.inventory import ids
 from apps.inventory.models import Location
 from apps.tenancy.models import User
@@ -149,6 +150,7 @@ def request_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "can_forward": services.can_forward(request.user, req),
             "editable": editable,
             "entries": entries,
+            "comments": Comment.for_object(req),
         },
     )
 

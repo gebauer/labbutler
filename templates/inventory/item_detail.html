@@ -75,5 +75,7 @@
     </dl>
   {% endif %}
 
+  {% include "comments/_thread.html" with comments=comments target=item comment_model="item" %}
+
   {% include "_audit_trail.html" %}
 {% endblock %}

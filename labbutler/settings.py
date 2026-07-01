@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "apps.imports",
     "apps.audit",
     "apps.notifications",
+    "apps.comments",
 ]
 
 MIDDLEWARE = [

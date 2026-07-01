@@ -17,6 +17,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
+from apps.comments.models import Comment
 from apps.procurement.models import Vendor
 from apps.tenancy.models import User
 from apps.tenancy.scoping import require_permission, set_current_lab, user_labs
@@ -142,6 +143,7 @@ def item_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "custom_fields": _custom_field_rows(request.lab, item),
             "can_manage": request.user.can(request.lab, "manage_inventory"),
             "entries": entries,
+            "comments": Comment.for_object(item),
         },
     )
 
