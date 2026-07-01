@@ -254,9 +254,7 @@ def commit(plan: ImportPlan, *, lab: Lab, actor: User | None = None) -> ImportRe
 
         # Register extra columns in the lab custom-field pool.
         for key, label in row.field_pool_keys:
-            FieldDefinition.objects.get_or_create(
-                lab=lab, key=key, defaults={"label": label}
-            )
+            FieldDefinition.objects.get_or_create(lab=lab, key=key, defaults={"label": label})
 
         defaults = dict(row.fields)
         defaults.update(
