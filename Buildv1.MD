@@ -49,9 +49,11 @@ Three separate concepts, kept separate:
 
 - **Identity** — an internal surrogate key (auto-increment / UUID). Never shown, never changes.
 - **Human identifier** — assigned **once at creation and frozen forever**, type-independent. New items get `{LAB_PREFIX}-{running number}`, e.g. `AGB-04821`. This is what goes on the container and barcode. It stays short, memorable, and searchable.
-- **Barcode** — a separate optional field for scanning; not the primary human handle.
+- **Barcode / Data Matrix** — the human identifier is also carried on the physical label as a **Data Matrix (ECC 200)** encoding *only* the human ID (e.g. `AGB-0001`). Data Matrix is chosen over QR / 1-D because it stays readable at ~1 cm on small, round, curved chemical containers. Labels are **preprinted externally** on off-the-shelf sheets (e.g. HERMA 189-up) — LabButler does **not** run a print service — laid out as in the mock-up: Data Matrix on the left, the human-readable ID (large) on the right.
 
 Type/classification is *not* part of the identifier. The UI may show a cosmetic tag-derived hint next to the number, but it follows the current tags and never alters the stored ID.
+
+**Assigning IDs at check-in.** Because labels are preprinted and handed out, the ID is *chosen*, not silently auto-incremented: when an item is created / checked in the user picks the ID that's physically on the container rather than always taking the next number. The UI suggests the next ~10 free IDs after the highest one used (preprinted labels can be skipped or lost, so gaps are fine) and also accepts a manually-typed `{PREFIX}-NNNN`, validated for uniqueness within the lab before saving. Once chosen the ID is frozen forever (the hard rule above). Imported legacy serials are unaffected.
 
 **Migration:** imported items **keep their original LabSuit serial** (`ch-0005`) as their frozen human identifier — searchable, never recomputed — so no physical container is relabelled. Only *new* items use the `{LAB_PREFIX}-…` scheme. Legacy serials collide across former types (e.g. `co-0001` in two sheets); that's fine because the surrogate key carries identity and the serial is just a searchable label.
 
@@ -332,7 +334,8 @@ erDiagram
 - Cross-lab inventory sharing: owner-side `SharingGrant` (recipient labs + visibility level + scope) AND searcher-side `cross_lab_search` permission; **read-only discovery**, both sides must consent.
 - Institute tier · low-stock alerts · batch container generation.
 - Auto H-P lookup by CAS via **PubChem / ECHA free APIs** (likely no paid AI needed) · vendor & tag cleanup/merge tools.
-- SSO/LDAP · scheduled email data-backup/export · configurable ordering workflow · barcode label printing · actual-invoice reconciliation field.
+- **Mobile Data Matrix scanner** — scan the preprinted label on a phone to look up / check in / check out an item, in-browser via the `BarcodeDetector` API (Android/Chrome) with a ZXing/bwip-js fallback (iOS Safari). Decodes only the human ID. No native app required; no in-app label *printing* (labels are preprinted externally). A later **"convert" tool** may re-label legacy imported serials onto the new `{PREFIX}-NNNN` + Data Matrix scheme.
+- SSO/LDAP · scheduled email data-backup/export · configurable ordering workflow · actual-invoice reconciliation field.
 
 ## 14. Open / minor items
 
