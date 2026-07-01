@@ -37,9 +37,10 @@ _SEARCH_FIELDS = (
     "lot_number",
 )
 
-# Query param -> the item field it filters on (all match a related row's primary key).
+# Query param -> the item field it filters on. Tag filters by name (a type-in combobox
+# offers the lab's tags, which are too many to show as pills); the rest match by pk.
 _FACETS = {
-    "tag": "tags__pk",
+    "tag": "tags__name__icontains",
     "location": "location__pk",
     "owner": "owner__pk",
     "vendor": "vendor__pk",

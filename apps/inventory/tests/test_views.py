@@ -92,13 +92,14 @@ def test_search_filters_by_query(client, lab, manager):
 
 
 @pytest.mark.django_db
-def test_search_filters_by_tag(client, lab, manager):
+def test_filter_by_tag_name(client, lab, manager):
     solvent = Tag.objects.create(lab=lab, name="solvent")
     tagged = _make_item(lab, name="Ethanol")
     tagged.tags.add(solvent)
     _make_item(lab, name="Sodium chloride")
     client.force_login(manager)
-    resp = client.get(reverse("inventory:item_list"), {"tag": solvent.pk})
+    # The tag combobox filters by name (case-insensitive, substring).
+    resp = client.get(reverse("inventory:item_list"), {"tag": "SOLV"})
     assert b"Ethanol" in resp.content
     assert b"Sodium chloride" not in resp.content
 
