@@ -14,6 +14,8 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
@@ -222,7 +224,17 @@ def request_action(request: HttpRequest, pk: int, action: str) -> HttpResponse:
         return redirect("procurement:request_detail", pk=req.pk)
 
     messages.success(request, f"Request moved to “{Request.Status(transition.to_status).label}”.")
-    return redirect("procurement:request_detail", pk=req.pk)
+    return redirect(_safe_next(request, reverse("procurement:request_detail", args=[req.pk])))
+
+
+def _safe_next(request: HttpRequest, default: str) -> str:
+    """Return a same-origin ``next`` target (e.g. the dashboard) or the default."""
+    target = request.POST.get("next", "")
+    if target and url_has_allowed_host_and_scheme(
+        target, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return target
+    return default
 
 
 @require_permission("check_in")

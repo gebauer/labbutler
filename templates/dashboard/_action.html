@@ -1,0 +1,10 @@
+{% comment %}Inline workflow action posted from the dashboard. Params: pk, action, label, style.
+Returns to the dashboard (next) after the transition.{% endcomment %}
+<form method="post" action="{% url 'procurement:request_action' pk action %}" class="inline">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.path }}">
+  <button type="submit" class="rounded px-2 py-1 text-xs font-medium
+    {% if style == 'danger' %}border border-red-300 text-red-700 hover:bg-red-50{% else %}bg-teal-600 text-white hover:bg-teal-700{% endif %}">
+    {{ label }}
+  </button>
+</form>

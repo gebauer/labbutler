@@ -1,7 +1,20 @@
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
+from django.utils import timezone
+
+from apps.tenancy.scoping import get_current_lab
+
+from . import dashboard
 
 
 def home(request: HttpRequest) -> HttpResponse:
-    """Placeholder landing page until the inventory dashboard lands."""
+    """A role-aware dashboard for a logged-in member; the landing page otherwise."""
+    if request.user.is_authenticated:
+        lab = get_current_lab(request)
+        if lab is not None:
+            return render(
+                request,
+                "dashboard.html",
+                {"widgets": dashboard.build(request.user, lab), "today": timezone.localdate()},
+            )
     return render(request, "home.html")
