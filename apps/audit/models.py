@@ -17,9 +17,7 @@ class AuditEntry(models.Model):
         related_name="audit_entries",
     )
     timestamp = models.DateTimeField(auto_now_add=True)
-    lab = models.ForeignKey(
-        "tenancy.Lab", on_delete=models.CASCADE, related_name="audit_entries"
-    )
+    lab = models.ForeignKey("tenancy.Lab", on_delete=models.CASCADE, related_name="audit_entries")
     action = models.CharField(max_length=64)
     target_type = models.CharField(max_length=64)
     target_id = models.CharField(max_length=64, blank=True)

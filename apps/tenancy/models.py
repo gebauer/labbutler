@@ -60,9 +60,7 @@ class Lab(TimeStampedModel):
     item_id_prefix = models.CharField(max_length=16)
     # Monotonic counter backing human-ID allocation; never decremented.
     next_item_number = models.PositiveIntegerField(default=1)
-    default_vat_rate = models.DecimalField(
-        max_digits=5, decimal_places=4, default=Decimal("0.19")
-    )
+    default_vat_rate = models.DecimalField(max_digits=5, decimal_places=4, default=Decimal("0.19"))
 
     def __str__(self) -> str:
         return self.name
@@ -109,9 +107,7 @@ class Role(TimeStampedModel):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["lab", "name"], name="unique_role_name_per_lab"
-            ),
+            models.UniqueConstraint(fields=["lab", "name"], name="unique_role_name_per_lab"),
         ]
 
     def __str__(self) -> str:
@@ -129,9 +125,7 @@ class Membership(TimeStampedModel):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["user", "lab"], name="unique_membership_per_user_lab"
-            ),
+            models.UniqueConstraint(fields=["user", "lab"], name="unique_membership_per_user_lab"),
         ]
 
     def __str__(self) -> str:

@@ -16,16 +16,24 @@ from apps.procurement.models import Vendor
 from apps.tenancy.services import create_lab
 
 SAMPLE = (
-    Path(__file__).resolve().parents[3]
-    / "sample_data"
-    / "AG Baumann-inventory-30-06-2026.xlsx"
+    Path(__file__).resolve().parents[3] / "sample_data" / "AG Baumann-inventory-30-06-2026.xlsx"
 )
 
 # Core LabSuit columns a minimal synthetic sheet needs.
 HEADER = [
-    "Delete? (y/n)", "SERIAL_NUMBER", "NAME", "TAGS", "AMOUNT_IN_STOCK",
-    "LOCATION", "SUB_LOCATION", "SUPPLIER", "PRICE", "EXPIRATION_DATE",
-    "CAS_NUMBER", "OWNER", "PURITY",
+    "Delete? (y/n)",
+    "SERIAL_NUMBER",
+    "NAME",
+    "TAGS",
+    "AMOUNT_IN_STOCK",
+    "LOCATION",
+    "SUB_LOCATION",
+    "SUPPLIER",
+    "PRICE",
+    "EXPIRATION_DATE",
+    "CAS_NUMBER",
+    "OWNER",
+    "PURITY",
 ]
 
 
@@ -46,9 +54,21 @@ def test_build_plan_resolves_fields_and_summary(tmp_path):
         tmp_path,
         "Chemical",
         [
-            ["", "ch-0005", "CHAPS", "Achtung,H319,WGK 1,LK 6.1D,2022", "1",
-             "Storage room (376)", "Fridge 2", "Sigma", "18.80EUR", "",
-             "75621-03-3", "alice@uni-koeln.de", "99%"],
+            [
+                "",
+                "ch-0005",
+                "CHAPS",
+                "Achtung,H319,WGK 1,LK 6.1D,2022",
+                "1",
+                "Storage room (376)",
+                "Fridge 2",
+                "Sigma",
+                "18.80EUR",
+                "",
+                "75621-03-3",
+                "alice@uni-koeln.de",
+                "99%",
+            ],
             ["", "", "No serial", "", "1", "", "", "", "", "", "", "", ""],
         ],
     )
@@ -75,9 +95,21 @@ def test_commit_creates_items_hierarchy_and_relations(tmp_path):
         tmp_path,
         "Chemical",
         [
-            ["", "ch-0005", "CHAPS", "Gefahr,H319,H315", "1",
-             "Storage room (376)", "Fridge 2", "Sigma", "18.80EUR", "02-01-2027",
-             "75621-03-3", "alice@uni-koeln.de", "99%"],
+            [
+                "",
+                "ch-0005",
+                "CHAPS",
+                "Gefahr,H319,H315",
+                "1",
+                "Storage room (376)",
+                "Fridge 2",
+                "Sigma",
+                "18.80EUR",
+                "02-01-2027",
+                "75621-03-3",
+                "alice@uni-koeln.de",
+                "99%",
+            ],
         ],
     )
     plan = build_plan(path)

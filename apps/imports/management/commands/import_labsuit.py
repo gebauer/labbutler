@@ -1,10 +1,10 @@
 """Import a LabSuit workbook into a lab.
 
-    # dry run (default): just print the preview
-    uv run python manage.py import_labsuit path/to/export.xlsx --lab ag-baumann
+# dry run (default): just print the preview
+uv run python manage.py import_labsuit path/to/export.xlsx --lab ag-baumann
 
-    # actually write the items
-    uv run python manage.py import_labsuit path/to/export.xlsx --lab ag-baumann --commit
+# actually write the items
+uv run python manage.py import_labsuit path/to/export.xlsx --lab ag-baumann --commit
 """
 
 from django.core.management.base import BaseCommand, CommandError

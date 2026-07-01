@@ -56,10 +56,7 @@ CORE_PASSTHROUGH = {
 # Everything in this union is a "core" column; anything else on a sheet is an extra
 # column that feeds the lab-level custom-field pool.
 CORE_COLUMNS = (
-    set(CONTROL_COLUMNS)
-    | set(CORE_TO_FIELD)
-    | set(SPECIAL_COLUMNS)
-    | set(CORE_PASSTHROUGH)
+    set(CONTROL_COLUMNS) | set(CORE_TO_FIELD) | set(SPECIAL_COLUMNS) | set(CORE_PASSTHROUGH)
 )
 
 

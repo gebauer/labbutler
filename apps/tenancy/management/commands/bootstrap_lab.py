@@ -38,9 +38,7 @@ class Command(BaseCommand):
 
         email = opts["email"] or self._prompt("Admin email", noinput)
         lab_name = opts["lab_name"] or self._prompt("Lab name", noinput)
-        lab_prefix = opts["lab_prefix"] or self._prompt(
-            "Lab item-ID prefix (e.g. AGB)", noinput
-        )
+        lab_prefix = opts["lab_prefix"] or self._prompt("Lab item-ID prefix (e.g. AGB)", noinput)
         password = opts["password"]
         if not password and not noinput:
             password = getpass.getpass("Admin password: ")
@@ -48,9 +46,7 @@ class Command(BaseCommand):
             raise CommandError("email, password, lab-name and lab-prefix are all required")
 
         with transaction.atomic():
-            user, created = User.objects.get_or_create(
-                email=email, defaults={"username": email}
-            )
+            user, created = User.objects.get_or_create(email=email, defaults={"username": email})
             if created:
                 user.is_staff = True
                 user.is_superuser = True

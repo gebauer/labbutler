@@ -14,9 +14,7 @@ def test_create_lab_clones_template_roles():
     assert lab.slug == "ag-baumann"
     assert lab.item_id_prefix == "AGB"  # prefix upper-cased
     cloned = Role.objects.filter(lab=lab, is_template=False)
-    template_names = set(
-        Role.objects.filter(is_template=True).values_list("name", flat=True)
-    )
+    template_names = set(Role.objects.filter(is_template=True).values_list("name", flat=True))
     assert set(cloned.values_list("name", flat=True)) == template_names
     # Lab manager clone carries every permission.
     manager = cloned.get(name="Lab manager")

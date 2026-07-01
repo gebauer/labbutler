@@ -38,9 +38,7 @@ class Budget(TimeStampedModel):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["lab", "number"], name="unique_budget_number_per_lab"
-            ),
+            models.UniqueConstraint(fields=["lab", "number"], name="unique_budget_number_per_lab"),
         ]
 
     def __str__(self) -> str:
@@ -50,9 +48,7 @@ class Budget(TimeStampedModel):
 class ShippingAddress(TimeStampedModel):
     """A delivery address; a request ships to one."""
 
-    lab = models.ForeignKey(
-        Lab, on_delete=models.CASCADE, related_name="shipping_addresses"
-    )
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name="shipping_addresses")
     label = models.CharField(max_length=200)
     address = models.TextField()
 
@@ -144,9 +140,7 @@ class Request(TimeStampedModel):
     tax = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
-    status = models.CharField(
-        max_length=16, choices=Status.choices, default=Status.REQUESTED
-    )
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.REQUESTED)
     is_urgent = models.BooleanField(default=False)
     po_number = models.CharField("PO #", max_length=64, blank=True)
     quote_id = models.CharField(max_length=64, blank=True)

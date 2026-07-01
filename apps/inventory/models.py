@@ -55,15 +55,11 @@ class FieldDefinition(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name="field_definitions")
     key = models.CharField(max_length=64)
     label = models.CharField(max_length=200)
-    data_type = models.CharField(
-        max_length=16, choices=DataType.choices, default=DataType.TEXT
-    )
+    data_type = models.CharField(max_length=16, choices=DataType.choices, default=DataType.TEXT)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["lab", "key"], name="unique_field_key_per_lab"
-            ),
+            models.UniqueConstraint(fields=["lab", "key"], name="unique_field_key_per_lab"),
         ]
 
     def __str__(self) -> str:
@@ -83,9 +79,7 @@ class FieldPreset(TimeStampedModel):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["lab", "name"], name="unique_preset_per_lab"
-            ),
+            models.UniqueConstraint(fields=["lab", "name"], name="unique_preset_per_lab"),
         ]
 
     def __str__(self) -> str:
@@ -148,9 +142,7 @@ class Item(TimeStampedModel):
         related_name="owned_items",
     )
 
-    price_amount = models.DecimalField(
-        max_digits=12, decimal_places=2, null=True, blank=True
-    )
+    price_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     price_currency = models.CharField(max_length=3, blank=True)
     expiration_date = models.DateField(null=True, blank=True)
     lot_number = models.CharField(max_length=128, blank=True)
@@ -172,9 +164,7 @@ class Item(TimeStampedModel):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["lab", "human_id"], name="unique_human_id_per_lab"
-            ),
+            models.UniqueConstraint(fields=["lab", "human_id"], name="unique_human_id_per_lab"),
         ]
         indexes = [
             models.Index(fields=["lab", "name"]),
