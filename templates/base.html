@@ -8,6 +8,18 @@
   <script src="https://unpkg.com/htmx.org@2.0.3" defer></script>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
+  {% if impersonating %}
+    <div class="bg-amber-400 text-sm text-amber-950 print:hidden">
+      <div class="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-1.5">
+        <span>👁 Viewing as <strong>{{ user.email }}</strong> — you're impersonating this user.</span>
+        <form method="post" action="{% url 'tenancy:stop_impersonating' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.path }}">
+          <button type="submit" class="rounded bg-amber-950/10 px-2.5 py-0.5 font-medium hover:bg-amber-950/20">Return to yourself</button>
+        </form>
+      </div>
+    </div>
+  {% endif %}
   <header class="sticky top-0 z-20 border-b border-gray-200 bg-white/95 backdrop-blur print:hidden">
     <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2.5">
       <div class="flex items-center gap-1.5">
@@ -36,6 +48,17 @@
       </div>
       <nav class="flex items-center gap-3 text-sm">
         {% if user.is_authenticated %}
+          {% if can_impersonate and lab_members %}
+            <form method="post" action="{% url 'tenancy:impersonate' %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.path }}">
+              <select name="user" onchange="this.form.submit()" title="View the app as another user"
+                      class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-600 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500">
+                <option value="">View as…</option>
+                {% for member in lab_members %}<option value="{{ member.pk }}">{{ member.email }}</option>{% endfor %}
+              </select>
+            </form>
+          {% endif %}
           {% if available_labs|length > 1 %}
             <form method="post" action="{% url 'inventory:switch_lab' current_lab.slug %}">
               {% csrf_token %}

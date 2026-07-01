@@ -10,5 +10,6 @@ urlpatterns = [
     path("imports/", include("apps.imports.urls")),
     path("requests/", include("apps.procurement.urls")),
     path("manage/", include("apps.tenancy.manage_urls")),
+    path("", include("apps.tenancy.urls")),
     path("", views.home, name="home"),
 ]
