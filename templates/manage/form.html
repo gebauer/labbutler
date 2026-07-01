@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}{{ config.singular|capfirst }} · Admin · LabButler{% endblock %}
+
+{% block content %}
+  <a href="{% url 'manage:list' kind=kind %}" class="text-sm text-teal-700 hover:underline">← {{ config.plural }}</a>
+  <h1 class="mt-1 text-2xl font-semibold tracking-tight">
+    {% if instance %}Edit {{ config.singular }}{% else %}New {{ config.singular }}{% endif %}
+  </h1>
+
+  <form method="post" class="mt-6 max-w-xl">
+    {% csrf_token %}
+    {% include "manage/_form_fields.html" %}
+    <div class="mt-6 flex gap-2">
+      <button type="submit" class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Save</button>
+      <a href="{% url 'manage:list' kind=kind %}" class="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

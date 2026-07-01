@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Admin · LabButler{% endblock %}
+
+{% block content %}
+  <h1 class="text-2xl font-semibold tracking-tight">Lab administration</h1>
+  <p class="mt-1 text-sm text-gray-500">Manage {{ current_lab.name }}.</p>
+
+  <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    {% for kind, config, count in sections %}
+      <a href="{% url 'manage:list' kind=kind %}"
+         class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-teal-400 hover:shadow-md">
+        <div class="flex items-center justify-between">
+          <h2 class="font-medium text-gray-900">{{ config.plural }}</h2>
+          <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{{ count }}</span>
+        </div>
+        <p class="mt-1 text-sm text-gray-500">Manage the lab's {{ config.plural|lower }}.</p>
+      </a>
+    {% endfor %}
+    {% block manage_cards %}{% endblock %}
+    <a href="{% url 'manage:settings' %}"
+       class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-teal-400 hover:shadow-md">
+      <h2 class="font-medium text-gray-900">Settings</h2>
+      <p class="mt-1 text-sm text-gray-500">Lab name and default VAT rate.</p>
+    </a>
+  </div>
+{% endblock %}

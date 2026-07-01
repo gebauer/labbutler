@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Settings · Admin · LabButler{% endblock %}
+
+{% block content %}
+  <a href="{% url 'manage:index' %}" class="text-sm text-teal-700 hover:underline">← Admin</a>
+  <h1 class="mt-1 text-2xl font-semibold tracking-tight">Lab settings</h1>
+
+  <form method="post" class="mt-6 max-w-xl">
+    {% csrf_token %}
+    {% include "manage/_form_fields.html" %}
+    <dl class="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+      <div class="flex justify-between"><dt class="text-gray-500">Item ID prefix</dt><dd class="font-mono text-gray-700">{{ lab.item_id_prefix }}</dd></div>
+      <div class="mt-1 flex justify-between"><dt class="text-gray-500">Next item number</dt><dd class="font-mono text-gray-700">{{ lab.next_item_number }}</dd></div>
+      <p class="mt-2 text-xs text-gray-400">The ID prefix is frozen — item IDs are permanent, so it can't be changed here.</p>
+    </dl>
+    <div class="mt-6">
+      <button type="submit" class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Save settings</button>
+    </div>
+  </form>
+{% endblock %}

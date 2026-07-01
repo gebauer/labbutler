@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}{{ config.plural }} · Admin · LabButler{% endblock %}
+
+{% block content %}
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <a href="{% url 'manage:index' %}" class="text-sm text-teal-700 hover:underline">← Admin</a>
+      <h1 class="mt-1 text-2xl font-semibold tracking-tight">{{ config.plural }}</h1>
+    </div>
+    <a href="{% url 'manage:add' kind=kind %}"
+       class="rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-teal-700">
+      + New {{ config.singular }}
+    </a>
+  </div>
+
+  {% if objects %}
+    <div class="mt-5 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <ul class="divide-y divide-gray-100">
+        {% for object in objects %}
+          <li class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+            <span class="font-medium text-gray-900">{{ object }}</span>
+            <span class="flex gap-2">
+              <a href="{% url 'manage:edit' kind=kind pk=object.pk %}" class="rounded border border-gray-300 px-2.5 py-1 text-xs hover:bg-gray-50">Edit</a>
+              <a href="{% url 'manage:delete' kind=kind pk=object.pk %}" class="rounded border border-red-300 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50">Delete</a>
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% else %}
+    <div class="mt-5 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-12 text-center text-sm text-gray-500">
+      No {{ config.plural|lower }} yet.
+    </div>
+  {% endif %}
+{% endblock %}

@@ -9,5 +9,6 @@ urlpatterns = [
     path("inventory/", include("apps.inventory.urls")),
     path("imports/", include("apps.imports.urls")),
     path("requests/", include("apps.procurement.urls")),
+    path("manage/", include("apps.tenancy.manage_urls")),
     path("", views.home, name="home"),
 ]
