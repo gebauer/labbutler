@@ -22,7 +22,7 @@
     </div>
   </div>
 
-  {# One HTMX form: the search box, facet selects and category pills all narrow the list.
+  {# One HTMX form: the search box, tag combobox and facet selects all narrow the list.
      Controls live outside #item-results, so they keep their state across partial swaps. #}
   <form class="mt-5 flex flex-wrap items-center gap-2"
         hx-get="{% url 'inventory:item_list' %}"

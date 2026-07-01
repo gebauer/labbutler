@@ -12,24 +12,37 @@
   </div>
 
   <div class="mt-5 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-    <ul class="divide-y divide-gray-100">
-      {% for role in roles %}
-        <li class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-          <div>
+    {% for role in roles %}
+      {# Click a role to reveal its permissions; Edit/Delete don't toggle (stopPropagation). #}
+      <details class="group border-b border-gray-100 last:border-b-0">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 [&::-webkit-details-marker]:hidden">
+          <span class="flex items-center gap-2">
+            <svg class="h-4 w-4 shrink-0 text-gray-400 transition group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7"/></svg>
             <span class="font-medium text-gray-900">{{ role.name }}</span>
-            <span class="ml-2 text-xs text-gray-500">{{ role.permissions.count }} permission{{ role.permissions.count|pluralize }}</span>
-          </div>
-          <div class="flex gap-2">
+            <span class="text-xs text-gray-500">{{ role.permissions.all|length }} permission{{ role.permissions.all|length|pluralize }}</span>
+          </span>
+          <span class="flex gap-2" onclick="event.stopPropagation()">
             <a href="{% url 'manage:role_edit' role.pk %}" class="rounded border border-gray-300 px-2.5 py-1 text-xs hover:bg-gray-50">Edit</a>
             <form method="post" action="{% url 'manage:role_delete' role.pk %}">
               {% csrf_token %}
               <button type="submit" class="rounded border border-red-300 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50">Delete</button>
             </form>
-          </div>
-        </li>
-      {% empty %}
-        <li class="px-4 py-8 text-center text-sm text-gray-500">No roles yet.</li>
-      {% endfor %}
-    </ul>
+          </span>
+        </summary>
+        <div class="px-4 pb-3 pl-10">
+          {% if role.permissions.all %}
+            <ul class="flex flex-wrap gap-1.5">
+              {% for permission in role.permissions.all %}
+                <li class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-700" title="{{ permission.code }}">{{ permission.label }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-xs text-gray-500">No permissions.</p>
+          {% endif %}
+        </div>
+      </details>
+    {% empty %}
+      <p class="px-4 py-8 text-center text-sm text-gray-500">No roles yet.</p>
+    {% endfor %}
   </div>
 {% endblock %}
