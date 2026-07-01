@@ -45,7 +45,8 @@
         <dt class="text-xs uppercase tracking-wide text-gray-500">Hazard statements</dt>
         <dd class="mt-1 flex flex-wrap gap-1">
           {% for hazard in item.hazards.all %}
-            <span class="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800" title="{{ hazard.text_en }}">{{ hazard.code }}</span>
+            <span class="cursor-help rounded px-2 py-0.5 text-xs {% if hazard.kind == 'P' %}bg-sky-100 text-sky-800{% else %}bg-amber-100 text-amber-800{% endif %}"
+                  title="{{ hazard.code }}{% if hazard.text_en %} — {{ hazard.text_en }}{% endif %}">{{ hazard.code }}</span>
           {% empty %}<span class="text-sm text-gray-400">—</span>{% endfor %}
         </dd>
       </div>

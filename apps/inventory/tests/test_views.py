@@ -9,7 +9,7 @@ import pytest
 from django.urls import reverse
 
 from apps.audit.models import AuditEntry
-from apps.inventory.models import Item, Tag
+from apps.inventory.models import HazardStatement, Item, Tag
 from apps.tenancy.models import User
 from apps.tenancy.services import add_member, create_lab
 
@@ -115,6 +115,30 @@ def test_htmx_request_returns_partial(client, lab, manager):
 
 
 @pytest.mark.django_db
+def test_cards_view_renders_cards_not_table(client, lab, manager):
+    _make_item(lab, name="Carditem")
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_list"), {"view": "cards"})
+    assert resp.status_code == 200
+    assert b"Carditem" in resp.content
+    assert b"<table" not in resp.content  # rendered as cards, not a table
+
+
+@pytest.mark.django_db
+def test_view_mode_persists_in_session(client, lab, manager):
+    _make_item(lab, name="Persisted")
+    client.force_login(manager)
+    # Default is the table.
+    assert b"<table" in client.get(reverse("inventory:item_list")).content
+    # Switching to cards sticks on later requests that omit ?view.
+    client.get(reverse("inventory:item_list"), {"view": "cards"})
+    assert b"<table" not in client.get(reverse("inventory:item_list")).content
+    # And switching back to the table sticks too.
+    client.get(reverse("inventory:item_list"), {"view": "table"})
+    assert b"<table" in client.get(reverse("inventory:item_list")).content
+
+
+@pytest.mark.django_db
 def test_detail_404_for_other_lab_item(client, lab, other_lab, manager):
     foreign = _make_item(other_lab, name="NotMine")
     client.force_login(manager)
@@ -186,3 +210,15 @@ def test_switch_lab_updates_session(client, lab, other_lab):
     listing = client.get(reverse("inventory:item_list"))
     assert b"InLabB" in listing.content
     assert b"InLabA" not in listing.content
+
+
+@pytest.mark.django_db
+def test_detail_shows_hazard_statement_on_hover(client, lab, manager):
+    item = _make_item(lab, name="Ethanol")
+    item.hazards.add(HazardStatement.objects.get(code="H319"))  # seeded with text
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_detail", args=[item.pk]))
+    assert resp.status_code == 200
+    assert b"H319" in resp.content
+    # The general GHS sentence for the code appears in the hover title.
+    assert b"Causes serious eye irritation" in resp.content

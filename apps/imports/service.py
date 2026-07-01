@@ -14,6 +14,7 @@ from pathlib import Path
 from django.db import transaction
 
 from apps.audit.models import AuditEntry
+from apps.inventory import ghs
 from apps.inventory.models import (
     FieldDefinition,
     HazardStatement,
@@ -278,7 +279,8 @@ def commit(plan: ImportPlan, *, lab: Lab, actor: User | None = None) -> ImportRe
         item.tags.set(tags)
         hazards = [
             HazardStatement.objects.get_or_create(
-                code=code, defaults={"kind": _hazard_kind(code)}
+                code=code,
+                defaults={"kind": _hazard_kind(code), "text_en": ghs.STATEMENTS_EN.get(code, "")},
             )[0]
             for code in row.hazard_codes
         ]

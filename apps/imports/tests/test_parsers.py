@@ -110,8 +110,9 @@ def test_parse_tags_na_values_dropped():
 
 
 def test_parse_tags_suffixed_codes():
+    # Codes keep their canonical GHS casing (H350i, not H350I) so they map to the catalog.
     parsed = parse_tags("Gefahr,H360FD,H350i,EUH059")
-    assert parsed.hazard_codes == ["H360FD", "H350I", "EUH059"]
+    assert parsed.hazard_codes == ["H360FD", "H350i", "EUH059"]
 
 
 def test_parse_amount_in_stock():

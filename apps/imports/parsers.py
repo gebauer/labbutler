@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
+from apps.inventory.ghs import canonical_code
+
 # --- Prices ---------------------------------------------------------------------------
 
 # Currency symbols/codes seen in the real export, mapped to ISO codes.
@@ -203,7 +205,7 @@ def _extract_hazard_codes(token: str) -> list[str] | None:
         part = part.strip()
         if not _HAZARD_CODE_RE.match(part):
             return None
-        codes.append(part.upper())
+        codes.append(canonical_code(part))
     return codes or None
 
 
