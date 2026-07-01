@@ -90,3 +90,27 @@ def test_offsite_next_is_ignored(client, lab):
         {"next": "http://evil.example.com/"},
     )
     assert reverse("procurement:request_detail", args=[req.pk]) in resp["Location"]
+
+
+@pytest.mark.django_db
+def test_forwarded_widget_hidden_for_non_coordinator(client, lab):
+    # A manager has place_order (via "*") but isn't in the Purchase coordinator role.
+    client.force_login(_user(lab, "m@x.de", ["Lab manager"]))
+    resp = client.get(reverse("home"))
+    assert b"Forwarded to you to order" not in resp.content
+
+
+@pytest.mark.django_db
+def test_my_requests_only_awaiting_approval(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    Request.objects.create(
+        lab=lab, item_name="Pending one", requested_by=member, status=Status.REQUESTED
+    )
+    Request.objects.create(
+        lab=lab, item_name="Already approved", requested_by=member, status=Status.APPROVED
+    )
+    client.force_login(member)
+    resp = client.get(reverse("home"))
+    assert b"My requests awaiting approval" in resp.content
+    assert b"Pending one" in resp.content
+    assert b"Already approved" not in resp.content

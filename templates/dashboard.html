@@ -27,14 +27,17 @@
             {% for item in w.items %}
               <li class="px-4 py-2.5 text-sm">
                 {% if w.kind == 'approvals' %}
-                  <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
                       <a href="{% url 'procurement:request_detail' item.pk %}" class="block truncate font-medium text-gray-900 hover:text-teal-700">{{ item.item_name }}</a>
-                      <div class="text-xs text-gray-500">{{ item.requested_by.email|default:"—" }} · {{ item.total }} {{ item.currency }}</div>
+                      <div class="text-xs text-gray-500">{{ item.requested_by.email|default:"—" }}</div>
                     </div>
-                    <div class="flex shrink-0 gap-1">
-                      {% include "dashboard/_action.html" with pk=item.pk action="approve" label="Approve" style="primary" %}
-                      {% include "dashboard/_action.html" with pk=item.pk action="reject" label="Reject" style="danger" %}
+                    <div class="flex shrink-0 items-center gap-3">
+                      <span class="whitespace-nowrap text-base font-semibold tabular-nums text-gray-900">{{ item.total }} {{ item.currency }}</span>
+                      <div class="flex gap-1">
+                        {% include "dashboard/_action.html" with pk=item.pk action="approve" label="Approve" style="primary" %}
+                        {% include "dashboard/_action.html" with pk=item.pk action="reject" label="Reject" style="danger" %}
+                      </div>
                     </div>
                   </div>
                 {% elif w.kind == 'to_order' %}

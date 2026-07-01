@@ -19,6 +19,12 @@ from apps.procurement.models import Request
 
 Status = Request.Status
 _LIMIT = 6  # items shown per widget before "View all"
+_COORDINATOR_ROLE = "Purchase coordinator"
+
+
+def _is_purchase_coordinator(user, lab) -> bool:
+    """Whether the user actually holds the Purchase coordinator role in this lab."""
+    return user.memberships.filter(lab=lab, roles__name=_COORDINATOR_ROLE).exists()
 
 
 @dataclass
@@ -56,8 +62,8 @@ def build(user, lab) -> list[Widget]:
             "Nothing waiting for approval.",
         )
 
-    assigned = requests.filter(assigned_to=user, status=Status.APPROVED).order_by("created_at")
-    if user.can(lab, "place_order") or assigned.exists():
+    if _is_purchase_coordinator(user, lab):
+        assigned = requests.filter(assigned_to=user, status=Status.APPROVED).order_by("created_at")
         add(
             "to_order",
             "Forwarded to you to order",
@@ -81,15 +87,14 @@ def build(user, lab) -> list[Widget]:
         )
 
     if user.can(lab, "create_request"):
-        open_states = [Status.REQUESTED, Status.APPROVED, Status.ORDERED, Status.DELIVERED]
-        qs = requests.filter(requested_by=user, status__in=open_states).order_by("-created_at")
+        qs = requests.filter(requested_by=user, status=Status.REQUESTED).order_by("-created_at")
         add(
             "my_requests",
-            "My open requests",
+            "My requests awaiting approval",
             "my_requests",
             qs,
-            f"{list_url}?requester={user.pk}",
-            "You have no open requests.",
+            f"{list_url}?requester={user.pk}&status=requested",
+            "None of your requests are awaiting approval.",
         )
 
     if user.can(lab, "manage_inventory"):
