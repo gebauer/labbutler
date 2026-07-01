@@ -54,11 +54,26 @@ def _filtered_items(lab, query: str, tag_id: str):
     return items.distinct()
 
 
+VIEW_MODES = ("table", "cards")
+VIEW_SESSION_KEY = "inventory_view"
+
+
+def _resolve_view_mode(request: HttpRequest) -> str:
+    """Pick table/cards from the request, remembering the choice per session."""
+    requested = request.GET.get("view")
+    if requested in VIEW_MODES:
+        request.session[VIEW_SESSION_KEY] = requested
+        return requested
+    return request.session.get(VIEW_SESSION_KEY, "table")
+
+
 @require_permission("view_inventory")
 def item_list(request: HttpRequest) -> HttpResponse:
-    """Paginated, searchable item table. HTMX requests get only the results partial."""
+    """Paginated, searchable item list, rendered as a table or cards. HTMX requests get
+    only the results partial."""
     query = request.GET.get("q", "")
     tag_id = request.GET.get("tag", "")
+    view_mode = _resolve_view_mode(request)
     items = _filtered_items(request.lab, query, tag_id)
 
     page = Paginator(items, PAGE_SIZE).get_page(request.GET.get("page"))
@@ -66,11 +81,12 @@ def item_list(request: HttpRequest) -> HttpResponse:
         "page": page,
         "query": query,
         "tag_id": tag_id,
+        "view_mode": view_mode,
         "tags": Tag.objects.filter(lab=request.lab).order_by("name"),
         "can_manage": request.user.can(request.lab, "manage_inventory"),
     }
     if request.htmx:
-        return render(request, "inventory/_item_table.html", context)
+        return render(request, "inventory/_item_results.html", context)
     return render(request, "inventory/item_list.html", context)
 
 

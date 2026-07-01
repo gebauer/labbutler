@@ -5,12 +5,25 @@
 {% block content %}
   <div class="flex items-center justify-between gap-4">
     <h1 class="text-xl font-semibold">Inventory</h1>
-    {% if can_manage %}
-      <a href="{% url 'inventory:item_create' %}"
-         class="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-700">
-        New item
-      </a>
-    {% endif %}
+    <div class="flex items-center gap-3">
+      {# Table / cards layout toggle — carries the current search so it survives the switch. #}
+      <div class="inline-flex overflow-hidden rounded border border-gray-300 text-sm">
+        <a href="?view=table&q={{ query|urlencode }}&tag={{ tag_id }}"
+           class="px-3 py-2 {% if view_mode == 'table' %}bg-gray-900 text-white{% else %}bg-white text-gray-600 hover:bg-gray-50{% endif %}">
+          Table
+        </a>
+        <a href="?view=cards&q={{ query|urlencode }}&tag={{ tag_id }}"
+           class="border-l border-gray-300 px-3 py-2 {% if view_mode == 'cards' %}bg-gray-900 text-white{% else %}bg-white text-gray-600 hover:bg-gray-50{% endif %}">
+          Cards
+        </a>
+      </div>
+      {% if can_manage %}
+        <a href="{% url 'inventory:item_create' %}"
+           class="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-700">
+          New item
+        </a>
+      {% endif %}
+    </div>
   </div>
 
   <form class="mt-4 flex flex-wrap items-center gap-3"
@@ -33,5 +46,5 @@
     <noscript><button type="submit" class="rounded border px-3 py-2 text-sm">Search</button></noscript>
   </form>
 
-  {% include "inventory/_item_table.html" %}
+  {% include "inventory/_item_results.html" %}
 {% endblock %}

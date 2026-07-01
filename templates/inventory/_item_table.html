@@ -1,54 +1,28 @@
-<div id="item-results" class="mt-4">
-  <p class="text-sm text-gray-500">{{ page.paginator.count }} item{{ page.paginator.count|pluralize }}</p>
-
-  {% if page.object_list %}
-    <div class="mt-2 overflow-x-auto rounded border bg-white">
-      <table class="min-w-full divide-y divide-gray-200 text-sm">
-        <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-          <tr>
-            <th class="px-3 py-2 font-medium">ID</th>
-            <th class="px-3 py-2 font-medium">Name</th>
-            <th class="px-3 py-2 font-medium">Location</th>
-            <th class="px-3 py-2 font-medium">Vendor</th>
-            <th class="px-3 py-2 font-medium">Expires</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          {% for item in page.object_list %}
-            <tr class="hover:bg-gray-50">
-              <td class="whitespace-nowrap px-3 py-2 font-mono text-xs text-gray-600">
-                <a href="{% url 'inventory:item_detail' item.pk %}" class="hover:underline">{{ item.human_id }}</a>
-              </td>
-              <td class="px-3 py-2">
-                <a href="{% url 'inventory:item_detail' item.pk %}" class="font-medium text-gray-900 hover:underline">{{ item.name }}</a>
-              </td>
-              <td class="px-3 py-2 text-gray-600">{{ item.location.name|default:"—" }}</td>
-              <td class="px-3 py-2 text-gray-600">{{ item.vendor.name|default:"—" }}</td>
-              <td class="whitespace-nowrap px-3 py-2 text-gray-600">{{ item.expiration_date|date:"Y-m-d"|default:"—" }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    {% if page.has_other_pages %}
-      <div class="mt-3 flex items-center justify-between text-sm text-gray-600">
-        <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
-        <div class="flex gap-2">
-          {% if page.has_previous %}
-            <a href="?q={{ query|urlencode }}&tag={{ tag_id }}&page={{ page.previous_page_number }}"
-               class="rounded border px-3 py-1 hover:bg-gray-50">Previous</a>
-          {% endif %}
-          {% if page.has_next %}
-            <a href="?q={{ query|urlencode }}&tag={{ tag_id }}&page={{ page.next_page_number }}"
-               class="rounded border px-3 py-1 hover:bg-gray-50">Next</a>
-          {% endif %}
-        </div>
-      </div>
-    {% endif %}
-  {% else %}
-    <div class="mt-4 rounded border border-dashed bg-white px-4 py-10 text-center text-sm text-gray-500">
-      No items match.
-    </div>
-  {% endif %}
+<div class="mt-2 overflow-x-auto rounded border bg-white">
+  <table class="min-w-full divide-y divide-gray-200 text-sm">
+    <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+      <tr>
+        <th class="px-3 py-2 font-medium">ID</th>
+        <th class="px-3 py-2 font-medium">Name</th>
+        <th class="px-3 py-2 font-medium">Location</th>
+        <th class="px-3 py-2 font-medium">Vendor</th>
+        <th class="px-3 py-2 font-medium">Expires</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for item in page.object_list %}
+        <tr class="hover:bg-gray-50">
+          <td class="whitespace-nowrap px-3 py-2 font-mono text-xs text-gray-600">
+            <a href="{% url 'inventory:item_detail' item.pk %}" class="hover:underline">{{ item.human_id }}</a>
+          </td>
+          <td class="px-3 py-2">
+            <a href="{% url 'inventory:item_detail' item.pk %}" class="font-medium text-gray-900 hover:underline">{{ item.name }}</a>
+          </td>
+          <td class="px-3 py-2 text-gray-600">{{ item.location.name|default:"—" }}</td>
+          <td class="px-3 py-2 text-gray-600">{{ item.vendor.name|default:"—" }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-gray-600">{{ item.expiration_date|date:"Y-m-d"|default:"—" }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
