@@ -123,7 +123,18 @@ def perform_transition(req: Request, action: str, *, actor, po_number: str = "")
         target=req,
         changes={"from": previous, "to": req.status},
     )
+    _notify_transition(req.pk, previous, req.status)
     return req
+
+
+def _notify_transition(req_pk: int, previous: str, new: str) -> None:
+    """Enqueue the status-change email once the surrounding transaction commits."""
+    # Imported lazily so procurement doesn't import the notifications app at load time.
+    from apps.notifications.tasks import notify_request_transition
+
+    transaction.on_commit(
+        lambda: notify_request_transition.delay(req_pk, previous, new)
+    )
 
 
 def _create_item_from(req: Request) -> Item:

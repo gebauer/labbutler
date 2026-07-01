@@ -8,6 +8,7 @@ live in the repo.
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -41,6 +42,7 @@ INSTALLED_APPS = [
     "apps.procurement",
     "apps.imports",
     "apps.audit",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [
@@ -123,6 +125,14 @@ CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/1")
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 
+# Daily item-expiry digest (run by `celery -A labbutler beat`). Hour is local time.
+CELERY_BEAT_SCHEDULE = {
+    "expiry-digest-daily": {
+        "task": "apps.notifications.tasks.send_expiry_digests",
+        "schedule": crontab(hour=env.int("EXPIRY_DIGEST_HOUR", default=7), minute=0),
+    },
+}
+
 # --- Email ----------------------------------------------------------------------------
 EMAIL_BACKEND = env(
     "DJANGO_EMAIL_BACKEND",
@@ -134,6 +144,12 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="labbutler@localhost")
+
+# --- Notifications --------------------------------------------------------------------
+# Absolute base URL used to build links in emails (blank omits links, e.g. in dev).
+LABBUTLER_BASE_URL = env("LABBUTLER_BASE_URL", default="")
+# How many days ahead the expiry digest looks.
+EXPIRY_DIGEST_DAYS = env.int("EXPIRY_DIGEST_DAYS", default=30)
 
 # --- Security (prod-friendly defaults, relaxed when DEBUG) -----------------------------
 CSRF_TRUSTED_ORIGINS = env("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])

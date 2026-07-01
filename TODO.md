@@ -54,7 +54,13 @@ Spec: [Buildv1.MD](Buildv1.MD) · Stack: Django 5 / Postgres 17 / Celery+Redis /
       Filterable list, detail with contextual action buttons (+optional PO#), create/edit
       (edit only while 'Requested'), auto VAT/total via `recalculate_totals`. Requests nav
       link gated on `view_requests`. 11 new tests; 77 total green, ruff clean.
-- [ ] **9. Notifications** — SMTP: status changes + expiry digest (Celery beat).
+- [x] **9. Notifications** — `apps/notifications/` app: pure email builders (`emails.py`) +
+      Celery tasks (`tasks.py`). Request status changes email the requester/approver/assignee,
+      enqueued via `transaction.on_commit` from `perform_transition`. Daily per-lab expiry
+      digest (expired + expiring within `EXPIRY_DIGEST_DAYS`) to members who can
+      `manage_inventory`, wired to `CELERY_BEAT_SCHEDULE` and a `send_expiry_digests`
+      management command. Links honour `LABBUTLER_BASE_URL`. 10 new tests (builders,
+      recipients, outbox sends, on-commit hook); 87 total green, ruff clean.
 
 ## Notes / open spec items (defer until relevant)
 - Shipping cost inside tax base? (assume yes)
