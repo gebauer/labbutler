@@ -108,3 +108,45 @@ def test_list_requires_view_requests_permission(client, lab):
     client.force_login(nobody)
     resp = client.get(reverse("procurement:request_list"))
     assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_filter_by_multiple_statuses(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    Request.objects.create(lab=lab, item_name="ReqA", requested_by=member, status=Status.REQUESTED)
+    Request.objects.create(lab=lab, item_name="OrdB", requested_by=member, status=Status.ORDERED)
+    Request.objects.create(lab=lab, item_name="AppC", requested_by=member, status=Status.APPROVED)
+    client.force_login(member)
+    resp = client.get(reverse("procurement:request_list"), {"status": ["requested", "ordered"]})
+    assert b"ReqA" in resp.content
+    assert b"OrdB" in resp.content
+    assert b"AppC" not in resp.content
+
+
+@pytest.mark.django_db
+def test_request_search_and_vendor_filter(client, lab):
+    from apps.procurement.models import Vendor
+
+    member = _user(lab, "u@x.de", ["Member"])
+    sigma = Vendor.objects.create(lab=lab, name="Sigma")
+    Request.objects.create(lab=lab, item_name="Tips box", requested_by=member, vendor=sigma)
+    Request.objects.create(lab=lab, item_name="Gloves", requested_by=member)
+    client.force_login(member)
+    by_q = client.get(reverse("procurement:request_list"), {"q": "tips"})
+    assert b"Tips box" in by_q.content and b"Gloves" not in by_q.content
+    by_vendor = client.get(reverse("procurement:request_list"), {"vendor": sigma.pk})
+    assert b"Tips box" in by_vendor.content and b"Gloves" not in by_vendor.content
+
+
+@pytest.mark.django_db
+def test_request_infinite_scroll_chunk(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    for i in range(26):
+        Request.objects.create(lab=lab, item_name=f"Req {i:02d}", requested_by=member)
+    client.force_login(member)
+    first = client.get(reverse("procurement:request_list"))
+    assert b'hx-trigger="revealed"' in first.content
+    chunk = client.get(reverse("procurement:request_list"), {"partial": "chunk", "page": 2})
+    assert chunk.status_code == 200
+    assert b'id="request-results"' not in chunk.content
+    assert b"/requests/" in chunk.content

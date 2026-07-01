@@ -11,42 +11,83 @@ from __future__ import annotations
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
+from apps.tenancy.models import User
 from apps.tenancy.scoping import require_permission
 
 from . import services
 from .forms import RequestForm
-from .models import Request
+from .models import Request, Vendor
 
 PAGE_SIZE = 25
+
+# Free-text query columns, and facet param -> the related pk it filters on.
+_REQ_SEARCH_FIELDS = ("item_name", "catalog_number", "cas_number", "po_number")
+_REQ_FACETS = {"vendor": "vendor__pk", "requester": "requested_by__pk"}
+
+
+def _filtered_requests(lab, query: str, statuses: list[str], facets: dict[str, str]):
+    """Narrow a lab's requests by search text, any selected statuses, and facet filters."""
+    requests = (
+        Request.objects.filter(lab=lab)
+        .select_related("vendor", "budget", "requested_by")
+        .order_by("-created_at")
+    )
+    query = query.strip()
+    if query:
+        lookup = Q()
+        for field_name in _REQ_SEARCH_FIELDS:
+            lookup |= Q(**{f"{field_name}__icontains": query})
+        requests = requests.filter(lookup)
+    valid_statuses = [s for s in statuses if s in Request.Status.values]
+    if valid_statuses:
+        requests = requests.filter(status__in=valid_statuses)
+    for param, lookup_field in _REQ_FACETS.items():
+        value = facets.get(param)
+        if value:
+            requests = requests.filter(**{lookup_field: value})
+    return requests
+
+
+def _request_querystring(request: HttpRequest) -> str:
+    """Current filter params (minus paging/partial), preserving multiple status values."""
+    params = request.GET.copy()
+    for transient in ("page", "partial"):
+        params.pop(transient, None)
+    return params.urlencode()
 
 
 @require_permission("view_requests")
 def request_list(request: HttpRequest) -> HttpResponse:
-    status = request.GET.get("status", "")
-    requests = (
-        Request.objects.filter(lab=request.lab)
-        .select_related("vendor", "budget", "requested_by")
-        .order_by("-created_at")
-    )
-    if status in Request.Status.values:
-        requests = requests.filter(status=status)
+    lab = request.lab
+    query = request.GET.get("q", "")
+    selected_statuses = request.GET.getlist("status")
+    facets = {param: request.GET.get(param, "") for param in _REQ_FACETS}
+    requests = _filtered_requests(lab, query, selected_statuses, facets)
 
     page = Paginator(requests, PAGE_SIZE).get_page(request.GET.get("page"))
-    return render(
-        request,
-        "procurement/request_list.html",
-        {
-            "page": page,
-            "status": status,
-            "statuses": Request.Status.choices,
-            "can_create": request.user.can(request.lab, "create_request"),
-        },
-    )
+    context = {
+        "page": page,
+        "query": query,
+        "selected_statuses": selected_statuses,
+        "facets": facets,
+        "statuses": Request.Status.choices,
+        "filter_qs": _request_querystring(request),
+        "has_filters": bool(query.strip()) or bool(selected_statuses) or any(facets.values()),
+        "vendors": Vendor.objects.filter(lab=lab).order_by("name"),
+        "requesters": User.objects.filter(requests_made__lab=lab).distinct().order_by("email"),
+        "can_create": request.user.can(lab, "create_request"),
+    }
+    if request.GET.get("partial") == "chunk":
+        return render(request, "procurement/_request_rows.html", context)
+    if request.htmx:
+        return render(request, "procurement/_request_results.html", context)
+    return render(request, "procurement/request_list.html", context)
 
 
 @require_permission("view_requests")

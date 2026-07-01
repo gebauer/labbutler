@@ -1,0 +1,15 @@
+{% comment %}One page of request rows; the last row auto-loads the next when revealed.{% endcomment %}
+{% for req in page.object_list %}
+  <tr {% if forloop.last and page.has_next %}hx-get="?{{ filter_qs }}&partial=chunk&page={{ page.next_page_number }}" hx-trigger="revealed" hx-swap="afterend"{% endif %}
+      class="hover:bg-teal-50/40">
+    <td class="px-4 py-2.5">
+      <a href="{% url 'procurement:request_detail' req.pk %}" class="font-medium text-gray-900 hover:text-teal-700">{{ req.item_name }}</a>
+      {% if req.is_urgent %}<span class="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-xs text-red-700">urgent</span>{% endif %}
+    </td>
+    <td class="px-4 py-2.5">{% include "procurement/_status_badge.html" with value=req.status label=req.get_status_display %}</td>
+    <td class="px-4 py-2.5 text-gray-600">{{ req.vendor.name|default:"—" }}</td>
+    <td class="whitespace-nowrap px-4 py-2.5 text-gray-600">{{ req.total }} {{ req.currency }}</td>
+    <td class="px-4 py-2.5 text-gray-600">{{ req.requested_by.email|default:"—" }}</td>
+    <td class="whitespace-nowrap px-4 py-2.5 text-gray-500">{{ req.created_at|date:"Y-m-d" }}</td>
+  </tr>
+{% endfor %}

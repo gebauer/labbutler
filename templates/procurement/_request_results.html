@@ -1,0 +1,33 @@
+<div id="request-results" class="mt-5">
+  <div class="flex items-center justify-between gap-3 text-sm text-gray-500">
+    <span><span class="font-medium text-gray-700">{{ page.paginator.count }}</span> request{{ page.paginator.count|pluralize }}</span>
+    {% if has_filters %}
+      <a href="{% url 'procurement:request_list' %}" class="text-teal-700 hover:underline">Clear filters</a>
+    {% endif %}
+  </div>
+
+  {% if page.object_list %}
+    <div class="mt-2 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+          <tr>
+            <th class="px-4 py-2.5 font-medium">Item</th>
+            <th class="px-4 py-2.5 font-medium">Status</th>
+            <th class="px-4 py-2.5 font-medium">Supplier</th>
+            <th class="px-4 py-2.5 font-medium">Total</th>
+            <th class="px-4 py-2.5 font-medium">Requested by</th>
+            <th class="px-4 py-2.5 font-medium">Raised</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% include "procurement/_request_rows.html" %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="mt-3 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-12 text-center">
+      <p class="text-sm font-medium text-gray-700">No requests match</p>
+      <p class="mt-1 text-sm text-gray-500">Try different filters, or clear them to see all.</p>
+    </div>
+  {% endif %}
+</div>

@@ -7,66 +7,40 @@
     <h1 class="text-2xl font-semibold tracking-tight">Requests</h1>
     {% if can_create %}
       <a href="{% url 'procurement:request_create' %}"
-         class="rounded bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700">
-        New request
+         class="rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-teal-700">
+        + New request
       </a>
     {% endif %}
   </div>
 
-  <form method="get" class="mt-4 flex items-center gap-2 text-sm">
-    <label for="status" class="text-gray-600">Status</label>
-    <select id="status" name="status" onchange="this.form.submit()"
-            class="rounded border border-gray-300 px-3 py-2 text-sm">
-      <option value="">All</option>
-      {% for value, label in statuses %}
-        <option value="{{ value }}" {% if value == status %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </form>
-
-  <p class="mt-4 text-sm text-gray-500">{{ page.paginator.count }} request{{ page.paginator.count|pluralize }}</p>
-
-  {% if page.object_list %}
-    <div class="mt-2 overflow-x-auto rounded border bg-white">
-      <table class="min-w-full divide-y divide-gray-200 text-sm">
-        <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-          <tr>
-            <th class="px-3 py-2 font-medium">Item</th>
-            <th class="px-3 py-2 font-medium">Status</th>
-            <th class="px-3 py-2 font-medium">Vendor</th>
-            <th class="px-3 py-2 font-medium">Total</th>
-            <th class="px-3 py-2 font-medium">Requested by</th>
-            <th class="px-3 py-2 font-medium">Raised</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          {% for req in page.object_list %}
-            <tr class="hover:bg-gray-50">
-              <td class="px-3 py-2">
-                <a href="{% url 'procurement:request_detail' req.pk %}" class="font-medium text-gray-900 hover:underline">{{ req.item_name }}</a>
-                {% if req.is_urgent %}<span class="ml-1 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">urgent</span>{% endif %}
-              </td>
-              <td class="px-3 py-2">{% include "procurement/_status_badge.html" with value=req.status label=req.get_status_display %}</td>
-              <td class="px-3 py-2 text-gray-600">{{ req.vendor.name|default:"—" }}</td>
-              <td class="whitespace-nowrap px-3 py-2 text-gray-600">{{ req.total }} {{ req.currency }}</td>
-              <td class="px-3 py-2 text-gray-600">{{ req.requested_by.email|default:"—" }}</td>
-              <td class="whitespace-nowrap px-3 py-2 text-gray-500">{{ req.created_at|date:"Y-m-d" }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  {# One HTMX form; controls live outside #request-results so they keep state on swaps. #}
+  <form class="mt-5 space-y-3"
+        hx-get="{% url 'procurement:request_list' %}"
+        hx-target="#request-results" hx-select="#request-results" hx-swap="outerHTML"
+        hx-trigger="input changed delay:300ms from:input[name='q'], change, submit"
+        hx-push-url="true">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="relative min-w-[16rem] flex-1">
+        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"/></svg>
+        <input type="search" name="q" value="{{ query }}" placeholder="Search item, catalog, CAS, PO…"
+               autocomplete="off"
+               class="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500">
+      </div>
+      {% include "inventory/_facet_select.html" with name="vendor" label="All suppliers" options=vendors selected=facets.vendor %}
+      {% include "inventory/_facet_select.html" with name="requester" label="All requesters" options=requesters selected=facets.requester use_email=1 %}
     </div>
 
-    {% if page.has_other_pages %}
-      <div class="mt-3 flex items-center justify-between text-sm text-gray-600">
-        <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
-        <div class="flex gap-2">
-          {% if page.has_previous %}<a href="?status={{ status }}&page={{ page.previous_page_number }}" class="rounded border px-3 py-1 hover:bg-gray-50">Previous</a>{% endif %}
-          {% if page.has_next %}<a href="?status={{ status }}&page={{ page.next_page_number }}" class="rounded border px-3 py-1 hover:bg-gray-50">Next</a>{% endif %}
-        </div>
-      </div>
-    {% endif %}
-  {% else %}
-    <div class="mt-4 rounded border border-dashed bg-white px-4 py-10 text-center text-sm text-gray-500">No requests yet.</div>
-  {% endif %}
+    {# Status pills — multi-select: pick several to combine, or none to show all. #}
+    <div class="flex flex-wrap gap-1.5">
+      {% for value, label in statuses %}
+        <label>
+          <input type="checkbox" name="status" value="{{ value }}" class="peer sr-only" {% if value in selected_statuses %}checked{% endif %}>
+          <span class="inline-block cursor-pointer rounded-full border border-gray-200 px-3 py-1 text-sm text-gray-600 hover:border-teal-300 peer-checked:border-teal-600 peer-checked:bg-teal-600 peer-checked:text-white">{{ label }}</span>
+        </label>
+      {% endfor %}
+    </div>
+    <noscript><button type="submit" class="rounded-lg border px-3 py-1.5 text-sm">Apply</button></noscript>
+  </form>
+
+  {% include "procurement/_request_results.html" %}
 {% endblock %}
