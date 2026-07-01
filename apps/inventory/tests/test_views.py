@@ -316,3 +316,47 @@ def test_item_detail_shows_history(client, lab, manager):
     resp = client.get(reverse("inventory:item_detail", args=[item.pk]))
     assert b"History" in resp.content
     assert b"item_created" in resp.content
+
+
+@pytest.mark.django_db
+def test_create_with_manual_id_is_normalized(client, lab, manager):
+    client.force_login(manager)
+    resp = client.post(
+        reverse("inventory:item_create"),
+        {"name": "Chosen", "tags": [], "human_id": "AGB-0042"},
+    )
+    assert resp.status_code == 302
+    assert Item.objects.get(name="Chosen").human_id == "AGB-00042"
+
+
+@pytest.mark.django_db
+def test_create_blank_id_uses_next_free(client, lab, manager):
+    _make_item(lab, name="First")  # AGB-00001
+    client.force_login(manager)
+    resp = client.post(reverse("inventory:item_create"), {"name": "Next", "tags": []})
+    assert resp.status_code == 302
+    assert Item.objects.get(name="Next").human_id == "AGB-00002"
+
+
+@pytest.mark.django_db
+def test_create_rejects_duplicate_id(client, lab, manager):
+    existing = _make_item(lab, name="First")  # AGB-00001
+    client.force_login(manager)
+    resp = client.post(
+        reverse("inventory:item_create"),
+        {"name": "Dup", "tags": [], "human_id": existing.human_id},
+    )
+    assert resp.status_code == 200
+    assert b"already in use" in resp.content
+    assert not Item.objects.filter(name="Dup").exists()
+
+
+@pytest.mark.django_db
+def test_create_rejects_malformed_id(client, lab, manager):
+    client.force_login(manager)
+    resp = client.post(
+        reverse("inventory:item_create"), {"name": "Bad", "tags": [], "human_id": "XYZ-1"}
+    )
+    assert resp.status_code == 200
+    assert b"must look like" in resp.content
+    assert not Item.objects.filter(name="Bad").exists()

@@ -17,6 +17,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
+from apps.inventory import ids
 from apps.inventory.models import Location
 from apps.tenancy.models import User
 from apps.tenancy.scoping import require_permission
@@ -204,22 +205,41 @@ def request_receive(request: HttpRequest, pk: int) -> HttpResponse:
         return redirect("procurement:request_detail", pk=req.pk)
 
     locations = Location.objects.filter(lab=request.lab).order_by("name")
+
+    def dialog(**extra):
+        context = {
+            "req": req,
+            "locations": locations,
+            "id_suggestions": ids.suggest_ids(request.lab),
+        }
+        context.update(extra)
+        return render(request, "procurement/receive.html", context)
+
     if request.method == "POST":
         if request.POST.get("outcome") == "no_item":
             services.receive(req, actor=request.user, create_item=False)
             messages.success(request, "Recorded as delivered — no inventory item created.")
             return redirect("procurement:request_detail", pk=req.pk)
 
+        raw_id = (request.POST.get("human_id") or "").strip()
+        human_id = ""
+        if raw_id:
+            try:
+                human_id = ids.normalize_item_id(request.lab, raw_id)
+            except ValueError as exc:
+                return dialog(id_error=str(exc), entered_id=raw_id)
+            if ids.item_id_taken(request.lab, human_id):
+                return dialog(id_error=f"{human_id} is already in use.", entered_id=raw_id)
+
         location = locations.filter(pk=request.POST.get("location") or 0).first()
         if location is None and not request.POST.get("confirm_no_location"):
             # Checking in with no location is allowed, but only after an explicit confirm.
-            return render(
-                request,
-                "procurement/receive.html",
-                {"req": req, "locations": locations, "warn_no_location": True},
-            )
-        services.receive(req, actor=request.user, create_item=True, location=location)
+            return dialog(warn_no_location=True, entered_id=human_id)
+
+        services.receive(
+            req, actor=request.user, create_item=True, location=location, human_id=human_id
+        )
         messages.success(request, f"Checked in as {req.created_item.human_id}.")
         return redirect("inventory:item_label", pk=req.created_item_id)
 
-    return render(request, "procurement/receive.html", {"req": req, "locations": locations})
+    return dialog()

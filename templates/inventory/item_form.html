@@ -18,6 +18,9 @@
 
   <form method="post" class="mt-6 max-w-3xl">
     {% csrf_token %}
+    {% if form.id_suggestions %}
+      <datalist id="id-options">{% for suggestion in form.id_suggestions %}<option value="{{ suggestion }}"></option>{% endfor %}</datalist>
+    {% endif %}
     {% if form.non_field_errors %}
       <div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>
     {% endif %}

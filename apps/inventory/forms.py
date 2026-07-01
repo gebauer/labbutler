@@ -12,6 +12,7 @@ from django import forms
 from apps.procurement.models import Vendor
 from apps.tenancy.models import Lab, User
 
+from . import ids
 from .models import FieldDefinition, Item, Location, Tag
 
 _INPUT_CLASS = (
@@ -71,15 +72,28 @@ class ItemForm(forms.ModelForm):
         self.fields["tags"].queryset = Tag.objects.filter(lab=lab)
         self.fields["owner"].queryset = User.objects.filter(memberships__lab=lab).distinct()
 
+        # New items get a chosen ID (from the preprinted pool); existing IDs are frozen.
+        self.creating = self.instance.pk is None
+        if self.creating:
+            self.id_suggestions = ids.suggest_ids(lab, 10)
+            self.fields["human_id"] = forms.CharField(
+                label="Item ID",
+                required=False,
+                help_text=f"Pick a free preprinted ID, or leave blank for {self.id_suggestions[0]}",
+                widget=forms.TextInput(attrs={"list": "id-options", "autocomplete": "off"}),
+                initial=self.id_suggestions[0],
+            )
+
         # One input per lab custom-field definition, pre-filled from the item's values.
-        self.custom_definitions = list(
-            FieldDefinition.objects.filter(lab=lab).order_by("label")
-        )
+        self.custom_definitions = list(FieldDefinition.objects.filter(lab=lab).order_by("label"))
         stored = self.instance.custom_fields or {}
         for definition in self.custom_definitions:
             field = _custom_field(definition)
             field.initial = stored.get(definition.key)
             self.fields[f"{_CUSTOM_PREFIX}{definition.key}"] = field
+
+        if self.creating:
+            self.order_fields(["human_id", *[f for f in self.fields if f != "human_id"]])
 
         for field in self.fields.values():
             if isinstance(field.widget, forms.SelectMultiple):
@@ -88,6 +102,18 @@ class ItemForm(forms.ModelForm):
                 continue
             else:
                 field.widget.attrs.setdefault("class", _INPUT_CLASS)
+
+    def clean_human_id(self) -> str:
+        raw = (self.cleaned_data.get("human_id") or "").strip()
+        if not raw:
+            return ""  # save() falls back to the next free ID
+        try:
+            human_id = ids.normalize_item_id(self.lab, raw)
+        except ValueError as exc:
+            raise forms.ValidationError(str(exc)) from exc
+        if ids.item_id_taken(self.lab, human_id):
+            raise forms.ValidationError(f"{human_id} is already in use.")
+        return human_id
 
     @staticmethod
     def _serialize(definition: FieldDefinition, value: object) -> object:
@@ -102,6 +128,8 @@ class ItemForm(forms.ModelForm):
 
     def save(self, commit: bool = True) -> Item:
         item = super().save(commit=False)
+        if self.creating:
+            item.human_id = self.cleaned_data.get("human_id") or ids.suggest_ids(self.lab, 1)[0]
         values = dict(item.custom_fields or {})
         for definition in self.custom_definitions:
             raw = self.cleaned_data.get(f"{_CUSTOM_PREFIX}{definition.key}")

@@ -222,3 +222,37 @@ def test_request_detail_shows_history(client, lab):
     resp = client.get(reverse("procurement:request_detail", args=[req.pk]))
     assert b"History" in resp.content
     assert b"request_approve" in resp.content
+
+
+@pytest.mark.django_db
+def test_receive_with_chosen_id(client, lab):
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    req = Request.objects.create(
+        lab=lab, item_name="Tips", requested_by=manager, status=Status.ORDERED
+    )
+    client.force_login(manager)
+    resp = client.post(
+        reverse("procurement:request_receive", args=[req.pk]),
+        {"outcome": "check_in", "human_id": "LB-0007", "confirm_no_location": "1"},
+    )
+    assert resp.status_code == 302
+    req.refresh_from_db()
+    assert req.created_item.human_id == "LB-00007"
+
+
+@pytest.mark.django_db
+def test_receive_rejects_taken_id(client, lab):
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    Item.objects.create(lab=lab, human_id="LB-00007", name="Existing")
+    req = Request.objects.create(
+        lab=lab, item_name="Tips", requested_by=manager, status=Status.ORDERED
+    )
+    client.force_login(manager)
+    resp = client.post(
+        reverse("procurement:request_receive", args=[req.pk]),
+        {"outcome": "check_in", "human_id": "LB-0007", "confirm_no_location": "1"},
+    )
+    assert resp.status_code == 200
+    assert b"already in use" in resp.content
+    req.refresh_from_db()
+    assert req.status == Status.ORDERED

@@ -166,9 +166,8 @@ def item_create(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = ItemForm(request.POST, lab=request.lab)
         if form.is_valid():
-            item = form.save(commit=False)
+            item = form.save(commit=False)  # form assigns the chosen/next-free human_id
             item.lab = request.lab
-            item.human_id = request.lab.allocate_item_id()
             item.save()
             form.save_m2m()
             AuditEntry.record(

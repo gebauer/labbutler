@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from django.db import transaction
 
 from apps.audit.models import AuditEntry
+from apps.inventory import ids
 from apps.inventory.models import Item
 
 from .models import Request
@@ -119,20 +120,23 @@ def can_receive(user, req: Request) -> bool:
 
 
 @transaction.atomic
-def receive(req: Request, *, actor, create_item: bool, location=None) -> Request:
+def receive(
+    req: Request, *, actor, create_item: bool, location=None, human_id: str = ""
+) -> Request:
     """Receive a delivered order.
 
     Two outcomes: ``create_item=True`` checks it into inventory (creates the item at the
-    given location and moves the request to Checked in); ``create_item=False`` records
-    delivery of something we don't track (software, services) and moves it to Delivered.
-    Raises :class:`TransitionError` if the request is not awaiting delivery.
+    given location, with the chosen ``human_id`` or the next free ID, and moves the
+    request to Checked in); ``create_item=False`` records delivery of something we don't
+    track (software, services) and moves it to Delivered. Raises :class:`TransitionError`
+    if the request is not awaiting delivery.
     """
     if req.status not in (Status.ORDERED, Status.DELIVERED):
         raise TransitionError(f"cannot receive a request that is {req.get_status_display()!r}")
 
     previous = req.status
     if create_item:
-        _create_item_from(req, location=location)
+        _create_item_from(req, location=location, human_id=human_id)
         req.status = Status.CHECKED_IN
         action = "checked_in"
         changes = {"from": previous, "to": req.status, "item": req.created_item.human_id}
@@ -161,11 +165,11 @@ def _notify_transition(req_pk: int, previous: str, new: str) -> None:
     transaction.on_commit(lambda: notify_request_transition.delay(req_pk, previous, new))
 
 
-def _create_item_from(req: Request, *, location=None) -> Item:
+def _create_item_from(req: Request, *, location=None, human_id: str = "") -> Item:
     """Create the inventory item a checked-in request delivers and link it back."""
     item = Item.objects.create(
         lab=req.lab,
-        human_id=req.lab.allocate_item_id(),
+        human_id=human_id or ids.suggest_ids(req.lab, 1)[0],
         name=req.item_name,
         location=location,
         catalog_number=req.catalog_number,
