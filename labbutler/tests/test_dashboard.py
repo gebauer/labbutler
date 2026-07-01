@@ -101,16 +101,30 @@ def test_forwarded_widget_hidden_for_non_coordinator(client, lab):
 
 
 @pytest.mark.django_db
-def test_my_requests_only_awaiting_approval(client, lab):
+def test_my_pending_requests_scope(lab):
+    from labbutler import dashboard
+
     member = _user(lab, "u@x.de", ["Member"])
+    coord = _user(lab, "c@x.de", ["Purchase coordinator"])
     Request.objects.create(
-        lab=lab, item_name="Pending one", requested_by=member, status=Status.REQUESTED
+        lab=lab, item_name="Awaiting", requested_by=member, status=Status.REQUESTED
     )
     Request.objects.create(
-        lab=lab, item_name="Already approved", requested_by=member, status=Status.APPROVED
+        lab=lab, item_name="Approved open", requested_by=member, status=Status.APPROVED
     )
-    client.force_login(member)
-    resp = client.get(reverse("home"))
-    assert b"My requests awaiting approval" in resp.content
-    assert b"Pending one" in resp.content
-    assert b"Already approved" not in resp.content
+    Request.objects.create(
+        lab=lab,
+        item_name="Approved forwarded",
+        requested_by=member,
+        status=Status.APPROVED,
+        assigned_to=coord,
+    )
+    Request.objects.create(
+        lab=lab, item_name="Already ordered", requested_by=member, status=Status.ORDERED
+    )
+
+    widgets = {w.key: w for w in dashboard.build(member, lab)}
+    pending = widgets["my_requests"]
+    assert pending.title == "My pending requests"
+    # Awaiting approval + approved-but-not-forwarded; excludes forwarded and ordered.
+    assert {r.item_name for r in pending.items} == {"Awaiting", "Approved open"}

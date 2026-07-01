@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
@@ -87,14 +88,22 @@ def build(user, lab) -> list[Widget]:
         )
 
     if user.can(lab, "create_request"):
-        qs = requests.filter(requested_by=user, status=Status.REQUESTED).order_by("-created_at")
+        # Mine that still need a push: awaiting approval, or approved but not yet
+        # forwarded to a coordinator or ordered.
+        qs = (
+            requests.filter(requested_by=user)
+            .filter(
+                Q(status=Status.REQUESTED) | Q(status=Status.APPROVED, assigned_to__isnull=True)
+            )
+            .order_by("-created_at")
+        )
         add(
             "my_requests",
-            "My requests awaiting approval",
+            "My pending requests",
             "my_requests",
             qs,
-            f"{list_url}?requester={user.pk}&status=requested",
-            "None of your requests are awaiting approval.",
+            f"{list_url}?requester={user.pk}&status=requested&status=approved",
+            "You have no pending requests.",
         )
 
     if user.can(lab, "manage_inventory"):
