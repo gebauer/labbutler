@@ -360,3 +360,15 @@ def test_create_rejects_malformed_id(client, lab, manager):
     assert resp.status_code == 200
     assert b"must look like" in resp.content
     assert not Item.objects.filter(name="Bad").exists()
+
+
+@pytest.mark.django_db
+def test_switch_lab_ignores_offsite_next(client, lab):
+    user = User.objects.create_user(username="", email="s@x.de", password="pw")
+    add_member(user=user, lab=lab, role_names=["Viewer"])
+    client.force_login(user)
+    resp = client.post(
+        reverse("inventory:switch_lab", args=[lab.slug]), {"next": "http://evil.example.com/"}
+    )
+    assert resp.status_code == 302
+    assert "evil.example.com" not in resp["Location"]  # open-redirect guard

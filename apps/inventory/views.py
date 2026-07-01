@@ -14,6 +14,7 @@ from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
@@ -239,4 +240,9 @@ def switch_lab(request: HttpRequest, slug: str) -> HttpResponse:
     """Set the session's active lab (must be one the user belongs to), then go to it."""
     lab = get_object_or_404(user_labs(request.user), slug=slug)
     set_current_lab(request, lab)
-    return redirect(request.POST.get("next") or reverse("inventory:item_list"))
+    target = request.POST.get("next", "")
+    if not target or not url_has_allowed_host_and_scheme(
+        target, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        target = reverse("inventory:item_list")  # ignore off-site targets (open-redirect guard)
+    return redirect(target)
