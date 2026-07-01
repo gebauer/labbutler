@@ -128,3 +128,35 @@ def test_my_pending_requests_scope(lab):
     assert pending.title == "My pending requests"
     # Awaiting approval + approved-but-not-forwarded; excludes forwarded and ordered.
     assert {r.item_name for r in pending.items} == {"Awaiting", "Approved open"}
+
+
+@pytest.mark.django_db
+def test_my_requests_in_progress_scope(lab):
+    from labbutler import dashboard
+
+    member = _user(lab, "u@x.de", ["Member"])
+    coord = _user(lab, "c@x.de", ["Purchase coordinator"])
+    Request.objects.create(
+        lab=lab, item_name="Awaiting", requested_by=member, status=Status.REQUESTED
+    )
+    Request.objects.create(
+        lab=lab, item_name="Approved open", requested_by=member, status=Status.APPROVED
+    )
+    Request.objects.create(
+        lab=lab,
+        item_name="Forwarded",
+        requested_by=member,
+        status=Status.APPROVED,
+        assigned_to=coord,
+    )
+    Request.objects.create(lab=lab, item_name="Ordered", requested_by=member, status=Status.ORDERED)
+    Request.objects.create(
+        lab=lab, item_name="Delivered", requested_by=member, status=Status.DELIVERED
+    )
+    Request.objects.create(lab=lab, item_name="Done", requested_by=member, status=Status.CHECKED_IN)
+
+    widgets = {w.key: w for w in dashboard.build(member, lab)}
+    tracking = widgets["tracking"]
+    assert tracking.title == "My requests in progress"
+    # Being handled elsewhere: forwarded / ordered / delivered — not pending, not finished.
+    assert {r.item_name for r in tracking.items} == {"Forwarded", "Ordered", "Delivered"}

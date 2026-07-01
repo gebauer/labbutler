@@ -64,6 +64,18 @@
                     <span class="truncate font-medium text-gray-900">{{ item.item_name }}</span>
                     {% include "procurement/_status_badge.html" with value=item.status label=item.get_status_display %}
                   </a>
+                {% elif w.kind == 'tracking' %}
+                  <a href="{% url 'procurement:request_detail' item.pk %}" class="block">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="truncate font-medium text-gray-900 hover:text-teal-700">{{ item.item_name }}</span>
+                      {% include "procurement/_status_badge.html" with value=item.status label=item.get_status_display %}
+                    </div>
+                    {% if item.assigned_to or item.expected_delivery %}
+                      <div class="mt-0.5 text-xs text-gray-500">
+                        {% if item.assigned_to %}with {{ item.assigned_to.email }}{% endif %}{% if item.expected_delivery %} · due {{ item.expected_delivery|date:"Y-m-d" }}{% endif %}
+                      </div>
+                    {% endif %}
+                  </a>
                 {% elif w.kind == 'expiring' %}
                   <a href="{% url 'inventory:item_detail' item.pk %}" class="flex items-center justify-between gap-2">
                     <span class="min-w-0">

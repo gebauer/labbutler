@@ -106,6 +106,25 @@ def build(user, lab) -> list[Widget]:
             "You have no pending requests.",
         )
 
+        # Mine that are being handled by someone else — follow, but nothing to do.
+        tracking = (
+            requests.filter(requested_by=user)
+            .filter(
+                Q(status=Status.ORDERED)
+                | Q(status=Status.DELIVERED)
+                | Q(status=Status.APPROVED, assigned_to__isnull=False)
+            )
+            .order_by("-created_at")
+        )
+        add(
+            "tracking",
+            "My requests in progress",
+            "tracking",
+            tracking,
+            f"{list_url}?requester={user.pk}&status=approved&status=ordered&status=delivered",
+            "Nothing of yours is in progress.",
+        )
+
     if user.can(lab, "manage_inventory"):
         horizon = timezone.localdate() + timedelta(days=30)
         items = (
