@@ -79,7 +79,7 @@ class ItemForm(forms.ModelForm):
             self.fields["human_id"] = forms.CharField(
                 label="Item ID",
                 required=False,
-                help_text="Open the ▾ to pick a free ID, or type your own; blank uses the next free.",
+                help_text="Open the ▾ to pick a free ID, or type your own.",
                 # Left empty on purpose: a prefilled value makes the browser filter the
                 # datalist down to that one match, so the dropdown would look empty.
                 widget=forms.TextInput(
