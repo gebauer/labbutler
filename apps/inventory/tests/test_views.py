@@ -276,3 +276,43 @@ def test_infinite_scroll_chunk_returns_rows_fragment(client, lab, manager):
     assert b'id="item-results"' not in chunk.content  # bare fragment, no wrapper
     assert b"<table" not in chunk.content
     assert b"Item 25" in chunk.content  # the 26th item, on page 2
+
+
+@pytest.mark.django_db
+def test_edit_item_custom_fields_round_trip(client, lab, manager):
+    from apps.inventory.models import FieldDefinition
+
+    FieldDefinition.objects.create(lab=lab, key="purity", label="Purity", data_type="text")
+    FieldDefinition.objects.create(lab=lab, key="volume_ml", label="Volume", data_type="number")
+    item = _make_item(lab, name="Ethanol")
+    client.force_login(manager)
+
+    form_page = client.get(reverse("inventory:item_edit", args=[item.pk]))
+    assert b'name="cf_purity"' in form_page.content  # custom inputs rendered
+
+    resp = client.post(
+        reverse("inventory:item_edit", args=[item.pk]),
+        {"name": "Ethanol", "tags": [], "cf_purity": "99%", "cf_volume_ml": "500"},
+    )
+    assert resp.status_code == 302
+    item.refresh_from_db()
+    assert item.custom_fields["purity"] == "99%"
+    assert item.custom_fields["volume_ml"] == 500.0  # typed as a number
+
+    # Clearing a value drops the key entirely.
+    client.post(
+        reverse("inventory:item_edit", args=[item.pk]),
+        {"name": "Ethanol", "tags": [], "cf_purity": "", "cf_volume_ml": "500"},
+    )
+    item.refresh_from_db()
+    assert "purity" not in item.custom_fields
+
+
+@pytest.mark.django_db
+def test_item_detail_shows_history(client, lab, manager):
+    client.force_login(manager)
+    client.post(reverse("inventory:item_create"), {"name": "Logged", "tags": []})
+    item = Item.objects.get(name="Logged")
+    resp = client.get(reverse("inventory:item_detail", args=[item.pk]))
+    assert b"History" in resp.content
+    assert b"item_created" in resp.content

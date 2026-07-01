@@ -102,6 +102,11 @@ def request_detail(request: HttpRequest, pk: int) -> HttpResponse:
     editable = req.status == Request.Status.REQUESTED and request.user.can(
         request.lab, "create_request"
     )
+    entries = (
+        AuditEntry.objects.filter(lab=request.lab, target_type="Request", target_id=str(req.pk))
+        .select_related("actor")
+        .order_by("-timestamp")[:50]
+    )
     return render(
         request,
         "procurement/request_detail.html",
@@ -109,6 +114,7 @@ def request_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "req": req,
             "transitions": services.available_transitions(request.user, req),
             "editable": editable,
+            "entries": entries,
         },
     )
 

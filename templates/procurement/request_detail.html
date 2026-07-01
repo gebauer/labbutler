@@ -83,4 +83,6 @@
       <a href="{% url 'inventory:item_detail' req.created_item.pk %}" class="font-medium text-green-800 hover:underline">{{ req.created_item.human_id }} · {{ req.created_item.name }}</a>.
     </div>
   {% endif %}
+
+  {% include "_audit_trail.html" %}
 {% endblock %}

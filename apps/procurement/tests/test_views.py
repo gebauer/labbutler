@@ -150,3 +150,15 @@ def test_request_infinite_scroll_chunk(client, lab):
     assert chunk.status_code == 200
     assert b'id="request-results"' not in chunk.content
     assert b"/requests/" in chunk.content
+
+
+@pytest.mark.django_db
+def test_request_detail_shows_history(client, lab):
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Member"])
+    req = Request.objects.create(lab=lab, item_name="Tips", requested_by=member)
+    client.force_login(manager)
+    client.post(reverse("procurement:request_action", args=[req.pk, "approve"]))
+    resp = client.get(reverse("procurement:request_detail", args=[req.pk]))
+    assert b"History" in resp.content
+    assert b"request_approve" in resp.content

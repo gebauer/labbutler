@@ -129,6 +129,11 @@ def item_detail(request: HttpRequest, pk: int) -> HttpResponse:
         pk=pk,
         lab=request.lab,
     )
+    entries = (
+        AuditEntry.objects.filter(lab=request.lab, target_type="Item", target_id=str(item.pk))
+        .select_related("actor")
+        .order_by("-timestamp")[:50]
+    )
     return render(
         request,
         "inventory/item_detail.html",
@@ -136,6 +141,7 @@ def item_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "item": item,
             "custom_fields": _custom_field_rows(request.lab, item),
             "can_manage": request.user.can(request.lab, "manage_inventory"),
+            "entries": entries,
         },
     )
 
