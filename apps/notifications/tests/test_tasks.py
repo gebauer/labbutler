@@ -119,3 +119,28 @@ def test_perform_transition_enqueues_notification_on_commit(
     assert len(mailoutbox) == 1
     assert "req@x.de" in mailoutbox[0].to
     assert "Approved" in mailoutbox[0].subject
+
+
+@pytest.mark.django_db
+def test_notify_request_assigned_emails_the_coordinator(lab, mailoutbox):
+    from apps.notifications.tasks import notify_request_assigned
+    from apps.procurement.models import Request
+
+    coord = _user(lab, "coord@x.de", ["Purchase coordinator"])
+    member = _user(lab, "req@x.de", ["Member"])
+    req = Request.objects.create(
+        lab=lab, item_name="Pipette tips", requested_by=member,
+        assigned_to=coord, status=Request.Status.APPROVED,
+    )
+    sent = notify_request_assigned(req.pk)
+    assert sent == 1
+    assert mailoutbox[0].to == ["coord@x.de"]
+    assert "Please order" in mailoutbox[0].subject
+
+
+@pytest.mark.django_db
+def test_notify_request_assigned_noop_without_assignee(mailoutbox):
+    from apps.notifications.tasks import notify_request_assigned
+
+    assert notify_request_assigned(999_999) == 0
+    assert mailoutbox == []

@@ -256,3 +256,46 @@ def test_receive_rejects_taken_id(client, lab):
     assert b"already in use" in resp.content
     req.refresh_from_db()
     assert req.status == Status.ORDERED
+
+
+@pytest.mark.django_db
+def test_forward_view_assigns_coordinator(client, lab):
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Member"])
+    coord = _user(lab, "c@x.de", ["Purchase coordinator"])
+    req = Request.objects.create(
+        lab=lab, item_name="Tips", requested_by=member, status=Status.APPROVED
+    )
+    client.force_login(manager)
+    resp = client.post(
+        reverse("procurement:request_forward", args=[req.pk]), {"assignee": coord.pk}
+    )
+    assert resp.status_code == 302
+    req.refresh_from_db()
+    assert req.assigned_to == coord
+
+
+@pytest.mark.django_db
+def test_forward_forbidden_for_uninvolved_member(client, lab):
+    requester = _user(lab, "r@x.de", ["Member"])
+    stranger = _user(lab, "s@x.de", ["Member"])
+    req = Request.objects.create(
+        lab=lab, item_name="Tips", requested_by=requester, status=Status.APPROVED
+    )
+    client.force_login(stranger)
+    assert client.get(reverse("procurement:request_forward", args=[req.pk])).status_code == 403
+
+
+@pytest.mark.django_db
+def test_filter_by_assignee(client, lab):
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    coord = _user(lab, "c@x.de", ["Purchase coordinator"])
+    Request.objects.create(
+        lab=lab, item_name="Assigned", requested_by=manager, assigned_to=coord,
+        status=Status.APPROVED,
+    )
+    Request.objects.create(lab=lab, item_name="Unassigned", requested_by=manager)
+    client.force_login(manager)
+    resp = client.get(reverse("procurement:request_list"), {"assignee": coord.pk})
+    assert b"Assigned" in resp.content
+    assert b"Unassigned" not in resp.content

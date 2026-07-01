@@ -28,6 +28,7 @@
       </div>
       {% include "inventory/_facet_select.html" with name="vendor" label="All suppliers" options=vendors selected=facets.vendor %}
       {% include "inventory/_facet_select.html" with name="requester" label="All requesters" options=requesters selected=facets.requester use_email=1 %}
+      {% include "inventory/_facet_select.html" with name="assignee" label="All assignees" options=assignees selected=facets.assignee use_email=1 %}
     </div>
 
     {# Status pills — multi-select: pick several to combine, or none to show all. #}

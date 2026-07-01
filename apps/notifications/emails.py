@@ -49,6 +49,23 @@ def build_status_change(
     return EmailContent(subject, body)
 
 
+def build_assignment(req: Request, *, base_url: str = "") -> EmailContent:
+    """Email asking a purchase coordinator to place an approved, forwarded request."""
+    subject = f"[LabButler] Please order “{req.item_name}”"
+    lines = [
+        "An approved request has been forwarded to you to order:",
+        "",
+        f"Request: {req.item_name}",
+        f"Total:   {req.total} {req.currency}",
+    ]
+    if req.vendor_id:
+        lines.append(f"Vendor:  {req.vendor.name}")
+    if req.catalog_number:
+        lines.append(f"Catalog: {req.catalog_number}")
+    body = "\n".join(lines) + _link(base_url, f"/requests/{req.pk}/")
+    return EmailContent(subject, body)
+
+
 def build_expiry_digest(
     lab,
     expired: list,

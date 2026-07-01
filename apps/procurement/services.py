@@ -15,6 +15,7 @@ from django.db import transaction
 from apps.audit.models import AuditEntry
 from apps.inventory import ids
 from apps.inventory.models import Item
+from apps.tenancy.models import User
 
 from .models import Request
 
@@ -117,6 +118,53 @@ def perform_transition(req: Request, action: str, *, actor, po_number: str = "")
 def can_receive(user, req: Request) -> bool:
     """Whether ``req`` is awaiting delivery and ``user`` may receive it."""
     return req.status in (Status.ORDERED, Status.DELIVERED) and user.can(req.lab, "check_in")
+
+
+def purchase_coordinators(lab):
+    """Lab members who can place orders — the people a request can be forwarded to."""
+    return (
+        User.objects.filter(
+            memberships__lab=lab,
+            memberships__roles__permissions__code="place_order",
+        )
+        .exclude(email="")
+        .distinct()
+        .order_by("email")
+    )
+
+
+def can_forward(user, req: Request) -> bool:
+    """Whether an approved request may be forwarded to a purchase coordinator by ``user``."""
+    if req.status != Status.APPROVED:
+        return False
+    return (
+        req.requested_by_id == user.pk
+        or user.can(req.lab, "approve_request")
+        or user.can(req.lab, "place_order")
+        or user.can(req.lab, "manage_lab")
+    )
+
+
+@transaction.atomic
+def forward(req: Request, *, actor, assignee: User) -> Request:
+    """Assign an approved request to a purchase coordinator and notify them."""
+    req.assigned_to = assignee
+    req.save()
+    AuditEntry.record(
+        lab=req.lab,
+        actor=actor,
+        action="procurement.request_forwarded",
+        target=req,
+        changes={"assigned_to": assignee.email},
+    )
+
+    def _notify() -> None:
+        from apps.notifications.tasks import notify_request_assigned
+
+        transaction.on_commit(lambda: notify_request_assigned.delay(req.pk))
+
+    _notify()
+    return req
 
 
 @transaction.atomic

@@ -64,6 +64,19 @@ def notify_request_transition(req_pk: int, previous: str, new: str) -> int:
 
 
 @shared_task
+def notify_request_assigned(req_pk: int) -> int:
+    """Email the coordinator a request was forwarded to. Returns count sent (0/1)."""
+    req = (
+        Request.objects.select_related("assigned_to", "vendor").filter(pk=req_pk).first()
+    )
+    if req is None or not req.assigned_to or not req.assigned_to.email:
+        return 0
+    content = emails.build_assignment(req, base_url=_base_url())
+    send_mail(content.subject, content.body, settings.DEFAULT_FROM_EMAIL, [req.assigned_to.email])
+    return 1
+
+
+@shared_task
 def send_expiry_digests(days_ahead: int | None = None) -> int:
     """Send a per-lab digest of expired / soon-to-expire items. Returns labs notified."""
     if days_ahead is None:

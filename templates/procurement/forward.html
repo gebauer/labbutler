@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Forward · {{ req.item_name }} · LabButler{% endblock %}
+
+{% block content %}
+  <a href="{% url 'procurement:request_detail' req.pk %}" class="text-sm text-teal-700 hover:underline">← Request</a>
+  <h1 class="mt-1 text-2xl font-semibold tracking-tight">Forward for ordering</h1>
+  <p class="mt-1 text-sm text-gray-500">Hand this approved request to a purchase coordinator to place the order.</p>
+
+  <form method="post" class="mt-5 max-w-xl rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    {% csrf_token %}
+    <h2 class="font-medium text-gray-900">{{ req.item_name }}</h2>
+    <p class="mt-1 text-sm text-gray-500">{{ req.total }} {{ req.currency }}{% if req.vendor %} · {{ req.vendor.name }}{% endif %}</p>
+
+    <label for="assignee" class="mt-4 block text-sm font-medium text-gray-700">Purchase coordinator</label>
+    {% if coordinators %}
+      <select id="assignee" name="assignee"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500">
+        {% for person in coordinators %}
+          <option value="{{ person.pk }}" {% if person == req.assigned_to %}selected{% endif %}>{{ person.email }}</option>
+        {% endfor %}
+      </select>
+      <div class="mt-5 flex gap-2">
+        <button type="submit" class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Forward</button>
+        <a href="{% url 'procurement:request_detail' req.pk %}" class="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50">Cancel</a>
+      </div>
+    {% else %}
+      <p class="mt-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        No purchase coordinators yet. Give someone the <strong>Purchase coordinator</strong> role (or any role with “{{ 'place_order' }}”) under Admin → Members.
+      </p>
+    {% endif %}
+  </form>
+{% endblock %}

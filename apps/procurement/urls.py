@@ -10,5 +10,6 @@ urlpatterns = [
     path("<int:pk>/", views.request_detail, name="request_detail"),
     path("<int:pk>/edit/", views.request_edit, name="request_edit"),
     path("<int:pk>/receive/", views.request_receive, name="request_receive"),
+    path("<int:pk>/forward/", views.request_forward, name="request_forward"),
     path("<int:pk>/<str:action>/", views.request_action, name="request_action"),
 ]

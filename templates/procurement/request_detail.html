@@ -18,11 +18,15 @@
     </div>
   </div>
 
-  {% if transitions or can_receive %}
+  {% if transitions or can_receive or can_forward %}
     <div class="mt-4 flex flex-wrap items-center gap-2 rounded border bg-white p-3">
       {% if can_receive %}
         <a href="{% url 'procurement:request_receive' req.pk %}"
            class="rounded bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700">Receive delivery…</a>
+      {% endif %}
+      {% if can_forward %}
+        <a href="{% url 'procurement:request_forward' req.pk %}"
+           class="rounded border border-teal-300 px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50">Forward for ordering…</a>
       {% endif %}
       {% for t in transitions %}
         <form method="post" action="{% url 'procurement:request_action' req.pk t.action %}" class="flex items-center gap-2">
@@ -48,6 +52,7 @@
     {% include "inventory/_detail_row.html" with label="Catalog no." value=req.catalog_number %}
     {% include "inventory/_detail_row.html" with label="CAS no." value=req.cas_number %}
     {% include "inventory/_detail_row.html" with label="Approver" value=req.approver.email %}
+    {% include "inventory/_detail_row.html" with label="Assigned to" value=req.assigned_to.email %}
     {% include "inventory/_detail_row.html" with label="PO #" value=req.po_number %}
     {% include "inventory/_detail_row.html" with label="Expected delivery" value=req.expected_delivery|date:"Y-m-d" %}
     <div>

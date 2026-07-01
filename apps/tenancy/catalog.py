@@ -33,4 +33,6 @@ TEMPLATE_ROLES: dict[str, list[str]] = {
         "check_out",
     ],
     "Viewer": ["view_inventory", "view_requests"],
+    # Order-responsible staff: approved requests are forwarded to them to place.
+    "Purchase coordinator": ["view_requests", "place_order"],
 }

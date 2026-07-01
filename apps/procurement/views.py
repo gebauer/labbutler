@@ -30,7 +30,11 @@ PAGE_SIZE = 25
 
 # Free-text query columns, and facet param -> the related pk it filters on.
 _REQ_SEARCH_FIELDS = ("item_name", "catalog_number", "cas_number", "po_number")
-_REQ_FACETS = {"vendor": "vendor__pk", "requester": "requested_by__pk"}
+_REQ_FACETS = {
+    "vendor": "vendor__pk",
+    "requester": "requested_by__pk",
+    "assignee": "assigned_to__pk",
+}
 
 
 def _filtered_requests(lab, query: str, statuses: list[str], facets: dict[str, str]):
@@ -83,6 +87,7 @@ def request_list(request: HttpRequest) -> HttpResponse:
         "has_filters": bool(query.strip()) or bool(selected_statuses) or any(facets.values()),
         "vendors": Vendor.objects.filter(lab=lab).order_by("name"),
         "requesters": User.objects.filter(requests_made__lab=lab).distinct().order_by("email"),
+        "assignees": services.purchase_coordinators(lab),
         "can_create": request.user.can(lab, "create_request"),
     }
     if request.GET.get("partial") == "chunk":
@@ -116,6 +121,7 @@ def request_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "req": req,
             "transitions": services.available_transitions(request.user, req),
             "can_receive": services.can_receive(request.user, req),
+            "can_forward": services.can_forward(request.user, req),
             "editable": editable,
             "entries": entries,
         },
@@ -243,3 +249,25 @@ def request_receive(request: HttpRequest, pk: int) -> HttpResponse:
         return redirect("inventory:item_label", pk=req.created_item_id)
 
     return dialog()
+
+
+@require_permission("view_requests")
+def request_forward(request: HttpRequest, pk: int) -> HttpResponse:
+    """Forward an approved request to a purchase coordinator to place the order."""
+    req = get_object_or_404(Request, pk=pk, lab=request.lab)
+    if not services.can_forward(request.user, req):
+        raise PermissionDenied
+    coordinators = services.purchase_coordinators(request.lab)
+
+    if request.method == "POST":
+        assignee = coordinators.filter(pk=request.POST.get("assignee") or 0).first()
+        if assignee is None:
+            messages.error(request, "Choose a purchase coordinator.")
+        else:
+            services.forward(req, actor=request.user, assignee=assignee)
+            messages.success(request, f"Forwarded to {assignee.email} for ordering.")
+            return redirect("procurement:request_detail", pk=req.pk)
+
+    return render(
+        request, "procurement/forward.html", {"req": req, "coordinators": coordinators}
+    )

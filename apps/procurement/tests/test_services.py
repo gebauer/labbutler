@@ -119,3 +119,41 @@ def test_available_transitions_for_requested(lab):
         "cancel",
     }
     assert {t.action for t in available_transitions(member, req)} == {"cancel"}
+
+
+@pytest.mark.django_db
+def test_purchase_coordinators_are_place_order_holders(lab):
+    _user(lab, "m@x.de", ["Lab manager"])  # place_order via "*"
+    _user(lab, "c@x.de", ["Purchase coordinator"])
+    _user(lab, "u@x.de", ["Member"])  # no place_order
+    emails = set(services.purchase_coordinators(lab).values_list("email", flat=True))
+    assert {"m@x.de", "c@x.de"} <= emails
+    assert "u@x.de" not in emails
+
+
+@pytest.mark.django_db
+def test_can_forward_only_when_approved_and_involved(lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    stranger = _user(lab, "s@x.de", ["Member"])
+    req = _request(lab, member)  # requested
+    assert services.can_forward(member, req) is False  # not approved yet
+    req.status = Status.APPROVED
+    req.save()
+    assert services.can_forward(member, req) is True  # requester of an approved request
+    assert services.can_forward(stranger, req) is False  # uninvolved member
+
+
+@pytest.mark.django_db
+def test_forward_assigns_and_audits(lab):
+    from apps.audit.models import AuditEntry
+
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Member"])
+    coord = _user(lab, "c@x.de", ["Purchase coordinator"])
+    req = _request(lab, member, status=Status.APPROVED)
+    services.forward(req, actor=manager, assignee=coord)
+    req.refresh_from_db()
+    assert req.assigned_to == coord
+    assert AuditEntry.objects.filter(
+        action="procurement.request_forwarded", target_id=str(req.pk)
+    ).exists()
