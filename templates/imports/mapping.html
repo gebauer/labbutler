@@ -5,7 +5,7 @@
 {% block content %}
   <div class="flex flex-wrap items-center justify-between gap-4">
     <div>
-      <h1 class="text-xl font-semibold">Map columns</h1>
+      <h1 class="text-2xl font-semibold tracking-tight">Map columns</h1>
       <p class="mt-1 text-sm text-gray-500">{{ filename }}</p>
     </div>
     <a href="{% url 'imports:cancel' %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Cancel</a>
@@ -59,7 +59,7 @@
       </table>
     </div>
     <div class="mt-4 flex gap-2">
-      <button type="submit" class="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700">
+      <button type="submit" class="rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">
         Preview import
       </button>
       <a href="{% url 'imports:start' %}" class="rounded border px-4 py-2 text-sm hover:bg-gray-50">Back</a>

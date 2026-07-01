@@ -7,27 +7,36 @@
   <link rel="stylesheet" href="{% static 'css/dist.css' %}">
   <script src="https://unpkg.com/htmx.org@2.0.3" defer></script>
 </head>
-<body class="min-h-screen bg-gray-50 text-gray-900">
-  <header class="border-b bg-white">
-    <div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-4">
-      <div class="flex items-center gap-6">
-        <a href="/" class="font-semibold">LabButler</a>
+<body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
+  <header class="sticky top-0 z-20 border-b border-gray-200 bg-white/95 backdrop-blur">
+    <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2.5">
+      <div class="flex items-center gap-1.5">
+        <a href="/" class="mr-4 flex items-center gap-2 font-semibold tracking-tight">
+          <span class="grid h-7 w-7 place-items-center rounded-lg bg-teal-600 text-sm font-bold text-white">L</span>
+          <span class="text-gray-900">Lab<span class="text-teal-600">Butler</span></span>
+        </a>
         {% if user.is_authenticated %}
-          <a href="{% url 'inventory:item_list' %}" class="text-sm text-gray-600 hover:text-gray-900">Inventory</a>
-          {% if can_view_requests %}
-            <a href="{% url 'procurement:request_list' %}" class="text-sm text-gray-600 hover:text-gray-900">Requests</a>
-          {% endif %}
-          {% if can_import %}
-            <a href="{% url 'imports:start' %}" class="text-sm text-gray-600 hover:text-gray-900">Import</a>
-          {% endif %}
+          {% with app=request.resolver_match.app_name %}
+            <a href="{% url 'inventory:item_list' %}"
+               class="rounded-md px-3 py-1.5 text-sm font-medium {% if app == 'inventory' %}bg-teal-50 text-teal-700{% else %}text-gray-600 hover:bg-gray-100 hover:text-gray-900{% endif %}">Inventory</a>
+            {% if can_view_requests %}
+              <a href="{% url 'procurement:request_list' %}"
+                 class="rounded-md px-3 py-1.5 text-sm font-medium {% if app == 'procurement' %}bg-teal-50 text-teal-700{% else %}text-gray-600 hover:bg-gray-100 hover:text-gray-900{% endif %}">Requests</a>
+            {% endif %}
+            {% if can_import %}
+              <a href="{% url 'imports:start' %}"
+                 class="rounded-md px-3 py-1.5 text-sm font-medium {% if app == 'imports' %}bg-teal-50 text-teal-700{% else %}text-gray-600 hover:bg-gray-100 hover:text-gray-900{% endif %}">Import</a>
+            {% endif %}
+          {% endwith %}
         {% endif %}
       </div>
       <nav class="flex items-center gap-3 text-sm">
         {% if user.is_authenticated %}
           {% if available_labs|length > 1 %}
-            <form method="post" action="{% url 'inventory:switch_lab' current_lab.slug %}" class="flex items-center">
+            <form method="post" action="{% url 'inventory:switch_lab' current_lab.slug %}">
               {% csrf_token %}
-              <select name="lab" class="rounded border border-gray-300 px-2 py-1 text-sm"
+              <select name="lab"
+                      class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
                       onchange="this.form.action='/inventory/switch-lab/'+this.value+'/'; this.form.submit();">
                 {% for lab in available_labs %}
                   <option value="{{ lab.slug }}" {% if lab == current_lab %}selected{% endif %}>{{ lab.name }}</option>
@@ -35,22 +44,31 @@
               </select>
             </form>
           {% elif current_lab %}
-            <span class="text-gray-500">{{ current_lab.name }}</span>
+            <span class="rounded-md bg-gray-100 px-2.5 py-1.5 text-sm font-medium text-gray-700">{{ current_lab.name }}</span>
           {% endif %}
-          <span class="text-gray-400">{{ user.email }}</span>
-          <form method="post" action="{% url 'logout' %}" class="inline">
-            {% csrf_token %}
-            <button type="submit" class="text-gray-500 hover:text-gray-900">Sign out</button>
-          </form>
+          <div class="flex items-center gap-2 border-l border-gray-200 pl-3">
+            <span class="hidden text-gray-500 sm:inline">{{ user.email }}</span>
+            <form method="post" action="{% url 'logout' %}">
+              {% csrf_token %}
+              <button type="submit" class="rounded-md px-2 py-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900">Sign out</button>
+            </form>
+          </div>
         {% endif %}
       </nav>
     </div>
   </header>
-  <main class="mx-auto max-w-6xl px-4 py-6">
+
+  <main class="mx-auto max-w-7xl px-4 py-6">
     {% if messages %}
-      {% for message in messages %}
-        <div class="mb-3 rounded border px-3 py-2 text-sm">{{ message }}</div>
-      {% endfor %}
+      <div class="mb-4 space-y-2">
+        {% for message in messages %}
+          <div class="rounded-lg border px-4 py-2.5 text-sm
+            {% if message.tags == 'success' %}border-teal-200 bg-teal-50 text-teal-800
+            {% elif message.tags == 'error' %}border-red-200 bg-red-50 text-red-700
+            {% elif message.tags == 'warning' %}border-amber-200 bg-amber-50 text-amber-800
+            {% else %}border-gray-200 bg-white text-gray-700{% endif %}">{{ message }}</div>
+        {% endfor %}
+      </div>
     {% endif %}
     {% block content %}{% endblock %}
   </main>

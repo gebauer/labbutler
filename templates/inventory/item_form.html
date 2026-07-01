@@ -4,7 +4,7 @@
 
 {% block content %}
   <div class="flex items-center justify-between gap-4">
-    <h1 class="text-xl font-semibold">{{ title }}</h1>
+    <h1 class="text-2xl font-semibold tracking-tight">{{ title }}</h1>
     {% if item %}
       <a href="{% url 'inventory:item_detail' item.pk %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Cancel</a>
     {% else %}
@@ -32,7 +32,7 @@
       {% endfor %}
     </div>
     <div class="mt-6">
-      <button type="submit" class="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700">Save</button>
+      <button type="submit" class="rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Save</button>
     </div>
   </form>
 {% endblock %}

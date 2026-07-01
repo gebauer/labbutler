@@ -1,0 +1,8 @@
+{% comment %}A lab-scoped filter dropdown. Params: name, label, options, selected, use_email.{% endcomment %}
+<select name="{{ name }}"
+        class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500">
+  <option value="">{{ label }}</option>
+  {% for option in options %}
+    <option value="{{ option.pk }}" {% if selected == option.pk|stringformat:'s' %}selected{% endif %}>{% if use_email %}{{ option.email }}{% else %}{{ option }}{% endif %}</option>
+  {% endfor %}
+</select>

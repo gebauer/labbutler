@@ -1,31 +1,39 @@
-<div id="item-results" class="mt-4">
-  <p class="text-sm text-gray-500">{{ page.paginator.count }} item{{ page.paginator.count|pluralize }}</p>
+<div id="item-results" class="mt-5">
+  <div class="flex items-center justify-between gap-3 text-sm text-gray-500">
+    <span><span class="font-medium text-gray-700">{{ page.paginator.count }}</span> item{{ page.paginator.count|pluralize }}</span>
+    {% if has_filters %}
+      <a href="{% url 'inventory:item_list' %}" class="text-teal-700 hover:underline">Clear filters</a>
+    {% endif %}
+  </div>
 
   {% if page.object_list %}
-    {% if view_mode == 'cards' %}
-      {% include "inventory/_item_cards.html" %}
-    {% else %}
-      {% include "inventory/_item_table.html" %}
-    {% endif %}
+    <div class="mt-2">
+      {% if view_mode == 'cards' %}
+        {% include "inventory/_item_cards.html" %}
+      {% else %}
+        {% include "inventory/_item_table.html" %}
+      {% endif %}
+    </div>
 
     {% if page.has_other_pages %}
       <div class="mt-3 flex items-center justify-between text-sm text-gray-600">
         <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
         <div class="flex gap-2">
           {% if page.has_previous %}
-            <a href="?q={{ query|urlencode }}&tag={{ tag_id }}&page={{ page.previous_page_number }}"
-               class="rounded border px-3 py-1 hover:bg-gray-50">Previous</a>
+            <a href="?{{ filter_qs }}&page={{ page.previous_page_number }}"
+               class="rounded-lg border border-gray-300 px-3 py-1 hover:bg-gray-50">Previous</a>
           {% endif %}
           {% if page.has_next %}
-            <a href="?q={{ query|urlencode }}&tag={{ tag_id }}&page={{ page.next_page_number }}"
-               class="rounded border px-3 py-1 hover:bg-gray-50">Next</a>
+            <a href="?{{ filter_qs }}&page={{ page.next_page_number }}"
+               class="rounded-lg border border-gray-300 px-3 py-1 hover:bg-gray-50">Next</a>
           {% endif %}
         </div>
       </div>
     {% endif %}
   {% else %}
-    <div class="mt-4 rounded border border-dashed bg-white px-4 py-10 text-center text-sm text-gray-500">
-      No items match.
+    <div class="mt-3 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-12 text-center">
+      <p class="text-sm font-medium text-gray-700">No items match</p>
+      <p class="mt-1 text-sm text-gray-500">Try a different search or clear the filters.</p>
     </div>
   {% endif %}
 </div>

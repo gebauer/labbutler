@@ -222,3 +222,42 @@ def test_detail_shows_hazard_statement_on_hover(client, lab, manager):
     assert b"H319" in resp.content
     # The general GHS sentence for the code appears in the hover title.
     assert b"Causes serious eye irritation" in resp.content
+
+
+@pytest.mark.django_db
+def test_filter_by_location(client, lab, manager):
+    from apps.inventory.models import Location
+
+    fridge = Location.objects.create(lab=lab, name="Fridge 2")
+    _make_item(lab, name="Cold thing", location=fridge)
+    _make_item(lab, name="Bench thing")
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_list"), {"location": fridge.pk})
+    assert b"Cold thing" in resp.content
+    assert b"Bench thing" not in resp.content
+
+
+@pytest.mark.django_db
+def test_filter_by_supplier(client, lab, manager):
+    from apps.procurement.models import Vendor
+
+    sigma = Vendor.objects.create(lab=lab, name="Sigma")
+    _make_item(lab, name="From Sigma", vendor=sigma)
+    _make_item(lab, name="From nowhere")
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_list"), {"vendor": sigma.pk})
+    assert b"From Sigma" in resp.content
+    assert b"From nowhere" not in resp.content
+
+
+@pytest.mark.django_db
+def test_filter_by_owner_and_combined(client, lab, manager):
+    owner = User.objects.create_user(username="", email="owner@x.de", password="pw")
+    _make_item(lab, name="Owned solvent", owner=owner)
+    _make_item(lab, name="Owned other", owner=owner)
+    _make_item(lab, name="Unowned")
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_list"), {"owner": owner.pk, "q": "solvent"})
+    assert b"Owned solvent" in resp.content
+    assert b"Owned other" not in resp.content  # narrowed further by the query
+    assert b"Unowned" not in resp.content

@@ -17,10 +17,12 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
+from apps.procurement.models import Vendor
+from apps.tenancy.models import User
 from apps.tenancy.scoping import require_permission, set_current_lab, user_labs
 
 from .forms import ItemForm
-from .models import Item, Tag
+from .models import Item, Location, Tag
 
 PAGE_SIZE = 25
 
@@ -35,9 +37,17 @@ _SEARCH_FIELDS = (
     "lot_number",
 )
 
+# Query param -> the item field it filters on (all match a related row's primary key).
+_FACETS = {
+    "tag": "tags__pk",
+    "location": "location__pk",
+    "owner": "owner__pk",
+    "vendor": "vendor__pk",
+}
 
-def _filtered_items(lab, query: str, tag_id: str):
-    """Return the lab's items narrowed by free-text query and optional tag."""
+
+def _filtered_items(lab, query: str, facets: dict[str, str]):
+    """Return the lab's items narrowed by free-text query and any active facet filters."""
     items = (
         Item.objects.filter(lab=lab)
         .select_related("location", "vendor", "owner")
@@ -49,9 +59,19 @@ def _filtered_items(lab, query: str, tag_id: str):
         for field_name in _SEARCH_FIELDS:
             lookup |= Q(**{f"{field_name}__icontains": query})
         items = items.filter(lookup)
-    if tag_id:
-        items = items.filter(tags__pk=tag_id)
+    for param, lookup_field in _FACETS.items():
+        value = facets.get(param)
+        if value:
+            items = items.filter(**{lookup_field: value})
     return items.distinct()
+
+
+def _filter_querystring(request: HttpRequest) -> str:
+    """Current query params minus page/view — for building pagination & toggle links."""
+    params = request.GET.copy()
+    params.pop("page", None)
+    params.pop("view", None)
+    return params.urlencode()
 
 
 VIEW_MODES = ("table", "cards")
@@ -71,19 +91,25 @@ def _resolve_view_mode(request: HttpRequest) -> str:
 def item_list(request: HttpRequest) -> HttpResponse:
     """Paginated, searchable item list, rendered as a table or cards. HTMX requests get
     only the results partial."""
+    lab = request.lab
     query = request.GET.get("q", "")
-    tag_id = request.GET.get("tag", "")
+    facets = {param: request.GET.get(param, "") for param in _FACETS}
     view_mode = _resolve_view_mode(request)
-    items = _filtered_items(request.lab, query, tag_id)
+    items = _filtered_items(lab, query, facets)
 
     page = Paginator(items, PAGE_SIZE).get_page(request.GET.get("page"))
     context = {
         "page": page,
         "query": query,
-        "tag_id": tag_id,
+        "facets": facets,
         "view_mode": view_mode,
-        "tags": Tag.objects.filter(lab=request.lab).order_by("name"),
-        "can_manage": request.user.can(request.lab, "manage_inventory"),
+        "filter_qs": _filter_querystring(request),
+        "has_filters": bool(query.strip()) or any(facets.values()),
+        "tags": Tag.objects.filter(lab=lab).order_by("name"),
+        "locations": Location.objects.filter(lab=lab).order_by("name"),
+        "vendors": Vendor.objects.filter(lab=lab).order_by("name"),
+        "owners": User.objects.filter(owned_items__lab=lab).distinct().order_by("email"),
+        "can_manage": request.user.can(lab, "manage_inventory"),
     }
     if request.htmx:
         return render(request, "inventory/_item_results.html", context)
