@@ -11,7 +11,7 @@ from __future__ import annotations
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -60,6 +60,27 @@ def _filtered_requests(lab, query: str, statuses: list[str], facets: dict[str, s
     return requests
 
 
+# The happy-path pipeline shown as a stepper (off-path states handled separately).
+_PIPELINE = ["requested", "approved", "ordered", "delivered", "checked_in"]
+_OFF_PATH = ["rejected", "cancelled"]
+
+
+def _status_overview(lab, selected: list[str]) -> tuple[list[dict], list[dict]]:
+    """Per-status counts (lab-wide) for the pipeline stepper and the off-path chips."""
+    counts = dict(Request.objects.filter(lab=lab).values_list("status").annotate(n=Count("id")))
+    labels = dict(Request.Status.choices)
+
+    def stage(code: str) -> dict:
+        return {
+            "code": code,
+            "label": labels[code],
+            "count": counts.get(code, 0),
+            "checked": code in selected,
+        }
+
+    return [stage(c) for c in _PIPELINE], [stage(c) for c in _OFF_PATH]
+
+
 def _request_querystring(request: HttpRequest) -> str:
     """Current filter params (minus paging/partial), preserving multiple status values."""
     params = request.GET.copy()
@@ -77,12 +98,14 @@ def request_list(request: HttpRequest) -> HttpResponse:
     requests = _filtered_requests(lab, query, selected_statuses, facets)
 
     page = Paginator(requests, PAGE_SIZE).get_page(request.GET.get("page"))
+    pipeline, off_path = _status_overview(lab, selected_statuses)
     context = {
         "page": page,
         "query": query,
         "selected_statuses": selected_statuses,
         "facets": facets,
-        "statuses": Request.Status.choices,
+        "pipeline": pipeline,
+        "off_path": off_path,
         "filter_qs": _request_querystring(request),
         "has_filters": bool(query.strip()) or bool(selected_statuses) or any(facets.values()),
         "vendors": Vendor.objects.filter(lab=lab).order_by("name"),

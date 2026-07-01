@@ -31,12 +31,26 @@
       {% include "inventory/_facet_select.html" with name="assignee" label="All assignees" options=assignees selected=facets.assignee use_email=1 %}
     </div>
 
-    {# Status pills — multi-select: pick several to combine, or none to show all. #}
-    <div class="flex flex-wrap gap-1.5">
-      {% for value, label in statuses %}
-        <label>
-          <input type="checkbox" name="status" value="{{ value }}" class="peer sr-only" {% if value in selected_statuses %}checked{% endif %}>
-          <span class="inline-block cursor-pointer rounded-full border border-gray-200 px-3 py-1 text-sm text-gray-600 hover:border-teal-300 peer-checked:border-teal-600 peer-checked:bg-teal-600 peer-checked:text-white">{{ label }}</span>
+    {# Workflow stepper — each stage is a multi-select toggle with a lab-wide count.
+       Pick several to combine; none shows all. #}
+    <div class="flex flex-wrap items-center gap-1.5">
+      {% for stage in pipeline %}
+        <label class="cursor-pointer">
+          <input type="checkbox" name="status" value="{{ stage.code }}" class="peer sr-only" {% if stage.checked %}checked{% endif %}>
+          <span class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:border-teal-300 peer-checked:border-teal-600 peer-checked:bg-teal-600 peer-checked:text-white">
+            {{ stage.label }}
+            {% if stage.count %}<span class="rounded-full bg-gray-900/10 px-1.5 text-xs font-semibold">{{ stage.count }}</span>{% endif %}
+          </span>
+        </label>
+        {% if not forloop.last %}<span class="text-gray-300" aria-hidden="true">›</span>{% endif %}
+      {% endfor %}
+      <span class="mx-1 hidden h-5 w-px bg-gray-200 sm:block"></span>
+      {% for stage in off_path %}
+        <label class="cursor-pointer">
+          <input type="checkbox" name="status" value="{{ stage.code }}" class="peer sr-only" {% if stage.checked %}checked{% endif %}>
+          <span class="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-500 hover:border-gray-300 peer-checked:border-gray-700 peer-checked:bg-gray-700 peer-checked:text-white">
+            {{ stage.label }}{% if stage.count %} <span class="font-semibold">{{ stage.count }}</span>{% endif %}
+          </span>
         </label>
       {% endfor %}
     </div>
