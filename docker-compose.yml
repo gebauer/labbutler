@@ -3,7 +3,42 @@
 #   docker compose up -d --build
 #   docker compose run --rm web python manage.py bootstrap_lab   # first run only
 #
-# The web service migrates on start; collectstatic runs at image build time.
+# Config is passed via ${VAR} interpolation (env values come from an auto-loaded .env for
+# plain `docker compose`, or from the platform's env UI e.g. Coolify) — NOT env_file, so
+# the variables reliably reach the containers. The web service migrates on start;
+# collectstatic runs at image build time.
+
+# Shared app configuration for web / worker / beat.
+x-app-environment: &app-environment
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-}
+  DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+  DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
+  DJANGO_TIME_ZONE: ${DJANGO_TIME_ZONE:-Europe/Berlin}
+  DJANGO_SECURE_SSL_REDIRECT: ${DJANGO_SECURE_SSL_REDIRECT:-true}
+  # Defaults to the bundled db service so it can never fall back to localhost. If you use
+  # a custom POSTGRES_PASSWORD, set DATABASE_URL with the same password (or point it at a
+  # managed database).
+  DATABASE_URL: ${DATABASE_URL:-postgres://labbutler:labbutler@db:5432/labbutler}
+  CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://broker:6379/0}
+  CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://broker:6379/1}
+  CELERY_TASK_ALWAYS_EAGER: ${CELERY_TASK_ALWAYS_EAGER:-false}
+  DJANGO_MEDIA_ROOT: ${DJANGO_MEDIA_ROOT:-/data/media}
+  DJANGO_EMAIL_BACKEND: ${DJANGO_EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+  EMAIL_HOST: ${EMAIL_HOST:-localhost}
+  EMAIL_PORT: ${EMAIL_PORT:-587}
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-labbutler@localhost}
+  LABBUTLER_BASE_URL: ${LABBUTLER_BASE_URL:-}
+  EXPIRY_DIGEST_DAYS: ${EXPIRY_DIGEST_DAYS:-30}
+  EXPIRY_DIGEST_HOUR: ${EXPIRY_DIGEST_HOUR:-7}
+  AXES_FAILURE_LIMIT: ${AXES_FAILURE_LIMIT:-5}
+  AXES_COOLOFF_HOURS: ${AXES_COOLOFF_HOURS:-1}
+  # Behind a reverse proxy (Coolify's Traefik = 1) so lockouts use the real client IP.
+  AXES_IPWARE_PROXY_COUNT: ${AXES_IPWARE_PROXY_COUNT:-0}
+
 services:
   db:
     image: postgres:17
@@ -29,7 +64,7 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput &&
              exec gunicorn labbutler.wsgi:application --bind 0.0.0.0:8000 --workers 3"
-    env_file: .env
+    environment: *app-environment
     depends_on:
       db:
         condition: service_healthy
@@ -48,7 +83,7 @@ services:
   worker:
     build: .
     command: celery -A labbutler worker -l info
-    env_file: .env
+    environment: *app-environment
     depends_on:
       db:
         condition: service_healthy
@@ -61,7 +96,7 @@ services:
   beat:
     build: .
     command: celery -A labbutler beat -l info --schedule /tmp/celerybeat-schedule
-    env_file: .env
+    environment: *app-environment
     depends_on:
       db:
         condition: service_healthy
