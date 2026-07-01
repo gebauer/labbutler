@@ -113,6 +113,10 @@ docker compose run --rm web python manage.py bootstrap_lab   # first run: superu
   Set `DJANGO_ALLOWED_HOSTS` and `DJANGO_CSRF_TRUSTED_ORIGINS` to your domain.
 - Health probe: `GET /healthz` returns `200 ok` when the database is reachable (the `web`
   container's health check uses it).
+- **Login brute-force protection** is on by default (django-axes): a client IP + username
+  is locked out after `AXES_FAILURE_LIMIT` failed sign-ins for `AXES_COOLOFF_HOURS`.
+  **Set `AXES_IPWARE_PROXY_COUNT` to the number of proxies** in front so the real client
+  IP is used, not the proxy's.
 
 All configuration is via environment variables (`.env`) — **no secrets in the repo**.
 Database migrations are append-only and reversible.

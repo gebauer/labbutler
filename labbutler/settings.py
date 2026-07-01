@@ -44,6 +44,8 @@ INSTALLED_APPS = [
     "apps.audit",
     "apps.notifications",
     "apps.comments",
+    # Login brute-force protection (keep last so it can wrap auth signals).
+    "axes",
 ]
 
 MIDDLEWARE = [
@@ -57,6 +59,14 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
+    # Must come last: blocks requests from locked-out clients.
+    "axes.middleware.AxesMiddleware",
+]
+
+# django-axes checks lockout in an auth backend; ModelBackend still does the real auth.
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
 ]
 
 ROOT_URLCONF = "labbutler.urls"
@@ -152,6 +162,20 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="labbutler@localhost")
 LABBUTLER_BASE_URL = env("LABBUTLER_BASE_URL", default="")
 # How many days ahead the expiry digest looks.
 EXPIRY_DIGEST_DAYS = env.int("EXPIRY_DIGEST_DAYS", default=30)
+
+# --- Login brute-force protection (django-axes) ----------------------------------------
+AXES_ENABLED = env.bool("AXES_ENABLED", default=True)
+# Lock the specific (client IP, username) pair — stops targeted guessing without letting a
+# remote attacker lock a victim out globally, or one office IP lock everyone.
+AXES_LOCKOUT_PARAMETERS = [["ip_address", "username"]]
+AXES_FAILURE_LIMIT = env.int("AXES_FAILURE_LIMIT", default=5)
+AXES_COOLOFF_TIME = env.int("AXES_COOLOFF_HOURS", default=1)  # hours before auto-unlock
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_TEMPLATE = "lockout.html"
+AXES_HTTP_RESPONSE_CODE = 429
+# Behind a reverse proxy set the number of proxies so the *client* IP is used, not the
+# proxy's (otherwise everyone shares one IP). 0 = trust REMOTE_ADDR (no proxy).
+AXES_IPWARE_PROXY_COUNT = env.int("AXES_IPWARE_PROXY_COUNT", default=0) or None
 
 # --- Security (prod-friendly defaults, relaxed when DEBUG) -----------------------------
 CSRF_TRUSTED_ORIGINS = env("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])

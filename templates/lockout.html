@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Too many attempts · LabButler{% endblock %}
+
+{% block content %}
+  <div class="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 px-6 py-10 text-center">
+    <h1 class="text-lg font-semibold text-amber-900">Too many failed sign-in attempts</h1>
+    <p class="mt-2 text-sm text-amber-800">
+      For security, sign-in from here is paused for a while. Please wait and try again later,
+      or contact a lab administrator if you're locked out.
+    </p>
+  </div>
+{% endblock %}

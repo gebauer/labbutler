@@ -17,3 +17,10 @@ def _plain_static_storage(settings):
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
         },
     }
+
+
+@pytest.fixture(autouse=True)
+def _disable_axes(settings):
+    """Turn off login lockout by default so force_login-based tests are unaffected;
+    the brute-force test re-enables it explicitly."""
+    settings.AXES_ENABLED = False
