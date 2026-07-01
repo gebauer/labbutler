@@ -18,8 +18,12 @@
     </div>
   </div>
 
-  {% if transitions %}
-    <div class="mt-4 flex flex-wrap gap-2 rounded border bg-white p-3">
+  {% if transitions or can_receive %}
+    <div class="mt-4 flex flex-wrap items-center gap-2 rounded border bg-white p-3">
+      {% if can_receive %}
+        <a href="{% url 'procurement:request_receive' req.pk %}"
+           class="rounded bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700">Receive delivery…</a>
+      {% endif %}
       {% for t in transitions %}
         <form method="post" action="{% url 'procurement:request_action' req.pk t.action %}" class="flex items-center gap-2">
           {% csrf_token %}

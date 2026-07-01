@@ -69,9 +69,12 @@ def test_action_forbidden_without_permission(client, lab):
 
 
 @pytest.mark.django_db
-def test_full_workflow_checkin_creates_item_and_redirects(client, lab):
+def test_full_workflow_receive_checks_in_and_labels(client, lab):
+    from apps.inventory.models import Location
+
     manager = _user(lab, "m@x.de", ["Lab manager"])
     member = _user(lab, "u@x.de", ["Member"])
+    fridge = Location.objects.create(lab=lab, name="Fridge 2")
     req = Request.objects.create(
         lab=lab, item_name="Tips", requested_by=member, unit_price=Decimal("5.00")
     )
@@ -80,14 +83,71 @@ def test_full_workflow_checkin_creates_item_and_redirects(client, lab):
     client.post(
         reverse("procurement:request_action", args=[req.pk, "order"]), {"po_number": "PO-9"}
     )
-    resp = client.post(reverse("procurement:request_action", args=[req.pk, "check_in"]))
+    resp = client.post(
+        reverse("procurement:request_receive", args=[req.pk]),
+        {"outcome": "check_in", "location": fridge.pk},
+    )
 
     assert resp.status_code == 302
     req.refresh_from_db()
     assert req.status == Status.CHECKED_IN
-    assert req.po_number == "PO-9"
-    assert Item.objects.filter(lab=lab, pk=req.created_item_id).exists()
-    assert reverse("inventory:item_detail", args=[req.created_item_id]) in resp["Location"]
+    item = Item.objects.get(lab=lab, pk=req.created_item_id)
+    assert item.location == fridge
+    # Check-in sends you to the print-label page.
+    assert reverse("inventory:item_label", args=[item.pk]) in resp["Location"]
+
+
+@pytest.mark.django_db
+def test_receive_without_location_needs_confirmation(client, lab):
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    req = Request.objects.create(
+        lab=lab, item_name="Tips", requested_by=manager, status=Status.ORDERED
+    )
+    client.force_login(manager)
+    # First attempt with no location re-renders the dialog with a confirmation.
+    first = client.post(
+        reverse("procurement:request_receive", args=[req.pk]), {"outcome": "check_in"}
+    )
+    assert first.status_code == 200
+    assert b"confirm_no_location" in first.content
+    req.refresh_from_db()
+    assert req.status == Status.ORDERED  # nothing happened yet
+
+    second = client.post(
+        reverse("procurement:request_receive", args=[req.pk]),
+        {"outcome": "check_in", "confirm_no_location": "1"},
+    )
+    assert second.status_code == 302
+    req.refresh_from_db()
+    assert req.status == Status.CHECKED_IN
+    assert req.created_item.location is None
+
+
+@pytest.mark.django_db
+def test_receive_without_item_marks_delivered(client, lab):
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    req = Request.objects.create(
+        lab=lab, item_name="Site licence", requested_by=manager, status=Status.ORDERED
+    )
+    client.force_login(manager)
+    resp = client.post(
+        reverse("procurement:request_receive", args=[req.pk]), {"outcome": "no_item"}
+    )
+    assert resp.status_code == 302
+    req.refresh_from_db()
+    assert req.status == Status.DELIVERED
+    assert req.created_item is None
+    assert not Item.objects.filter(lab=lab).exists()
+
+
+@pytest.mark.django_db
+def test_receive_forbidden_without_check_in_permission(client, lab):
+    viewer = _user(lab, "v@x.de", ["Viewer"])  # no check_in
+    req = Request.objects.create(
+        lab=lab, item_name="Tips", requested_by=viewer, status=Status.ORDERED
+    )
+    client.force_login(viewer)
+    assert client.get(reverse("procurement:request_receive", args=[req.pk])).status_code == 403
 
 
 @pytest.mark.django_db

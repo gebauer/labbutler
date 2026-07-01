@@ -4,6 +4,7 @@ from decimal import Decimal
 
 import pytest
 
+from apps.procurement import services
 from apps.procurement.models import Request
 from apps.procurement.services import (
     TRANSITIONS,
@@ -47,13 +48,36 @@ def test_happy_path_to_checked_in_creates_linked_item(lab):
     assert req.status == Status.ORDERED
     assert req.po_number == "PO-1"
 
-    perform_transition(req, "check_in", actor=member)
+    from apps.inventory.models import Location
+
+    fridge = Location.objects.create(lab=lab, name="Fridge 2")
+    services.receive(req, actor=member, create_item=True, location=fridge)
     req.refresh_from_db()
     assert req.status == Status.CHECKED_IN
     assert req.created_item is not None
     assert req.created_item.name == "Pipette tips"
     assert req.created_item.owner == member
+    assert req.created_item.location == fridge
     assert req.created_item.human_id.startswith("LB-")
+
+
+@pytest.mark.django_db
+def test_receive_without_item_marks_delivered(lab):
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member, status=Status.ORDERED)
+    services.receive(req, actor=manager, create_item=False)
+    req.refresh_from_db()
+    assert req.status == Status.DELIVERED
+    assert req.created_item is None
+
+
+@pytest.mark.django_db
+def test_receive_rejects_non_ordered(lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member)  # still 'requested'
+    with pytest.raises(TransitionError):
+        services.receive(req, actor=member, create_item=True)
 
 
 @pytest.mark.django_db

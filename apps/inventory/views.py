@@ -154,6 +154,13 @@ def _custom_field_rows(lab, item: Item) -> list[tuple[str, object]]:
     return [(labels.get(key, key), value) for key, value in sorted(item.custom_fields.items())]
 
 
+@require_permission("view_inventory")
+def item_label(request: HttpRequest, pk: int) -> HttpResponse:
+    """Print-friendly label page for an item: its frozen ID plus labelling instructions."""
+    item = get_object_or_404(Item, pk=pk, lab=request.lab)
+    return render(request, "inventory/item_label.html", {"item": item})
+
+
 @require_permission("manage_inventory")
 def item_create(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":

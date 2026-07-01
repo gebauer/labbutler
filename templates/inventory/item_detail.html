@@ -10,6 +10,7 @@
     </div>
     <div class="flex gap-2">
       <a href="{% url 'inventory:item_list' %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Back</a>
+      <a href="{% url 'inventory:item_label' item.pk %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Label</a>
       {% if can_manage %}
         <a href="{% url 'inventory:item_edit' item.pk %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Edit</a>
         <a href="{% url 'inventory:item_delete' item.pk %}" class="rounded border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50">Delete</a>

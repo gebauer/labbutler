@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Label · {{ item.human_id }} · LabButler{% endblock %}
+
+{% block content %}
+  <div class="print:hidden">
+    <a href="{% url 'inventory:item_detail' item.pk %}" class="text-sm text-teal-700 hover:underline">← {{ item.name }}</a>
+    <div class="mt-1 flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-2xl font-semibold tracking-tight">Label this item</h1>
+      <button type="button" onclick="window.print()"
+              class="rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700">Print</button>
+    </div>
+  </div>
+
+  {# The label itself — kept small and self-contained so it prints cleanly. #}
+  <div class="mt-5 inline-block rounded-lg border-2 border-gray-900 px-6 py-4 text-center">
+    <div class="text-xs uppercase tracking-widest text-gray-500">{{ current_lab.name }}</div>
+    <div class="mt-1 font-mono text-3xl font-bold tracking-tight">{{ item.human_id }}</div>
+    <div class="mt-1 max-w-[16rem] truncate text-sm text-gray-600">{{ item.name }}</div>
+    <div class="mt-2 grid h-24 w-24 mx-auto place-items-center rounded border border-dashed border-gray-300 text-[10px] text-gray-400">
+      Data&nbsp;Matrix
+    </div>
+  </div>
+
+  <div class="mt-6 max-w-xl rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 print:hidden">
+    <h2 class="text-sm font-semibold text-gray-800">How to label</h2>
+    <ol class="mt-2 list-decimal space-y-1 pl-5">
+      <li>Write or stick the ID <span class="font-mono font-medium text-gray-900">{{ item.human_id }}</span> on the container.</li>
+      <li>This ID is permanent — it never changes, even if the item is reclassified or moved.</li>
+      <li>Preprinted Data&nbsp;Matrix labels (encoding just this ID) can be applied instead; scanning support is coming.</li>
+    </ol>
+  </div>
+{% endblock %}

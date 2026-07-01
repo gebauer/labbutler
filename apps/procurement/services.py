@@ -47,20 +47,8 @@ TRANSITIONS: dict[str, Transition] = {
         Transition(
             "order", "Mark ordered", Status.ORDERED, frozenset({Status.APPROVED}), "place_order"
         ),
-        Transition(
-            "deliver",
-            "Mark delivered",
-            Status.DELIVERED,
-            frozenset({Status.ORDERED}),
-            "place_order",
-        ),
-        Transition(
-            "check_in",
-            "Check in → create item",
-            Status.CHECKED_IN,
-            frozenset({Status.ORDERED, Status.DELIVERED}),
-            "check_in",
-        ),
+        # Delivery is handled by receive() (a dialog), not a one-click transition, because
+        # the receiver chooses between checking the item in and closing it untracked.
         Transition(
             "cancel",
             "Cancel",
@@ -110,8 +98,6 @@ def perform_transition(req: Request, action: str, *, actor, po_number: str = "")
         req.approver = actor
     elif transition.action == "order" and po_number:
         req.po_number = po_number
-    elif transition.action == "check_in":
-        _create_item_from(req)
 
     req.status = transition.to_status
     req.save()
@@ -127,6 +113,46 @@ def perform_transition(req: Request, action: str, *, actor, po_number: str = "")
     return req
 
 
+def can_receive(user, req: Request) -> bool:
+    """Whether ``req`` is awaiting delivery and ``user`` may receive it."""
+    return req.status in (Status.ORDERED, Status.DELIVERED) and user.can(req.lab, "check_in")
+
+
+@transaction.atomic
+def receive(req: Request, *, actor, create_item: bool, location=None) -> Request:
+    """Receive a delivered order.
+
+    Two outcomes: ``create_item=True`` checks it into inventory (creates the item at the
+    given location and moves the request to Checked in); ``create_item=False`` records
+    delivery of something we don't track (software, services) and moves it to Delivered.
+    Raises :class:`TransitionError` if the request is not awaiting delivery.
+    """
+    if req.status not in (Status.ORDERED, Status.DELIVERED):
+        raise TransitionError(f"cannot receive a request that is {req.get_status_display()!r}")
+
+    previous = req.status
+    if create_item:
+        _create_item_from(req, location=location)
+        req.status = Status.CHECKED_IN
+        action = "checked_in"
+        changes = {"from": previous, "to": req.status, "item": req.created_item.human_id}
+    else:
+        req.status = Status.DELIVERED
+        action = "delivered_untracked"
+        changes = {"from": previous, "to": req.status}
+    req.save()
+
+    AuditEntry.record(
+        lab=req.lab,
+        actor=actor,
+        action=f"procurement.request_{action}",
+        target=req,
+        changes=changes,
+    )
+    _notify_transition(req.pk, previous, req.status)
+    return req
+
+
 def _notify_transition(req_pk: int, previous: str, new: str) -> None:
     """Enqueue the status-change email once the surrounding transaction commits."""
     # Imported lazily so procurement doesn't import the notifications app at load time.
@@ -135,12 +161,13 @@ def _notify_transition(req_pk: int, previous: str, new: str) -> None:
     transaction.on_commit(lambda: notify_request_transition.delay(req_pk, previous, new))
 
 
-def _create_item_from(req: Request) -> Item:
+def _create_item_from(req: Request, *, location=None) -> Item:
     """Create the inventory item a checked-in request delivers and link it back."""
     item = Item.objects.create(
         lab=req.lab,
         human_id=req.lab.allocate_item_id(),
         name=req.item_name,
+        location=location,
         catalog_number=req.catalog_number,
         cas_number=req.cas_number,
         vendor=req.vendor,

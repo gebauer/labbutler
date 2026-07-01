@@ -17,6 +17,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
+from apps.inventory.models import Location
 from apps.tenancy.models import User
 from apps.tenancy.scoping import require_permission
 
@@ -113,6 +114,7 @@ def request_detail(request: HttpRequest, pk: int) -> HttpResponse:
         {
             "req": req,
             "transitions": services.available_transitions(request.user, req),
+            "can_receive": services.can_receive(request.user, req),
             "editable": editable,
             "entries": entries,
         },
@@ -190,6 +192,34 @@ def request_action(request: HttpRequest, pk: int, action: str) -> HttpResponse:
         return redirect("procurement:request_detail", pk=req.pk)
 
     messages.success(request, f"Request moved to “{Request.Status(transition.to_status).label}”.")
-    if action == "check_in" and req.created_item_id:
-        return redirect("inventory:item_detail", pk=req.created_item_id)
     return redirect("procurement:request_detail", pk=req.pk)
+
+
+@require_permission("check_in")
+def request_receive(request: HttpRequest, pk: int) -> HttpResponse:
+    """Delivery dialog: check the order into inventory, or record it delivered-untracked."""
+    req = get_object_or_404(Request, pk=pk, lab=request.lab)
+    if req.status not in (Request.Status.ORDERED, Request.Status.DELIVERED):
+        messages.error(request, "Only an ordered request can be received.")
+        return redirect("procurement:request_detail", pk=req.pk)
+
+    locations = Location.objects.filter(lab=request.lab).order_by("name")
+    if request.method == "POST":
+        if request.POST.get("outcome") == "no_item":
+            services.receive(req, actor=request.user, create_item=False)
+            messages.success(request, "Recorded as delivered — no inventory item created.")
+            return redirect("procurement:request_detail", pk=req.pk)
+
+        location = locations.filter(pk=request.POST.get("location") or 0).first()
+        if location is None and not request.POST.get("confirm_no_location"):
+            # Checking in with no location is allowed, but only after an explicit confirm.
+            return render(
+                request,
+                "procurement/receive.html",
+                {"req": req, "locations": locations, "warn_no_location": True},
+            )
+        services.receive(req, actor=request.user, create_item=True, location=location)
+        messages.success(request, f"Checked in as {req.created_item.human_id}.")
+        return redirect("inventory:item_label", pk=req.created_item_id)
+
+    return render(request, "procurement/receive.html", {"req": req, "locations": locations})
