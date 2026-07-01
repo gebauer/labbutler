@@ -262,3 +262,17 @@ def test_filter_by_owner_and_combined(client, lab, manager):
     assert b"Owned solvent" in resp.content
     assert b"Owned other" not in resp.content  # narrowed further by the query
     assert b"Unowned" not in resp.content
+
+
+@pytest.mark.django_db
+def test_infinite_scroll_chunk_returns_rows_fragment(client, lab, manager):
+    for i in range(26):  # > PAGE_SIZE (25), so a second page exists
+        _make_item(lab, name=f"Item {i:02d}")
+    client.force_login(manager)
+    first = client.get(reverse("inventory:item_list"))
+    assert b'hx-trigger="revealed"' in first.content  # last row lazy-loads the next page
+    chunk = client.get(reverse("inventory:item_list"), {"partial": "chunk", "page": 2})
+    assert chunk.status_code == 200
+    assert b'id="item-results"' not in chunk.content  # bare fragment, no wrapper
+    assert b"<table" not in chunk.content
+    assert b"Item 25" in chunk.content  # the 26th item, on page 2

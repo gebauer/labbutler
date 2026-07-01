@@ -68,10 +68,10 @@ def _filtered_items(lab, query: str, facets: dict[str, str]):
 
 
 def _filter_querystring(request: HttpRequest) -> str:
-    """Current query params minus page/view — for building pagination & toggle links."""
+    """Current filter params (minus paging/view/partial) — for infinite-scroll & toggle links."""
     params = request.GET.copy()
-    params.pop("page", None)
-    params.pop("view", None)
+    for transient in ("page", "view", "partial"):
+        params.pop(transient, None)
     return params.urlencode()
 
 
@@ -112,6 +112,9 @@ def item_list(request: HttpRequest) -> HttpResponse:
         "owners": User.objects.filter(owned_items__lab=lab).distinct().order_by("email"),
         "can_manage": request.user.can(lab, "manage_inventory"),
     }
+    if request.GET.get("partial") == "chunk":
+        # Infinite scroll: append just the next page of rows/cards.
+        return render(request, "inventory/_item_chunk.html", context)
     if request.htmx:
         return render(request, "inventory/_item_results.html", context)
     return render(request, "inventory/item_list.html", context)
