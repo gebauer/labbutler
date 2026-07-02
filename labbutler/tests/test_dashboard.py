@@ -61,6 +61,52 @@ def test_forwarded_widget_lists_requests_assigned_to_me(client, lab):
 
 
 @pytest.mark.django_db
+def test_deliveries_widget_scoped_to_my_involvement(lab):
+    from labbutler import dashboard
+
+    manager = _user(lab, "m@x.de", ["Lab manager"])  # has check_in via "*"
+    other = _user(lab, "o@x.de", ["Member"])
+    Request.objects.create(
+        lab=lab, item_name="I requested", requested_by=manager, status=Status.ORDERED
+    )
+    Request.objects.create(
+        lab=lab,
+        item_name="I order",
+        requested_by=other,
+        assigned_to=manager,
+        status=Status.DELIVERED,
+    )
+    Request.objects.create(
+        lab=lab, item_name="Someone else", requested_by=other, status=Status.ORDERED
+    )
+    Request.objects.create(  # right person, wrong status
+        lab=lab, item_name="Not yet ordered", requested_by=manager, status=Status.APPROVED
+    )
+
+    widgets = {w.key: w for w in dashboard.build(manager, lab)}
+    deliveries = widgets["deliveries"]
+    assert deliveries.title == "Expecting deliveries"
+    assert {r.item_name for r in deliveries.items} == {"I requested", "I order"}
+    assert deliveries.total == 2
+    assert deliveries.view_all_url.endswith("?mine=1&status=ordered&status=delivered")
+
+
+@pytest.mark.django_db
+def test_deliveries_widget_caps_items_at_ten(lab):
+    from labbutler import dashboard
+
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    for i in range(12):
+        Request.objects.create(
+            lab=lab, item_name=f"Delivery {i:02d}", requested_by=manager, status=Status.ORDERED
+        )
+
+    deliveries = {w.key: w for w in dashboard.build(manager, lab)}["deliveries"]
+    assert len(deliveries.items) == 10
+    assert deliveries.total == 12
+
+
+@pytest.mark.django_db
 def test_direct_approve_returns_to_dashboard(client, lab):
     manager = _user(lab, "m@x.de", ["Lab manager"])
     member = _user(lab, "u@x.de", ["Member"])

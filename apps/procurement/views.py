@@ -49,8 +49,14 @@ _REQ_FACETS = {
 }
 
 
-def _filtered_requests(lab, query: str, statuses: list[str], facets: dict[str, str]):
-    """Narrow a lab's requests by search text, any selected statuses, and facet filters."""
+def _filtered_requests(
+    lab, query: str, statuses: list[str], facets: dict[str, str], *, user=None, mine=False
+):
+    """Narrow a lab's requests by search text, any selected statuses, and facet filters.
+
+    ``mine`` scopes to requests the given ``user`` is involved in — raised by them or
+    forwarded to them to order — which the AND-only facets cannot express on their own.
+    """
     requests = (
         Request.objects.filter(lab=lab)
         .select_related("vendor", "budget", "requested_by")
@@ -69,6 +75,8 @@ def _filtered_requests(lab, query: str, statuses: list[str], facets: dict[str, s
         value = facets.get(param)
         if value:
             requests = requests.filter(**{lookup_field: value})
+    if mine and user is not None:
+        requests = requests.filter(Q(requested_by=user) | Q(assigned_to=user))
     return requests
 
 
@@ -107,7 +115,10 @@ def request_list(request: HttpRequest) -> HttpResponse:
     query = request.GET.get("q", "")
     selected_statuses = request.GET.getlist("status")
     facets = {param: request.GET.get(param, "") for param in _REQ_FACETS}
-    requests = _filtered_requests(lab, query, selected_statuses, facets)
+    mine = request.GET.get("mine") == "1"
+    requests = _filtered_requests(
+        lab, query, selected_statuses, facets, user=request.user, mine=mine
+    )
 
     page = Paginator(requests, PAGE_SIZE).get_page(request.GET.get("page"))
     pipeline, off_path = _status_overview(lab, selected_statuses)
@@ -116,10 +127,14 @@ def request_list(request: HttpRequest) -> HttpResponse:
         "query": query,
         "selected_statuses": selected_statuses,
         "facets": facets,
+        "mine": mine,
         "pipeline": pipeline,
         "off_path": off_path,
         "filter_qs": _request_querystring(request),
-        "has_filters": bool(query.strip()) or bool(selected_statuses) or any(facets.values()),
+        "has_filters": bool(query.strip())
+        or bool(selected_statuses)
+        or any(facets.values())
+        or mine,
         "vendors": Vendor.objects.filter(lab=lab).order_by("name"),
         "requesters": User.objects.filter(requests_made__lab=lab).distinct().order_by("email"),
         "assignees": services.purchase_coordinators(lab),

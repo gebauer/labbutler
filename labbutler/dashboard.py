@@ -47,9 +47,9 @@ def build(user, lab) -> list[Widget]:
     )
     list_url = reverse("procurement:request_list")
 
-    def add(key, title, kind, queryset, view_all, empty):
+    def add(key, title, kind, queryset, view_all, empty, limit=_LIMIT):
         widgets.append(
-            Widget(key, title, kind, list(queryset[:_LIMIT]), queryset.count(), view_all, empty)
+            Widget(key, title, kind, list(queryset[:limit]), queryset.count(), view_all, empty)
         )
 
     if user.can(lab, "approve_request"):
@@ -75,16 +75,21 @@ def build(user, lab) -> list[Widget]:
         )
 
     if user.can(lab, "check_in"):
-        qs = requests.filter(status__in=[Status.ORDERED, Status.DELIVERED]).order_by(
-            "expected_delivery", "created_at"
+        # Only deliveries the viewer is involved in: raised by them or forwarded to them
+        # to order — not every open delivery in the lab.
+        qs = (
+            requests.filter(status__in=[Status.ORDERED, Status.DELIVERED])
+            .filter(Q(requested_by=user) | Q(assigned_to=user))
+            .order_by("expected_delivery", "created_at")
         )
         add(
             "deliveries",
             "Expecting deliveries",
             "deliveries",
             qs,
-            f"{list_url}?status=ordered&status=delivered",
+            f"{list_url}?mine=1&status=ordered&status=delivered",
             "No deliveries expected.",
+            limit=10,
         )
 
     if user.can(lab, "create_request"):

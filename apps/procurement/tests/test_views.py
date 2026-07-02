@@ -304,6 +304,41 @@ def test_forward_forbidden_for_uninvolved_member(client, lab):
 
 
 @pytest.mark.django_db
+def test_filter_mine_includes_requested_or_ordered(client, lab):
+    me = _user(lab, "me@x.de", ["Purchase coordinator"])
+    other = _user(lab, "o@x.de", ["Member"])
+    Request.objects.create(lab=lab, item_name="I requested", requested_by=me, status=Status.ORDERED)
+    Request.objects.create(
+        lab=lab,
+        item_name="I order",
+        requested_by=other,
+        assigned_to=me,
+        status=Status.ORDERED,
+    )
+    Request.objects.create(lab=lab, item_name="Not mine", requested_by=other, status=Status.ORDERED)
+    client.force_login(me)
+    resp = client.get(reverse("procurement:request_list"), {"mine": "1"})
+    assert b"I requested" in resp.content
+    assert b"I order" in resp.content
+    assert b"Not mine" not in resp.content
+
+
+@pytest.mark.django_db
+def test_filter_mine_still_ands_status(client, lab):
+    me = _user(lab, "me@x.de", ["Member"])
+    Request.objects.create(
+        lab=lab, item_name="Mine ordered", requested_by=me, status=Status.ORDERED
+    )
+    Request.objects.create(
+        lab=lab, item_name="Mine requested", requested_by=me, status=Status.REQUESTED
+    )
+    client.force_login(me)
+    resp = client.get(reverse("procurement:request_list"), {"mine": "1", "status": ["ordered"]})
+    assert b"Mine ordered" in resp.content
+    assert b"Mine requested" not in resp.content
+
+
+@pytest.mark.django_db
 def test_filter_by_assignee(client, lab):
     manager = _user(lab, "m@x.de", ["Lab manager"])
     coord = _user(lab, "c@x.de", ["Purchase coordinator"])
