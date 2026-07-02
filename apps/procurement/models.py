@@ -147,6 +147,14 @@ class Request(TimeStampedModel):
     expected_delivery = models.DateField(null=True, blank=True)
     comment = models.TextField(blank=True)
 
+    # Historical workflow milestones, populated by the LabSuit orders import. Requests
+    # created in-app leave these blank and rely on the auto created/updated timestamps.
+    date_requested = models.DateField(null=True, blank=True)
+    date_approved = models.DateField(null=True, blank=True)
+    date_ordered = models.DateField(null=True, blank=True)
+    date_cancelled = models.DateField(null=True, blank=True)
+    date_received = models.DateField(null=True, blank=True)
+
     tags = models.ManyToManyField("inventory.Tag", related_name="requests", blank=True)
 
     def __str__(self) -> str:
