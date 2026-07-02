@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Self-approve · {{ req.item_name }} · LabButler{% endblock %}
+
+{% block content %}
+  <a href="{% url 'procurement:request_detail' req.pk %}" class="text-sm text-teal-700 hover:underline">← Request</a>
+  <h1 class="mt-1 text-2xl font-semibold tracking-tight">Self-approve request</h1>
+  <p class="mt-1 text-sm text-gray-500">
+    Approve your own request. Use this only when a lab manager has authorised it (e.g. in
+    person). The self-approval is recorded as a comment on the request.
+  </p>
+
+  <form method="post" class="mt-5 max-w-xl rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    {% csrf_token %}
+    <h2 class="font-medium text-gray-900">{{ req.item_name }}</h2>
+    <p class="mt-1 text-sm text-gray-500">{{ req.total }} {{ req.currency }}{% if req.vendor %} · {{ req.vendor.name }}{% endif %}</p>
+
+    <label for="note" class="mt-4 block text-sm font-medium text-gray-700">Note (optional)</label>
+    <textarea id="note" name="note" rows="2" placeholder="e.g. approved by Dr. Baumann on 2026-07-02"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"></textarea>
+
+    <label class="mt-4 flex items-start gap-2 text-sm text-gray-700">
+      <input type="checkbox" name="confirm" value="1" class="mt-0.5 rounded border-gray-300 text-teal-600 focus:ring-teal-500">
+      <span>I confirm this request was authorised by lab management.</span>
+    </label>
+
+    <div class="mt-5 flex gap-2">
+      <button type="submit" class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Approve my request</button>
+      <a href="{% url 'procurement:request_detail' req.pk %}" class="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

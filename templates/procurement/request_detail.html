@@ -18,8 +18,12 @@
     </div>
   </div>
 
-  {% if transitions or can_receive or can_forward %}
+  {% if transitions or can_receive or can_forward or can_self_approve %}
     <div class="mt-4 flex flex-wrap items-center gap-2 rounded border bg-white p-3">
+      {% if can_self_approve %}
+        <a href="{% url 'procurement:request_self_approve' req.pk %}"
+           class="rounded bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700">Self-approve…</a>
+      {% endif %}
       {% if can_receive %}
         <a href="{% url 'procurement:request_receive' req.pk %}"
            class="rounded bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700">Receive delivery…</a>

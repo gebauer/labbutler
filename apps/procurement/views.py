@@ -149,6 +149,7 @@ def request_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "transitions": services.available_transitions(request.user, req),
             "can_receive": services.can_receive(request.user, req),
             "can_forward": services.can_forward(request.user, req),
+            "can_self_approve": services.can_self_approve(request.user, req),
             "editable": editable,
             "entries": entries,
             "comments": Comment.for_object(req),
@@ -313,3 +314,23 @@ def request_forward(request: HttpRequest, pk: int) -> HttpResponse:
     return render(
         request, "procurement/forward.html", {"req": req, "coordinators": coordinators}
     )
+
+
+@require_permission("view_requests")
+def request_self_approve(request: HttpRequest, pk: int) -> HttpResponse:
+    """Confirmation dialog for approving one's own request (needs the self_approve right)."""
+    req = get_object_or_404(Request, pk=pk, lab=request.lab)
+    if not services.can_self_approve(request.user, req):
+        raise PermissionDenied
+
+    if request.method == "POST":
+        if not request.POST.get("confirm"):
+            messages.error(request, "Please tick the box to confirm the self-approval.")
+            return render(request, "procurement/self_approve.html", {"req": req})
+        services.self_approve(
+            req, actor=request.user, note=(request.POST.get("note") or "").strip()
+        )
+        messages.success(request, "Request self-approved.")
+        return redirect("procurement:request_detail", pk=req.pk)
+
+    return render(request, "procurement/self_approve.html", {"req": req})

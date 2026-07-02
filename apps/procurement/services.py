@@ -167,6 +167,60 @@ def forward(req: Request, *, actor, assignee: User) -> Request:
     return req
 
 
+def can_self_approve(user, req: Request) -> bool:
+    """Whether ``user`` may self-approve ``req``.
+
+    Allowed only for the requester's own still-pending request when they hold
+    ``self_approve``. Hidden from users who can already ``approve_request`` — they use the
+    normal one-click Approve, which already covers their own requests — so no duplicate
+    button appears.
+    """
+    return (
+        req.status == Status.REQUESTED
+        and req.requested_by_id == user.pk
+        and user.can(req.lab, "self_approve")
+        and not user.can(req.lab, "approve_request")
+    )
+
+
+@transaction.atomic
+def self_approve(req: Request, *, actor, note: str = "") -> Request:
+    """Approve one's own request, recording the (typically in-person) authorisation.
+
+    Behaves like a manager approval — sets the approver and moves to Approved — but also
+    posts a visible comment so the self-approval stays on the record. Raises
+    :class:`TransitionError` if the request is not awaiting approval.
+    """
+    if req.status != Status.REQUESTED:
+        raise TransitionError(
+            f"cannot self-approve a request that is {req.get_status_display()!r}"
+        )
+
+    previous = req.status
+    req.approver = actor
+    req.status = Status.APPROVED
+    req.save()
+
+    AuditEntry.record(
+        lab=req.lab,
+        actor=actor,
+        action="procurement.request_self_approved",
+        target=req,
+        changes={"from": previous, "to": req.status},
+    )
+
+    # Leave a visible record that this was self-approved (approved in person).
+    from apps.comments.models import Comment
+
+    body = "Self-approved — authorised by lab management in person."
+    if note:
+        body += f"\n\n{note}"
+    Comment.objects.create(lab=req.lab, author=actor, target=req, body=body)
+
+    _notify_transition(req.pk, previous, req.status)
+    return req
+
+
 @transaction.atomic
 def receive(
     req: Request, *, actor, create_item: bool, location=None, human_id: str = ""
