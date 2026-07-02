@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Notification settings · LabButler{% endblock %}
+
+{% block content %}
+  <h1 class="text-2xl font-semibold tracking-tight">Notification settings</h1>
+  <p class="mt-1 text-sm text-gray-500">
+    Email preferences for <span class="font-medium text-gray-700">{{ lab.name }}</span>.
+  </p>
+
+  {% if form %}
+    <form method="post" class="mt-6 max-w-xl">
+      {% csrf_token %}
+      {% include "manage/_form_fields.html" %}
+      <p class="mt-3 text-xs text-gray-400">
+        “Every email” sends one message per event, “Daily summary” bundles them into a
+        once-a-day digest, and “No email” switches them off.
+      </p>
+      <div class="mt-6">
+        <button type="submit" class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Save preferences</button>
+      </div>
+    </form>
+  {% else %}
+    <p class="mt-6 max-w-xl rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+      You have no notification preferences to set in this lab.
+    </p>
+  {% endif %}
+{% endblock %}

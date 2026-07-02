@@ -74,7 +74,10 @@
             <span class="rounded-md bg-gray-100 px-2.5 py-1.5 text-sm font-medium text-gray-700">{{ current_lab.name }}</span>
           {% endif %}
           <div class="flex items-center gap-2 border-l border-gray-200 pl-3">
-            <span class="hidden text-gray-500 sm:inline">{{ user.email }}</span>
+            <a href="{% url 'tenancy:notification_settings' %}"
+               title="Notification settings"
+               class="hidden text-gray-500 hover:text-gray-900 sm:inline">{{ user.email }}</a>
+            <span class="text-gray-500 sm:hidden">{{ user.email }}</span>
             <form method="post" action="{% url 'logout' %}">
               {% csrf_token %}
               <button type="submit" class="rounded-md px-2 py-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900">Sign out</button>

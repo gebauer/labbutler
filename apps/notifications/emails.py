@@ -49,6 +49,45 @@ def build_status_change(
     return EmailContent(subject, body)
 
 
+def build_approval_needed(req: Request, *, base_url: str = "") -> EmailContent:
+    """Email telling an approver a newly-raised request is waiting for their decision."""
+    subject = f"[LabButler] Approval needed: “{req.item_name}”"
+    lines = [
+        "A new request is waiting for approval:",
+        "",
+        f"Request:   {req.item_name}",
+        f"Total:     {req.total} {req.currency}",
+    ]
+    if req.requested_by_id and req.requested_by.email:
+        lines.append(f"Requested: {req.requested_by.email}")
+    if req.vendor_id:
+        lines.append(f"Vendor:    {req.vendor.name}")
+    body = "\n".join(lines) + _link(base_url, f"/requests/{req.pk}/")
+    return EmailContent(subject, body)
+
+
+def build_daily_digest(
+    lab, pending_approvals: list, recent_updates: list, today: date, *, base_url: str = ""
+) -> EmailContent:
+    """A once-a-day per-member digest: requests awaiting their approval + their updates."""
+    subject = f"[LabButler] {lab.name}: daily procurement summary"
+    sections = [f"Procurement summary for {lab.name}, {today:%Y-%m-%d}."]
+    if pending_approvals:
+        sections.append(
+            "\nAwaiting your approval:\n"
+            + "\n".join(f"  {r.item_name}  ({r.total} {r.currency})" for r in pending_approvals)
+        )
+    if recent_updates:
+        sections.append(
+            "\nYour requests, recently updated:\n"
+            + "\n".join(
+                f"  {r.item_name}  →  {Request.Status(r.status).label}" for r in recent_updates
+            )
+        )
+    body = "\n".join(sections) + _link(base_url, "/requests/")
+    return EmailContent(subject, body)
+
+
 def build_assignment(req: Request, *, base_url: str = "") -> EmailContent:
     """Email asking a purchase coordinator to place an approved, forwarded request."""
     subject = f"[LabButler] Please order “{req.item_name}”"
