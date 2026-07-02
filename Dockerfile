@@ -35,5 +35,12 @@ RUN uv sync --frozen --no-dev \
     && DJANGO_SECRET_KEY=build DATABASE_URL=postgres://u@localhost/db \
        python manage.py collectstatic --noinput
 
+# Run unprivileged. /data/media is created here so the named volume inherits this
+# ownership on first use and uploads stay writable.
+RUN useradd --system --create-home labbutler \
+    && mkdir -p /data/media \
+    && chown -R labbutler:labbutler /data/media
+USER labbutler
+
 EXPOSE 8000
 CMD ["gunicorn", "labbutler.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

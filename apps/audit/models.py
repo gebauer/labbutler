@@ -48,11 +48,20 @@ class AuditEntry(models.Model):
         else:
             target_type = target.__class__.__name__
             target_id = str(target.pk)
+        changes = dict(changes or {})
+        # When a superuser acts while impersonating, the entry names the impersonated
+        # user as actor — keep the real person on record too. Imported lazily to avoid
+        # a module-load cycle with tenancy.
+        from apps.tenancy.middleware import current_impersonator
+
+        impersonator = current_impersonator.get()
+        if impersonator is not None:
+            changes.setdefault("impersonated_by", impersonator.email)
         return cls.objects.create(
             lab=lab,
             actor=actor,
             action=action,
             target_type=target_type,
             target_id=str(target_id),
-            changes=changes or {},
+            changes=changes,
         )

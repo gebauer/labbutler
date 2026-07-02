@@ -234,15 +234,34 @@ def _apply(row: ParsedRow, target: str, header: str, value: object) -> None:
         row.field_pool_keys.append((key, header))
 
 
-def build_generic_plan(rows: Iterator[dict[str, object]], mapping: dict[str, str]) -> ImportPlan:
+# Upper bound on data rows per import: the whole plan is held in memory, so an
+# unbounded (or maliciously padded) spreadsheet must not be able to exhaust the worker.
+MAX_IMPORT_ROWS = 20_000
+
+
+class ImportTooLarge(ValueError):
+    """Raised when a spreadsheet holds more data rows than one import may process."""
+
+
+def build_generic_plan(
+    rows: Iterator[dict[str, object]],
+    mapping: dict[str, str],
+    *,
+    max_rows: int = MAX_IMPORT_ROWS,
+) -> ImportPlan:
     """Build a dry-run :class:`ImportPlan` from raw rows and a column->target mapping.
 
     Pure: no DB access. Rows carry no ``human_id`` (generic sources have no stable
     identifier), so :func:`apps.imports.service.commit` allocates a fresh frozen ID and
-    always creates — generic imports never silently update existing items.
+    always creates — generic imports never silently update existing items. Raises
+    :class:`ImportTooLarge` beyond ``max_rows`` data rows.
     """
     plan = ImportPlan()
     for offset, values in enumerate(rows, start=2):  # row 1 is the header
+        if offset - 1 > max_rows:
+            raise ImportTooLarge(
+                f"the sheet has more than {max_rows} data rows; split the file and retry"
+            )
         row = ParsedRow(sheet="", row_number=offset)
         for header, raw_value in values.items():
             target = mapping.get(header, IGNORE)

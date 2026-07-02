@@ -1,5 +1,6 @@
 """Expose the active lab and the user's labs to every template (for the nav switcher)."""
 
+from django.conf import settings
 from django.http import HttpRequest
 
 from .models import User
@@ -21,8 +22,9 @@ def labs(request: HttpRequest) -> dict:
     }
 
     # Impersonation controls, driven by the *real* logged-in user (a superuser).
+    # Hidden entirely unless the deployment has opted in.
     real = getattr(request, "impersonator", None) or user
-    if real.is_superuser:
+    if settings.LABBUTLER_IMPERSONATION_ENABLED and real.is_superuser:
         members = User.objects.none()
         if current is not None:
             members = (

@@ -148,7 +148,12 @@ def preview(request: HttpRequest) -> HttpResponse:
     path = default_storage.path(stored_name)
     sheet = request.session[SHEET_KEY]
 
-    plan = generic.plan_from_file(path, sheet, mapping_spec)
+    try:
+        plan = generic.plan_from_file(path, sheet, mapping_spec)
+    except generic.ImportTooLarge as exc:
+        _cleanup(request)
+        messages.error(request, f"Import cancelled: {exc}.")
+        return redirect("imports:start")
 
     if request.method == "POST":
         filename = request.session.get(NAME_KEY, "the file")

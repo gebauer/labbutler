@@ -14,7 +14,7 @@
   {% if sheet_names|length > 1 %}
     <form method="get" class="mt-4 flex items-center gap-2 text-sm">
       <label for="sheet" class="text-gray-600">Sheet</label>
-      <select id="sheet" name="sheet" onchange="this.form.submit()"
+      <select id="sheet" name="sheet" data-autosubmit
               class="rounded border border-gray-300 px-2 py-1">
         {% for name in sheet_names %}
           <option value="{{ name }}" {% if name == sheet %}selected{% endif %}>{{ name }}</option>

@@ -96,26 +96,7 @@
     </div>
 
     <script src="{% static 'vendor/sortable.min.js' %}" defer></script>
-    <script>
-      document.addEventListener('DOMContentLoaded', function () {
-        var grid = document.getElementById('dashboard-grid');
-        if (!grid || !window.Sortable) return;
-        var STORE = 'labbutler-dashboard-order';
-        try {
-          JSON.parse(localStorage.getItem(STORE) || '[]').reverse().forEach(function (key) {
-            var el = grid.querySelector('[data-key="' + key + '"]');
-            if (el) grid.insertBefore(el, grid.firstChild);
-          });
-        } catch (e) { /* ignore a corrupt saved order */ }
-        Sortable.create(grid, {
-          handle: '[data-drag]', animation: 150,
-          onEnd: function () {
-            var keys = Array.prototype.map.call(grid.children, function (c) { return c.dataset.key; });
-            localStorage.setItem(STORE, JSON.stringify(keys));
-          }
-        });
-      });
-    </script>
+    <script src="{% static 'js/dashboard.js' %}" defer></script>
   {% else %}
     <div class="mt-6 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-12 text-center">
       <p class="text-sm font-medium text-gray-700">Nothing needs your attention right now.</p>

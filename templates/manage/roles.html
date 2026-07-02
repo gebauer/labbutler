@@ -21,7 +21,7 @@
             <span class="font-medium text-gray-900">{{ role.name }}</span>
             <span class="text-xs text-gray-500">{{ role.permissions.all|length }} permission{{ role.permissions.all|length|pluralize }}</span>
           </span>
-          <span class="flex gap-2" onclick="event.stopPropagation()">
+          <span class="flex gap-2" data-stop-propagation>
             <a href="{% url 'manage:role_edit' role.pk %}" class="rounded border border-gray-300 px-2.5 py-1 text-xs hover:bg-gray-50">Edit</a>
             <form method="post" action="{% url 'manage:role_delete' role.pk %}">
               {% csrf_token %}

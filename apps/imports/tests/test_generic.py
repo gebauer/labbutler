@@ -114,3 +114,15 @@ def test_commit_allocates_fresh_frozen_ids_for_generic_rows(tmp_path):
     assert result.created == 2
     ids = set(Item.objects.filter(lab=lab).values_list("human_id", flat=True))
     assert ids == {"GEN-00001", "GEN-00002"}
+
+
+def test_plan_refuses_more_rows_than_the_cap():
+    rows = ({"Product": f"Item {i}"} for i in range(10))
+    with pytest.raises(generic.ImportTooLarge):
+        generic.build_generic_plan(rows, {"Product": "name"}, max_rows=5)
+
+
+def test_plan_accepts_exactly_the_cap():
+    rows = ({"Product": f"Item {i}"} for i in range(5))
+    plan = generic.build_generic_plan(rows, {"Product": "name"}, max_rows=5)
+    assert len(plan.rows) == 5

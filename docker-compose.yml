@@ -25,7 +25,9 @@ x-app-environment: &app-environment
   CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://broker:6379/1}
   CELERY_TASK_ALWAYS_EAGER: ${CELERY_TASK_ALWAYS_EAGER:-false}
   DJANGO_MEDIA_ROOT: ${DJANGO_MEDIA_ROOT:-/data/media}
-  DJANGO_EMAIL_BACKEND: ${DJANGO_EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+  # SMTP by default: with the console backend, password-reset emails (account-takeover
+  # links) would be printed into `docker logs`. Configure the EMAIL_* vars below.
+  DJANGO_EMAIL_BACKEND: ${DJANGO_EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
   EMAIL_HOST: ${EMAIL_HOST:-localhost}
   EMAIL_PORT: ${EMAIL_PORT:-587}
   EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
@@ -38,8 +40,11 @@ x-app-environment: &app-environment
   NOTIFY_DIGEST_HOUR: ${NOTIFY_DIGEST_HOUR:-7}
   AXES_FAILURE_LIMIT: ${AXES_FAILURE_LIMIT:-5}
   AXES_COOLOFF_HOURS: ${AXES_COOLOFF_HOURS:-1}
-  # Behind a reverse proxy (Coolify's Traefik = 1) so lockouts use the real client IP.
-  AXES_IPWARE_PROXY_COUNT: ${AXES_IPWARE_PROXY_COUNT:-0}
+  # This stack sits behind a reverse proxy (Coolify's Traefik = 1), so default to 1;
+  # with 0 every client shares the proxy's IP and anyone could lock out any username.
+  AXES_IPWARE_PROXY_COUNT: ${AXES_IPWARE_PROXY_COUNT:-1}
+  # Superuser "view as another user" — keep off in production unless deliberately needed.
+  LABBUTLER_IMPERSONATION_ENABLED: ${LABBUTLER_IMPERSONATION_ENABLED:-false}
 
 # Shared base for the app services (web / worker / beat): same image, env, restart policy
 # and startup ordering. Each service only overrides its command (and web its healthcheck).

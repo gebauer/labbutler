@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -9,6 +10,8 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
+
+from apps.audit.models import AuditEntry
 
 from .forms import NotificationSettingsForm, ProfileForm
 from .middleware import SESSION_KEY
@@ -74,17 +77,31 @@ def account_settings(request: HttpRequest) -> HttpResponse:
     )
 
 
+def _record_impersonation(request: HttpRequest, action: str, target: User) -> None:
+    """Audit an impersonation start/stop against the active lab (if any)."""
+    lab = get_current_lab(request)
+    if lab is not None:
+        AuditEntry.record(
+            lab=lab,
+            actor=_real_user(request),
+            action=action,
+            target=target,
+            changes={"target": target.email},
+        )
+
+
 @login_required
 @require_POST
 def impersonate(request: HttpRequest) -> HttpResponse:
     """Start (or switch) viewing the app as another user — superusers only."""
-    if not _real_user(request).is_superuser:
+    if not settings.LABBUTLER_IMPERSONATION_ENABLED or not _real_user(request).is_superuser:
         raise PermissionDenied
     target = User.objects.filter(pk=request.POST.get("user") or 0).first()
     if target is None or target.pk == _real_user(request).pk:
         request.session.pop(SESSION_KEY, None)  # self / invalid -> just stop
     else:
         request.session[SESSION_KEY] = target.pk
+        _record_impersonation(request, "tenancy.impersonation_started", target)
         messages.info(request, f"Now viewing as {target.email}.")
     return redirect(_safe_next(request))
 
@@ -93,4 +110,6 @@ def impersonate(request: HttpRequest) -> HttpResponse:
 @require_POST
 def stop_impersonating(request: HttpRequest) -> HttpResponse:
     request.session.pop(SESSION_KEY, None)
+    if getattr(request, "impersonator", None) is not None:
+        _record_impersonation(request, "tenancy.impersonation_stopped", request.user)
     return redirect(_safe_next(request))

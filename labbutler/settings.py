@@ -23,8 +23,13 @@ if env_file.exists():
     env.read_env(str(env_file))
 
 # --- Core -----------------------------------------------------------------------------
-SECRET_KEY = env("DJANGO_SECRET_KEY", default="insecure-dev-key-change-me")
 DEBUG = env("DJANGO_DEBUG")
+if DEBUG:
+    SECRET_KEY = env("DJANGO_SECRET_KEY", default="insecure-dev-key-change-me")
+else:
+    # No fallback outside DEBUG: a known key would let anyone forge session cookies and
+    # password-reset tokens. Missing var -> ImproperlyConfigured at startup.
+    SECRET_KEY = env("DJANGO_SECRET_KEY")
 ALLOWED_HOSTS = env("DJANGO_ALLOWED_HOSTS")
 
 INSTALLED_APPS = [
@@ -50,6 +55,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "labbutler.middleware.ContentSecurityPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -111,6 +117,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LOGIN_REDIRECT_URL = "/"
 LOGIN_URL = "/accounts/login/"
+
+# Superuser "view as another user". A deployment must opt in explicitly (dev defaults
+# on); when disabled the middleware never swaps users and the UI/endpoints are hidden.
+LABBUTLER_IMPERSONATION_ENABLED = env.bool("LABBUTLER_IMPERSONATION_ENABLED", default=DEBUG)
 
 # --- I18N / TZ ------------------------------------------------------------------------
 LANGUAGE_CODE = "en-us"
@@ -182,6 +192,18 @@ AXES_HTTP_RESPONSE_CODE = 429
 AXES_IPWARE_PROXY_COUNT = env.int("AXES_IPWARE_PROXY_COUNT", default=0) or None
 
 # --- Security (prod-friendly defaults, relaxed when DEBUG) -----------------------------
+# Sent on every response (see labbutler.middleware.ContentSecurityPolicyMiddleware).
+# All scripts are vendored and served same-origin, so script-src stays strict; styles
+# allow inline because the Django admin still relies on a few inline style attributes.
+CONTENT_SECURITY_POLICY = env(
+    "DJANGO_CONTENT_SECURITY_POLICY",
+    default=(
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; "
+        "base-uri 'self'; form-action 'self'"
+    ),
+)
+
 CSRF_TRUSTED_ORIGINS = env("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
 if not DEBUG:
     # Assumes TLS is terminated at a reverse proxy that sets X-Forwarded-Proto.
