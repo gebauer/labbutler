@@ -15,6 +15,7 @@ from apps.notifications.tasks import (
     request_update_recipients,
     send_expiry_digests,
     send_notification_digests,
+    send_welcome_email,
 )
 from apps.procurement.models import Request
 from apps.procurement.services import perform_transition
@@ -187,6 +188,41 @@ def test_notify_request_assigned_noop_without_assignee(mailoutbox):
     from apps.notifications.tasks import notify_request_assigned
 
     assert notify_request_assigned(999_999) == 0
+    assert mailoutbox == []
+
+
+@pytest.mark.django_db
+def test_send_welcome_email_links_a_valid_set_password_token(lab, mailoutbox, settings):
+    from urllib.parse import urlparse
+
+    from django.contrib.auth.tokens import default_token_generator
+    from django.utils.http import urlsafe_base64_decode
+
+    settings.LABBUTLER_BASE_URL = "https://lab.example.org"
+    # An invited member: created without a usable password, mirroring member_add.
+    user = User.objects.create_user(username="", email="new@x.de")
+
+    assert send_welcome_email(user.pk, lab.pk) == 1
+    assert len(mailoutbox) == 1
+    assert mailoutbox[0].to == ["new@x.de"]
+    assert lab.name in mailoutbox[0].subject
+
+    # The emailed link must carry a token that Django will accept for this user, even though
+    # the account has no usable password yet.
+    link = next(w for w in mailoutbox[0].body.split() if w.startswith("https://"))
+    assert link.startswith("https://lab.example.org/")
+    parts = urlparse(link).path.strip("/").split("/")
+    uidb64, token = parts[-2], parts[-1]
+    assert urlsafe_base64_decode(uidb64).decode() == str(user.pk)
+    assert default_token_generator.check_token(user, token)
+
+
+@pytest.mark.django_db
+def test_send_welcome_email_is_noop_for_missing_user_or_email(lab, mailoutbox):
+    assert send_welcome_email(999_999, lab.pk) == 0
+    # Bypass the manager's email requirement to exercise the task's defensive guard.
+    no_email = User.objects.create(username="noemail", email="")
+    assert send_welcome_email(no_email.pk, lab.pk) == 0
     assert mailoutbox == []
 
 

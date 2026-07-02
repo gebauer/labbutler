@@ -10,8 +10,12 @@ from datetime import timedelta
 
 from celery import shared_task
 from django.conf import settings
+from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 
 from apps.inventory.models import Item
 from apps.procurement.models import Request
@@ -128,6 +132,31 @@ def notify_request_assigned(req_pk: int) -> int:
         return 0
     content = emails.build_assignment(req, base_url=_base_url())
     send_mail(content.subject, content.body, settings.DEFAULT_FROM_EMAIL, [req.assigned_to.email])
+    return 1
+
+
+@shared_task
+def send_welcome_email(user_pk: int, lab_pk: int) -> int:
+    """Welcome a freshly-added member with a link to set their password. Returns 0/1.
+
+    Reuses Django's password-reset-confirm route and default token generator, so the link
+    works even though the invited user has no usable password yet. The link is absolute via
+    ``LABBUTLER_BASE_URL`` (the project's convention for emailed links); with no base URL
+    configured it falls back to a relative path.
+    """
+    user = User.objects.filter(pk=user_pk).first()
+    lab = Lab.objects.filter(pk=lab_pk).first()
+    if user is None or lab is None or not user.email:
+        return 0
+
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    path = reverse("password_reset_confirm", kwargs={"uidb64": uid, "token": token})
+    base = _base_url()
+    url = f"{base.rstrip('/')}{path}" if base else path
+
+    content = emails.build_welcome(user, lab, url)
+    send_mail(content.subject, content.body, settings.DEFAULT_FROM_EMAIL, [user.email])
     return 1
 
 

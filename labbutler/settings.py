@@ -135,6 +135,10 @@ AUTH_PASSWORD_VALIDATORS = [
 LOGIN_REDIRECT_URL = "/"
 LOGIN_URL = "/accounts/login/"
 
+# How long a password-reset / invite set-password link stays valid. Governs both the
+# self-service recovery flow and the welcome email sent to newly-added members.
+PASSWORD_RESET_TIMEOUT = env.int("PASSWORD_RESET_TIMEOUT_DAYS", default=3) * 86400
+
 # Superuser "view as another user". A deployment must opt in explicitly (dev defaults
 # on); when disabled the middleware never swaps users and the UI/endpoints are hidden.
 LABBUTLER_IMPERSONATION_ENABLED = env.bool("LABBUTLER_IMPERSONATION_ENABLED", default=DEBUG)

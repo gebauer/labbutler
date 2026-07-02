@@ -126,6 +126,32 @@ def test_add_member_creates_user_and_membership(client, lab):
 
 
 @pytest.mark.django_db
+def test_add_member_sends_welcome_only_to_brand_new_users(
+    client, lab, mailoutbox, monkeypatch, django_capture_on_commit_callbacks
+):
+    from apps.notifications import tasks
+
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    # Run the enqueued task inline instead of dispatching to a Celery worker.
+    monkeypatch.setattr(
+        tasks.send_welcome_email,
+        "delay",
+        lambda *args, **kwargs: tasks.send_welcome_email(*args, **kwargs),
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        client.post(reverse("manage:member_add"), {"email": "new@x.de", "roles": []})
+    assert [m.to for m in mailoutbox] == [["new@x.de"]]
+    assert lab.name in mailoutbox[0].subject
+
+    # Adding an already-existing account to the lab must not send a welcome.
+    _user(lab, "known@x.de", ["Viewer"])
+    with django_capture_on_commit_callbacks(execute=True):
+        client.post(reverse("manage:member_add"), {"email": "known@x.de", "roles": []})
+    assert len(mailoutbox) == 1
+
+
+@pytest.mark.django_db
 def test_add_member_matches_existing_email_case_insensitively(client, lab):
     from apps.tenancy.models import Membership, User
 

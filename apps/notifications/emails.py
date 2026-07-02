@@ -105,6 +105,28 @@ def build_assignment(req: Request, *, base_url: str = "") -> EmailContent:
     return EmailContent(subject, body)
 
 
+def build_welcome(user, lab, set_password_url: str) -> EmailContent:
+    """Welcome a newly-added member and hand them a link to set their password.
+
+    The link is passed in fully-formed — generating the reset token is an effect that
+    lives in :mod:`apps.notifications.tasks`, keeping this builder pure.
+    """
+    subject = f"[LabButler] Welcome to {lab.name}"
+    lines = [
+        f"Hello {user.display_name},",
+        "",
+        f"You've been added to {lab.name} on LabButler.",
+        "",
+        "To get started, set a password for your account using the link below:",
+        "",
+        set_password_url,
+        "",
+        "For security, this link expires after a while — if it stops working, use the "
+        "“Forgot your password?” link on the sign-in page to request a fresh one.",
+    ]
+    return EmailContent(subject, "\n".join(lines))
+
+
 def build_expiry_digest(
     lab,
     expired: list,

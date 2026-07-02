@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 
 from apps.inventory.models import Item
-from apps.notifications.emails import build_expiry_digest, build_status_change
+from apps.notifications.emails import build_expiry_digest, build_status_change, build_welcome
 from apps.procurement.models import Request
 
 Status = Request.Status
@@ -27,6 +27,22 @@ def test_status_change_appends_link_only_with_base_url():
         req, Status.REQUESTED, Status.APPROVED, base_url="https://lab.example.org/"
     )
     assert "https://lab.example.org/requests/5/" in withlink.body
+
+
+def test_welcome_greets_member_and_carries_set_password_link():
+    from apps.tenancy.models import User
+
+    user = User(email="new@x.de", friendly_name="Ada Lovelace")
+
+    class FakeLab:
+        name = "AG Baumann"
+
+    url = "https://lab.example.org/accounts/reset/MQ/set-token/"
+    content = build_welcome(user, FakeLab(), url)
+    assert content.subject == "[LabButler] Welcome to AG Baumann"
+    assert "Ada Lovelace" in content.body
+    assert "AG Baumann" in content.body
+    assert url in content.body
 
 
 def test_expiry_digest_lists_items_and_counts():

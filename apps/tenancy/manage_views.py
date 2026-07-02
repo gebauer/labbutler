@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -190,9 +191,16 @@ def member_add(request: HttpRequest) -> HttpResponse:
         return redirect("manage:members")
 
     email = form.cleaned_data["email"]
-    user, _ = User.objects.get_or_create_by_email(email, defaults={"username": email})
+    user, user_created = User.objects.get_or_create_by_email(email, defaults={"username": email})
     membership, created = Membership.objects.get_or_create(user=user, lab=request.lab)
     membership.roles.set(form.cleaned_data["roles"])
+    if user_created:
+        # Brand-new account: welcome them and hand over a set-password link. Existing users
+        # added to another lab already have credentials, so they get nothing here.
+        from apps.notifications.tasks import send_welcome_email
+
+        lab_pk = request.lab.pk
+        transaction.on_commit(lambda: send_welcome_email.delay(user.pk, lab_pk))
     AuditEntry.record(
         lab=request.lab,
         actor=request.user,
