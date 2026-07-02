@@ -77,6 +77,10 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput &&
              exec gunicorn labbutler.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+    # Advertise the app port on the internal network so Coolify's Traefik can route to it.
+    # `expose` does not publish a host port (no clash), unlike `ports`.
+    expose:
+      - "8000"
     volumes:
       - media:/data/media
     healthcheck:
