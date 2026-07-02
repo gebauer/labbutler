@@ -15,6 +15,30 @@ def test_login_succeeds_with_axes_enabled(client, settings):
 
 
 @pytest.mark.django_db
+def test_login_is_case_insensitive_on_email(client, settings):
+    settings.AXES_ENABLED = True
+    User.objects.create_user(username="", email="Alice@x.de", password="rightpass")
+    # Registered with mixed case; logging in with a different case still authenticates.
+    resp = client.post(reverse("login"), {"username": "alice@x.de", "password": "rightpass"})
+    assert resp.status_code == 302
+
+
+@pytest.mark.django_db
+def test_lockout_counter_is_shared_across_email_casings(client, settings):
+    settings.AXES_ENABLED = True  # AXES_FAILURE_LIMIT defaults to 5
+    User.objects.create_user(username="", email="Target@x.de", password="rightpass")
+    login = reverse("login")
+
+    # Alternate the casing on every failed attempt; a per-casing counter would never
+    # reach the limit, so a lockout proves the counter is normalised to one key.
+    statuses = []
+    for i in range(7):
+        username = "TARGET@x.de" if i % 2 else "target@x.de"
+        statuses.append(client.post(login, {"username": username, "password": "wrong"}).status_code)
+    assert 429 in statuses
+
+
+@pytest.mark.django_db
 def test_login_locks_out_after_repeated_failures(client, settings):
     settings.AXES_ENABLED = True  # AXES_FAILURE_LIMIT defaults to 5
     User.objects.create_user(username="", email="target@x.de", password="rightpass")

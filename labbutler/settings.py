@@ -75,6 +75,19 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
+
+def _axes_username(request, credentials):
+    """Normalise the login identifier so brute-force counters are case-insensitive.
+
+    Emails are the login field and treated case-insensitively; without this,
+    ``Alice@x.de`` and ``alice@x.de`` would get independent lockout allowances.
+    """
+    username = (credentials or {}).get("username") or request.POST.get("username", "")
+    return username.strip().lower()
+
+
+AXES_USERNAME_CALLABLE = "labbutler.settings._axes_username"
+
 ROOT_URLCONF = "labbutler.urls"
 
 TEMPLATES = [
@@ -107,6 +120,10 @@ DATABASES = {
 
 # --- Auth -----------------------------------------------------------------------------
 AUTH_USER_MODEL = "tenancy.User"
+
+# email is USERNAME_FIELD but intentionally not field-level unique: uniqueness is enforced
+# case-insensitively via a Lower("email") UniqueConstraint, which Django's check cannot see.
+SILENCED_SYSTEM_CHECKS = ["auth.W004"]
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

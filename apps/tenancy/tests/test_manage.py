@@ -120,8 +120,25 @@ def test_add_member_creates_user_and_membership(client, lab):
     viewer = Role.objects.get(lab=lab, name="Viewer")
     resp = client.post(reverse("manage:member_add"), {"email": "New@x.de", "roles": [viewer.pk]})
     assert resp.status_code == 302
-    membership = Membership.objects.get(user__email="new@x.de", lab=lab)  # normalised
+    membership = Membership.objects.get(user__email__iexact="new@x.de", lab=lab)
+    assert membership.user.email == "New@x.de"  # stored casing preserved for readability
     assert set(membership.roles.values_list("name", flat=True)) == {"Viewer"}
+
+
+@pytest.mark.django_db
+def test_add_member_matches_existing_email_case_insensitively(client, lab):
+    from apps.tenancy.models import Membership, User
+
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    existing = _user(lab, "Alice@x.de", ["Viewer"])
+
+    resp = client.post(reverse("manage:member_add"), {"email": "ALICE@x.de", "roles": []})
+    assert resp.status_code == 302
+    # No second account is created and the original casing is untouched.
+    assert User.objects.filter(email__iexact="alice@x.de").count() == 1
+    assert Membership.objects.filter(user=existing, lab=lab).count() == 1
+    existing.refresh_from_db()
+    assert existing.email == "Alice@x.de"
 
 
 @pytest.mark.django_db

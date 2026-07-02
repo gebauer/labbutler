@@ -190,7 +190,7 @@ def member_add(request: HttpRequest) -> HttpResponse:
         return redirect("manage:members")
 
     email = form.cleaned_data["email"]
-    user, _ = User.objects.get_or_create(email=email, defaults={"username": email})
+    user, _ = User.objects.get_or_create_by_email(email, defaults={"username": email})
     membership, created = Membership.objects.get_or_create(user=user, lab=request.lab)
     membership.roles.set(form.cleaned_data["roles"])
     AuditEntry.record(

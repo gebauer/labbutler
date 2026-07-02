@@ -120,7 +120,9 @@ class MemberAddForm(forms.Form):
         self.fields["email"].widget.attrs.setdefault("class", _INPUT)
 
     def clean_email(self) -> str:
-        return self.cleaned_data["email"].strip().lower()
+        # Preserve the typed casing for readability; uniqueness and lookups are
+        # case-insensitive (see User.Meta constraint and get_or_create_by_email).
+        return self.cleaned_data["email"].strip()
 
 
 class MemberRolesForm(forms.Form):

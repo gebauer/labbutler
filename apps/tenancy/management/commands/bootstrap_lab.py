@@ -46,7 +46,7 @@ class Command(BaseCommand):
             raise CommandError("email, password, lab-name and lab-prefix are all required")
 
         with transaction.atomic():
-            user, created = User.objects.get_or_create(email=email, defaults={"username": email})
+            user, created = User.objects.get_or_create_by_email(email, defaults={"username": email})
             if created:
                 user.is_staff = True
                 user.is_superuser = True

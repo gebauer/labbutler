@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models, transaction
+from django.db.models.functions import Lower
 
 from labbutler.abstract import TimeStampedModel
 
@@ -17,6 +18,23 @@ class LabButlerUserManager(UserManager):
         username = username or email
         return super()._create_user(username, email, password, **extra_fields)
 
+    def get_by_natural_key(self, username):
+        # Email is the login identifier; match case-insensitively so that the stored
+        # casing does not affect authentication (used by ModelBackend and django-axes).
+        return self.get(**{f"{self.model.USERNAME_FIELD}__iexact": username})
+
+    def get_or_create_by_email(self, email, defaults=None):
+        """Case-insensitive counterpart to ``get_or_create(email=...)``.
+
+        Existing accounts are matched on the lowercased email so we never create a
+        second account that differs only by case; the typed casing is preserved on
+        creation.
+        """
+        existing = self.filter(email__iexact=email).first()
+        if existing is not None:
+            return existing, False
+        return self.create(email=email, **(defaults or {})), True
+
 
 class User(AbstractUser):
     """Custom user: email is the canonical identifier.
@@ -25,7 +43,10 @@ class User(AbstractUser):
     application authenticates and displays users by email.
     """
 
-    email = models.EmailField("email address", unique=True)
+    # Not ``unique=True``: uniqueness is enforced case-insensitively via the Meta
+    # constraint below so ``Alice@x.de`` and ``alice@x.de`` cannot both exist, while the
+    # value is stored exactly as entered for readability.
+    email = models.EmailField("email address")
     # Display-only label chosen by the user; never an identifier. Blank -> show the email.
     friendly_name = models.CharField("friendly name", max_length=150, blank=True, default="")
 
@@ -33,6 +54,11 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ["username"]
 
     objects = LabButlerUserManager()
+
+    class Meta(AbstractUser.Meta):
+        constraints = [
+            models.UniqueConstraint(Lower("email"), name="tenancy_user_email_ci_unique"),
+        ]
 
     def __str__(self) -> str:
         return self.display_name
