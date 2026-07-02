@@ -26,6 +26,8 @@ class User(AbstractUser):
     """
 
     email = models.EmailField("email address", unique=True)
+    # Display-only label chosen by the user; never an identifier. Blank -> show the email.
+    friendly_name = models.CharField("friendly name", max_length=150, blank=True, default="")
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
@@ -33,7 +35,12 @@ class User(AbstractUser):
     objects = LabButlerUserManager()
 
     def __str__(self) -> str:
-        return self.email or self.username
+        return self.display_name
+
+    @property
+    def display_name(self) -> str:
+        """Human label for the UI: friendly name if set, else the email."""
+        return self.friendly_name or self.email or self.username
 
     def can(self, lab: "Lab", permission_code: str) -> bool:
         """Return whether this user holds ``permission_code`` in ``lab``.

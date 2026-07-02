@@ -17,7 +17,7 @@
       <select id="assignee" name="assignee"
               class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500">
         {% for person in coordinators %}
-          <option value="{{ person.pk }}" {% if person == req.assigned_to %}selected{% endif %}>{{ person.email }}</option>
+          <option value="{{ person.pk }}" {% if person == req.assigned_to %}selected{% endif %}>{{ person.display_name }}</option>
         {% endfor %}
       </select>
       <div class="mt-5 flex gap-2">

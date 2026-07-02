@@ -10,7 +10,7 @@
         {% include "procurement/_status_badge.html" with value=req.status label=req.get_status_display %}
         {% if req.is_urgent %}<span class="rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">urgent</span>{% endif %}
       </div>
-      <p class="mt-1 text-sm text-gray-500">Request #{{ req.pk }} · raised by {{ req.requested_by.email|default:"—" }} on {{ req.created_at|date:"Y-m-d" }}</p>
+      <p class="mt-1 text-sm text-gray-500">Request #{{ req.pk }} · raised by {{ req.requested_by.display_name|default:"—" }} on {{ req.created_at|date:"Y-m-d" }}</p>
     </div>
     <div class="flex gap-2">
       <a href="{% url 'procurement:request_list' %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Back</a>
@@ -55,8 +55,8 @@
     {% include "inventory/_detail_row.html" with label="Ships to" value=req.shipping_address.label %}
     {% include "inventory/_detail_row.html" with label="Catalog no." value=req.catalog_number %}
     {% include "inventory/_detail_row.html" with label="CAS no." value=req.cas_number %}
-    {% include "inventory/_detail_row.html" with label="Approver" value=req.approver.email %}
-    {% include "inventory/_detail_row.html" with label="Assigned to" value=req.assigned_to.email %}
+    {% include "inventory/_detail_row.html" with label="Approver" value=req.approver.display_name %}
+    {% include "inventory/_detail_row.html" with label="Assigned to" value=req.assigned_to.display_name %}
     {% include "inventory/_detail_row.html" with label="PO #" value=req.po_number %}
     {% include "inventory/_detail_row.html" with label="Expected delivery" value=req.expected_delivery|date:"Y-m-d" %}
     <div>

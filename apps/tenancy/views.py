@@ -10,7 +10,7 @@ from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from .forms import NotificationSettingsForm
+from .forms import NotificationSettingsForm, ProfileForm
 from .middleware import SESSION_KEY
 from .models import Membership, User
 from .scoping import get_current_lab
@@ -31,11 +31,12 @@ def _safe_next(request: HttpRequest) -> str:
 
 
 @login_required
-def notification_settings(request: HttpRequest) -> HttpResponse:
-    """Let a member set their per-lab email preferences for the active lab.
+def account_settings(request: HttpRequest) -> HttpResponse:
+    """Personal settings for the active lab: the account's friendly name plus (when the
+    member can act on them) per-lab email preferences.
 
-    Only shows the categories the member can act on: approval settings for approvers,
-    request-update settings for people who can raise requests.
+    The notification section only shows the categories the member can act on: approval
+    settings for approvers, request-update settings for people who can raise requests.
     """
     lab = get_current_lab(request)
     if lab is None:
@@ -44,23 +45,33 @@ def notification_settings(request: HttpRequest) -> HttpResponse:
     membership = Membership.objects.filter(user=request.user, lab=lab).first()
     can_approve = request.user.can(lab, "approve_request")
     can_request = request.user.can(lab, "create_request")
+    show_notifications = membership is not None and (can_approve or can_request)
 
-    # No membership (e.g. a superuser) or no relevant permission -> nothing to configure.
-    if membership is None or not (can_approve or can_request):
-        return render(request, "tenancy/notification_settings.html", {"lab": lab, "form": None})
-
-    form = NotificationSettingsForm(
-        request.POST or None,
-        instance=membership,
-        can_approve=can_approve,
-        can_request=can_request,
+    profile_form = ProfileForm(request.POST or None, instance=request.user)
+    notif_form = (
+        NotificationSettingsForm(
+            request.POST or None,
+            instance=membership,
+            can_approve=can_approve,
+            can_request=can_request,
+        )
+        if show_notifications
+        else None
     )
-    if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Notification preferences saved.")
-        return redirect("tenancy:notification_settings")
 
-    return render(request, "tenancy/notification_settings.html", {"lab": lab, "form": form})
+    forms = [f for f in (profile_form, notif_form) if f is not None]
+    # Validate every form (list, not generator) so each renders its own errors on failure.
+    if request.method == "POST" and all([f.is_valid() for f in forms]):
+        for form in forms:
+            form.save()
+        messages.success(request, "Settings saved.")
+        return redirect("tenancy:settings")
+
+    return render(
+        request,
+        "tenancy/settings.html",
+        {"lab": lab, "profile_form": profile_form, "notif_form": notif_form},
+    )
 
 
 @login_required

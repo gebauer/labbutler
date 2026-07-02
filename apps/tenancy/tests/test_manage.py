@@ -125,6 +125,21 @@ def test_add_member_creates_user_and_membership(client, lab):
 
 
 @pytest.mark.django_db
+def test_members_search_matches_email_and_friendly_name(client, lab):
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    alice = _user(lab, "alice@x.de", ["Viewer"])
+    alice.friendly_name = "Alice Wonder"
+    alice.save(update_fields=["friendly_name"])
+    _user(lab, "bob@x.de", ["Viewer"])
+
+    by_name = client.get(reverse("manage:members"), {"q": "wonder"})
+    assert b"alice@x.de" in by_name.content and b"bob@x.de" not in by_name.content
+
+    by_email = client.get(reverse("manage:members"), {"q": "bob@"})
+    assert b"bob@x.de" in by_email.content and b"alice@x.de" not in by_email.content
+
+
+@pytest.mark.django_db
 def test_member_edit_roles(client, lab):
     from apps.tenancy.models import Membership, Role
 

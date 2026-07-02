@@ -4,7 +4,7 @@
   {% for comment in comments %}
     <div class="rounded-lg border border-gray-200 bg-white p-3">
       <div class="flex items-center justify-between gap-2 text-xs text-gray-500">
-        <span class="font-medium text-gray-700">{{ comment.author.email|default:"—" }}</span>
+        <span class="font-medium text-gray-700">{{ comment.author.display_name|default:"—" }}</span>
         <span>{{ comment.created_at|date:"Y-m-d H:i" }}</span>
       </div>
       <p class="mt-1 whitespace-pre-line text-sm text-gray-800">{{ comment.body }}</p>

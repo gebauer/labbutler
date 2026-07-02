@@ -24,12 +24,22 @@
     <p class="mt-2 text-xs text-gray-500">If the email is new, a user account is created and can sign in once a password is set.</p>
   </form>
 
-  <div class="mt-5 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+  <form method="get" class="mt-5">
+    <div class="relative max-w-sm">
+      <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"/></svg>
+      <input type="search" name="q" value="{{ query }}" placeholder="Search name or email…"
+             autocomplete="off"
+             class="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500">
+    </div>
+  </form>
+
+  <div class="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
     <ul class="divide-y divide-gray-100">
       {% for membership in memberships %}
         <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
           <div>
-            <div class="font-medium text-gray-900">{{ membership.user.email }}</div>
+            <div class="font-medium text-gray-900">{{ membership.user.display_name }}</div>
+            {% if membership.user.friendly_name %}<div class="mt-0.5 text-xs text-gray-500">{{ membership.user.email }}</div>{% endif %}
             <div class="mt-0.5 text-xs text-gray-500">
               {% for role in membership.roles.all %}{{ role.name }}{% if not forloop.last %}, {% endif %}{% empty %}no roles{% endfor %}
             </div>

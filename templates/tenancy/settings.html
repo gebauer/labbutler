@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Settings · LabButler{% endblock %}
+
+{% block content %}
+  <h1 class="text-2xl font-semibold tracking-tight">Settings</h1>
+  <p class="mt-1 text-sm text-gray-500">
+    Your account and email preferences for <span class="font-medium text-gray-700">{{ lab.name }}</span>.
+  </p>
+
+  <form method="post" class="mt-6 max-w-xl space-y-8">
+    {% csrf_token %}
+
+    <fieldset>
+      <legend class="text-sm font-semibold text-gray-700">Account</legend>
+      <div class="mt-3">
+        {% include "manage/_form_fields.html" with form=profile_form %}
+      </div>
+    </fieldset>
+
+    {% if notif_form %}
+      <fieldset>
+        <legend class="text-sm font-semibold text-gray-700">Notifications</legend>
+        <div class="mt-3">
+          {% include "manage/_form_fields.html" with form=notif_form %}
+        </div>
+        <p class="mt-3 text-xs text-gray-400">
+          “Every email” sends one message per event, “Daily summary” bundles them into a
+          once-a-day digest, and “No email” switches them off.
+        </p>
+      </fieldset>
+    {% endif %}
+
+    <div>
+      <button type="submit" class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Save settings</button>
+    </div>
+  </form>
+{% endblock %}

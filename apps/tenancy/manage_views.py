@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django.contrib import messages
+from django.db.models import Q
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -65,8 +66,7 @@ def _config(kind: str) -> CrudConfig:
 def index(request: HttpRequest) -> HttpResponse:
     """Admin landing page with one card per manageable area."""
     sections = [
-        (kind, cfg, cfg.model.objects.filter(lab=request.lab).count())
-        for kind, cfg in CRUD.items()
+        (kind, cfg, cfg.model.objects.filter(lab=request.lab).count()) for kind, cfg in CRUD.items()
     ]
     return render(request, "manage/index.html", {"sections": sections})
 
@@ -164,10 +164,20 @@ def members(request: HttpRequest) -> HttpResponse:
         .prefetch_related("roles")
         .order_by("user__email")
     )
+    query = request.GET.get("q", "").strip()
+    if query:
+        # Match on the identity (email) or the display label (friendly name).
+        memberships = memberships.filter(
+            Q(user__email__icontains=query) | Q(user__friendly_name__icontains=query)
+        )
     return render(
         request,
         "manage/members.html",
-        {"memberships": memberships, "add_form": MemberAddForm(lab=request.lab)},
+        {
+            "memberships": memberships,
+            "add_form": MemberAddForm(lab=request.lab),
+            "query": query,
+        },
     )
 
 
@@ -252,9 +262,7 @@ def role_list(request: HttpRequest) -> HttpResponse:
 
 @require_permission("manage_lab")
 def role_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
-    instance = (
-        get_object_or_404(Role, pk=pk, lab=request.lab, is_template=False) if pk else None
-    )
+    instance = get_object_or_404(Role, pk=pk, lab=request.lab, is_template=False) if pk else None
     if request.method == "POST":
         form = RoleForm(request.POST, instance=instance, lab=request.lab)
         if form.is_valid():

@@ -11,7 +11,7 @@
   {% if impersonating %}
     <div class="bg-amber-400 text-sm text-amber-950 print:hidden">
       <div class="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-1.5">
-        <span>👁 Viewing as <strong>{{ user.email }}</strong> — you're impersonating this user.</span>
+        <span>👁 Viewing as <strong>{{ user.display_name }}</strong> — you're impersonating this user.</span>
         <form method="post" action="{% url 'tenancy:stop_impersonating' %}">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.path }}">
@@ -55,7 +55,7 @@
               <select name="user" onchange="this.form.submit()" title="View the app as another user"
                       class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-600 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500">
                 <option value="">View as…</option>
-                {% for member in lab_members %}<option value="{{ member.pk }}">{{ member.email }}</option>{% endfor %}
+                {% for member in lab_members %}<option value="{{ member.pk }}">{{ member.display_name }}</option>{% endfor %}
               </select>
             </form>
           {% endif %}
@@ -74,10 +74,10 @@
             <span class="rounded-md bg-gray-100 px-2.5 py-1.5 text-sm font-medium text-gray-700">{{ current_lab.name }}</span>
           {% endif %}
           <div class="flex items-center gap-2 border-l border-gray-200 pl-3">
-            <a href="{% url 'tenancy:notification_settings' %}"
-               title="Notification settings"
-               class="hidden text-gray-500 hover:text-gray-900 sm:inline">{{ user.email }}</a>
-            <span class="text-gray-500 sm:hidden">{{ user.email }}</span>
+            <a href="{% url 'tenancy:settings' %}"
+               title="Settings"
+               class="hidden text-gray-500 hover:text-gray-900 sm:inline">{{ user.display_name }}</a>
+            <span class="text-gray-500 sm:hidden">{{ user.display_name }}</span>
             <form method="post" action="{% url 'logout' %}">
               {% csrf_token %}
               <button type="submit" class="rounded-md px-2 py-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900">Sign out</button>

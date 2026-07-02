@@ -4,7 +4,7 @@
 
 {% block content %}
   <a href="{% url 'manage:members' %}" class="text-sm text-teal-700 hover:underline">← Members</a>
-  <h1 class="mt-1 text-2xl font-semibold tracking-tight">Roles for {{ membership.user.email }}</h1>
+  <h1 class="mt-1 text-2xl font-semibold tracking-tight">Roles for {{ membership.user.display_name }}</h1>
 
   <form method="post" class="mt-6 max-w-xl">
     {% csrf_token %}

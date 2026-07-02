@@ -9,7 +9,7 @@
     <td class="px-4 py-2.5">{% include "procurement/_status_badge.html" with value=req.status label=req.get_status_display %}</td>
     <td class="px-4 py-2.5 text-gray-600">{{ req.vendor.name|default:"—" }}</td>
     <td class="whitespace-nowrap px-4 py-2.5 text-gray-600">{{ req.total }} {{ req.currency }}</td>
-    <td class="px-4 py-2.5 text-gray-600">{{ req.requested_by.email|default:"—" }}</td>
+    <td class="px-4 py-2.5 text-gray-600">{{ req.requested_by.display_name|default:"—" }}</td>
     <td class="whitespace-nowrap px-4 py-2.5 text-gray-500">{{ req.created_at|date:"Y-m-d" }}</td>
   </tr>
 {% endfor %}

@@ -1,15 +1,34 @@
-"""Personal (non-admin) forms for tenancy — currently just notification preferences."""
+"""Personal (non-admin) forms for tenancy — profile and notification preferences."""
 
 from __future__ import annotations
 
 from django import forms
 
-from .models import Membership
+from .models import Membership, User
 
-_SELECT = (
+_INPUT = (
     "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm "
     "focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
 )
+_SELECT = _INPUT
+
+
+class ProfileForm(forms.ModelForm):
+    """A user's own account details. The friendly name is display-only, not an identifier."""
+
+    class Meta:
+        model = User
+        fields = ["friendly_name"]
+        labels = {"friendly_name": "Friendly name"}
+        help_texts = {
+            "friendly_name": "Shown instead of your email in lists and tables. "
+            "Leave blank to show your email.",
+        }
+        widgets = {
+            "friendly_name": forms.TextInput(
+                attrs={"class": _INPUT, "placeholder": "e.g. Jane Doe"}
+            ),
+        }
 
 
 class NotificationSettingsForm(forms.ModelForm):

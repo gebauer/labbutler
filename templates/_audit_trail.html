@@ -9,7 +9,7 @@
           <span class="whitespace-nowrap text-xs text-gray-400">{{ entry.timestamp|date:"Y-m-d H:i" }}</span>
         </div>
         <div class="mt-0.5 text-xs text-gray-500">
-          {% if entry.actor %}{{ entry.actor.email }}{% else %}system{% endif %}
+          {% if entry.actor %}{{ entry.actor.display_name }}{% else %}system{% endif %}
           {% if entry.changes %} · {% for key, value in entry.changes.items %}{{ key }}={{ value }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
         </div>
       </li>

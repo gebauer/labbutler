@@ -199,6 +199,23 @@ def test_request_search_and_vendor_filter(client, lab):
 
 
 @pytest.mark.django_db
+def test_request_search_matches_requester_email_and_friendly_name(client, lab):
+    alice = _user(lab, "alice@x.de", ["Member"])
+    alice.friendly_name = "Alice Wonder"
+    alice.save(update_fields=["friendly_name"])
+    bob = _user(lab, "bob@x.de", ["Member"])
+    Request.objects.create(lab=lab, item_name="Widget", requested_by=alice)
+    Request.objects.create(lab=lab, item_name="Gadget", requested_by=bob)
+    client.force_login(alice)
+
+    by_name = client.get(reverse("procurement:request_list"), {"q": "wonder"})
+    assert b"Widget" in by_name.content and b"Gadget" not in by_name.content
+
+    by_email = client.get(reverse("procurement:request_list"), {"q": "bob@"})
+    assert b"Gadget" in by_email.content and b"Widget" not in by_email.content
+
+
+@pytest.mark.django_db
 def test_request_infinite_scroll_chunk(client, lab):
     member = _user(lab, "u@x.de", ["Member"])
     for i in range(26):
@@ -291,7 +308,10 @@ def test_filter_by_assignee(client, lab):
     manager = _user(lab, "m@x.de", ["Lab manager"])
     coord = _user(lab, "c@x.de", ["Purchase coordinator"])
     Request.objects.create(
-        lab=lab, item_name="Assigned", requested_by=manager, assigned_to=coord,
+        lab=lab,
+        item_name="Assigned",
+        requested_by=manager,
+        assigned_to=coord,
         status=Status.APPROVED,
     )
     Request.objects.create(lab=lab, item_name="Unassigned", requested_by=manager)

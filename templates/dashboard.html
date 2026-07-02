@@ -31,7 +31,7 @@
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
                       <a href="{% url 'procurement:request_detail' item.pk %}" class="block truncate font-medium text-gray-900 hover:text-teal-700">{{ item.item_name }}</a>
-                      <div class="text-xs text-gray-500">{{ item.requested_by.email|default:"—" }}</div>
+                      <div class="text-xs text-gray-500">{{ item.requested_by.display_name|default:"—" }}</div>
                     </div>
                     <div class="flex shrink-0 items-center gap-3">
                       <span class="whitespace-nowrap text-base font-semibold tabular-nums text-gray-900">{{ item.total }} {{ item.currency }}</span>
@@ -73,7 +73,7 @@
                     </div>
                     {% if item.assigned_to or item.expected_delivery %}
                       <div class="mt-0.5 text-xs text-gray-500">
-                        {% if item.assigned_to %}with {{ item.assigned_to.email }}{% endif %}{% if item.expected_delivery %} · due {{ item.expected_delivery|date:"Y-m-d" }}{% endif %}
+                        {% if item.assigned_to %}with {{ item.assigned_to.display_name }}{% endif %}{% if item.expected_delivery %} · due {{ item.expected_delivery|date:"Y-m-d" }}{% endif %}
                       </div>
                     {% endif %}
                   </a>

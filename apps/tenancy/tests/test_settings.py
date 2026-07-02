@@ -1,4 +1,4 @@
-"""Notification-settings page: permission-gated fields and saving preferences."""
+"""Personal settings page: friendly name plus permission-gated notification preferences."""
 
 import pytest
 from django.urls import reverse
@@ -6,7 +6,7 @@ from django.urls import reverse
 from apps.tenancy.models import Membership, NotificationFrequency, User
 from apps.tenancy.services import add_member, create_lab
 
-URL = reverse("tenancy:notification_settings")
+URL = reverse("tenancy:settings")
 
 
 @pytest.fixture
@@ -21,10 +21,11 @@ def _user(lab, email: str, roles: list[str]) -> User:
 
 
 @pytest.mark.django_db
-def test_manager_sees_both_settings(client, lab):
+def test_manager_sees_account_and_both_notification_settings(client, lab):
     client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
     resp = client.get(URL)
     assert resp.status_code == 200
+    assert b"Friendly name" in resp.content
     assert b"needs approval" in resp.content
     assert b"changes status" in resp.content
 
@@ -40,11 +41,29 @@ def test_member_sees_only_request_updates(client, lab):
 
 
 @pytest.mark.django_db
-def test_viewer_has_no_settings(client, lab):
+def test_viewer_sees_account_but_no_notifications(client, lab):
     client.force_login(_user(lab, "viewer@x.de", ["Viewer"]))
     resp = client.get(URL)
     assert resp.status_code == 200
-    assert b"no notification preferences" in resp.content
+    # The account section is always available; notification categories are not.
+    assert b"Friendly name" in resp.content
+    assert b"changes status" not in resp.content
+    assert b"needs approval" not in resp.content
+
+
+@pytest.mark.django_db
+def test_can_set_and_clear_friendly_name(client, lab):
+    user = _user(lab, "viewer@x.de", ["Viewer"])
+    client.force_login(user)
+
+    resp = client.post(URL, {"friendly_name": "Vera Viewer"})
+    assert resp.status_code == 302
+    user.refresh_from_db()
+    assert user.friendly_name == "Vera Viewer"
+
+    client.post(URL, {"friendly_name": ""})
+    user.refresh_from_db()
+    assert user.friendly_name == ""
 
 
 @pytest.mark.django_db

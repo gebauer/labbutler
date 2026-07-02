@@ -43,7 +43,7 @@
     </datalist>
     {% include "inventory/_facet_select.html" with name="location" label="All locations" options=locations selected=facets.location %}
     {% include "inventory/_facet_select.html" with name="vendor" label="All suppliers" options=vendors selected=facets.vendor %}
-    {% include "inventory/_facet_select.html" with name="owner" label="All owners" options=owners selected=facets.owner use_email=1 %}
+    {% include "inventory/_facet_select.html" with name="owner" label="All owners" options=owners selected=facets.owner person=1 %}
     <noscript><button type="submit" class="rounded-lg border px-3 py-1.5 text-sm">Apply</button></noscript>
   </form>
 

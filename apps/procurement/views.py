@@ -32,8 +32,16 @@ from .models import Request, Vendor
 
 PAGE_SIZE = 25
 
-# Free-text query columns, and facet param -> the related pk it filters on.
-_REQ_SEARCH_FIELDS = ("item_name", "catalog_number", "cas_number", "po_number")
+# Free-text query columns, and facet param -> the related pk it filters on. The requester
+# is searchable by both email (the identity) and friendly name (the display label).
+_REQ_SEARCH_FIELDS = (
+    "item_name",
+    "catalog_number",
+    "cas_number",
+    "po_number",
+    "requested_by__email",
+    "requested_by__friendly_name",
+)
 _REQ_FACETS = {
     "vendor": "vendor__pk",
     "requester": "requested_by__pk",
@@ -311,9 +319,7 @@ def request_forward(request: HttpRequest, pk: int) -> HttpResponse:
             messages.success(request, f"Forwarded to {assignee.email} for ordering.")
             return redirect("procurement:request_detail", pk=req.pk)
 
-    return render(
-        request, "procurement/forward.html", {"req": req, "coordinators": coordinators}
-    )
+    return render(request, "procurement/forward.html", {"req": req, "coordinators": coordinators})
 
 
 @require_permission("view_requests")
