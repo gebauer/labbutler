@@ -16,10 +16,11 @@ x-app-environment: &app-environment
   DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
   DJANGO_TIME_ZONE: ${DJANGO_TIME_ZONE:-Europe/Berlin}
   DJANGO_SECURE_SSL_REDIRECT: ${DJANGO_SECURE_SSL_REDIRECT:-true}
-  # Defaults to the bundled db service so it can never fall back to localhost. If you use
-  # a custom POSTGRES_PASSWORD, set DATABASE_URL with the same password (or point it at a
-  # managed database).
-  DATABASE_URL: ${DATABASE_URL:-postgres://labbutler:labbutler@db:5432/labbutler}
+  # Defaults to the bundled db service, derived from the same POSTGRES_* vars that
+  # initialize it — so the app password can never drift from the DB password. Override
+  # DATABASE_URL directly to point at a managed database. NOTE: POSTGRES_PASSWORD must be
+  # URL-safe (avoid @ : / ? #); otherwise set DATABASE_URL explicitly and URL-encode it.
+  DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-labbutler}:${POSTGRES_PASSWORD:-labbutler}@db:5432/${POSTGRES_DB:-labbutler}}
   CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://broker:6379/0}
   CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://broker:6379/1}
   CELERY_TASK_ALWAYS_EAGER: ${CELERY_TASK_ALWAYS_EAGER:-false}
