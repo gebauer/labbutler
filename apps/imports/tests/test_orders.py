@@ -201,6 +201,31 @@ def test_commit_reuses_relations_across_rows(tmp_path):
     assert User.objects.filter(email="x@lab.de").count() == 1
 
 
+@pytest.mark.django_db
+def test_commit_aligns_timestamps_to_workflow_dates(tmp_path):
+    lab = create_lab(name="Timestamp Lab", item_id_prefix="TS")
+    path = _make_workbook(
+        tmp_path,
+        [
+            _row(
+                ITEM_NAME="Old order",
+                STATUS="received",
+                DATE_REQUESTED="05-06-2019",
+                DATE_RECEIVED="10-08-2023",
+            ),
+            _row(ITEM_NAME="No dates", STATUS="requested"),
+        ],
+    )
+    commit_orders(build_orders_plan(path), lab=lab)
+
+    dated = Request.objects.get(lab=lab, item_name="Old order")
+    assert dated.created_at.date() == date(2019, 6, 5)  # requested date -> created
+    assert dated.updated_at.date() == date(2023, 8, 10)  # latest milestone -> updated
+    # A request with no historical dates keeps its real (import-time) timestamp.
+    undated = Request.objects.get(lab=lab, item_name="No dates")
+    assert undated.created_at.date() == date.today()
+
+
 # --- Real sample (skipped when the git-ignored file is absent) ------------------------
 
 

@@ -12,10 +12,13 @@ the generic inventory importer, re-running duplicates rather than updates.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date, datetime, time
 from decimal import Decimal
 from pathlib import Path
 
+from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from apps.audit.models import AuditEntry
 from apps.inventory.models import Tag
@@ -47,6 +50,9 @@ _DATE_FIELDS = {
     "DATE_CANCELLED": "date_cancelled",
     "DATE_RECEIVED": "date_received",
 }
+
+# Request fields holding historical workflow dates, used to align the auto timestamps.
+_ACTIVITY_DATE_FIELDS = tuple(_DATE_FIELDS.values())
 
 # Columns with no dedicated Request field, folded into the comment for provenance.
 _COMMENT_EXTRAS = [
@@ -257,6 +263,31 @@ def _cached(cache: dict, key: str, make):
     return cache[key]
 
 
+def _as_datetime(value: date) -> datetime:
+    """Midday datetime for a date, so the auto timestamps get a sensible time-of-day."""
+    stamp = datetime.combine(value, time(12, 0))
+    return timezone.make_aware(stamp) if settings.USE_TZ else stamp
+
+
+def align_timestamps(request: Request) -> bool:
+    """Set ``created_at``/``updated_at`` from a request's historical workflow dates.
+
+    Imported orders would otherwise all carry the import moment, so the default
+    ``-created_at`` ordering couldn't reflect when each order actually happened. Uses the
+    requested date as "created" and the latest milestone as "updated", writing them with a
+    direct UPDATE to bypass the ``auto_now``/``auto_now_add`` fields. No-op (returns False)
+    for requests with no historical dates — i.e. those created in-app.
+    """
+    dates = [d for d in (getattr(request, f) for f in _ACTIVITY_DATE_FIELDS) if d]
+    if not dates:
+        return False
+    created = request.date_requested or min(dates)
+    Request.objects.filter(pk=request.pk).update(
+        created_at=_as_datetime(created), updated_at=_as_datetime(max(dates))
+    )
+    return True
+
+
 @transaction.atomic
 def commit_orders(
     plan: OrderImportPlan, *, lab: Lab, actor: User | None = None
@@ -317,6 +348,7 @@ def commit_orders(
                 _cached(tags, name, lambda n=name: Tag.objects.get_or_create(lab=lab, name=n)[0])
                 for name in row.tag_names
             )
+        align_timestamps(request)
         result.created += 1
 
     AuditEntry.record(
