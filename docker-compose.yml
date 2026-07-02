@@ -40,6 +40,18 @@ x-app-environment: &app-environment
   # Behind a reverse proxy (Coolify's Traefik = 1) so lockouts use the real client IP.
   AXES_IPWARE_PROXY_COUNT: ${AXES_IPWARE_PROXY_COUNT:-0}
 
+# Shared base for the app services (web / worker / beat): same image, env, restart policy
+# and startup ordering. Each service only overrides its command (and web its healthcheck).
+x-app: &app
+  build: .
+  environment: *app-environment
+  restart: unless-stopped
+  depends_on:
+    db:
+      condition: service_healthy
+    broker:
+      condition: service_started
+
 services:
   db:
     image: postgres:17
@@ -61,16 +73,10 @@ services:
     restart: unless-stopped
 
   web:
-    build: .
+    <<: *app
     command: >
       sh -c "python manage.py migrate --noinput &&
              exec gunicorn labbutler.wsgi:application --bind 0.0.0.0:8000 --workers 3"
-    environment: *app-environment
-    depends_on:
-      db:
-        condition: service_healthy
-      broker:
-        condition: service_started
     volumes:
       - media:/data/media
     healthcheck:
@@ -79,31 +85,16 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
-    restart: unless-stopped
 
   worker:
-    build: .
+    <<: *app
     command: celery -A labbutler worker -l info
-    environment: *app-environment
-    depends_on:
-      db:
-        condition: service_healthy
-      broker:
-        condition: service_started
     volumes:
       - media:/data/media
-    restart: unless-stopped
 
   beat:
-    build: .
+    <<: *app
     command: celery -A labbutler beat -l info --schedule /tmp/celerybeat-schedule
-    environment: *app-environment
-    depends_on:
-      db:
-        condition: service_healthy
-      broker:
-        condition: service_started
-    restart: unless-stopped
 
 volumes:
   pgdata:
