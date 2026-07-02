@@ -11,6 +11,7 @@ from __future__ import annotations
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -173,6 +174,10 @@ def request_create(request: HttpRequest) -> HttpResponse:
                 target=req,
                 changes={"item_name": req.item_name, "total": str(req.total)},
             )
+            # Notify the lab's approvers (once the row is committed) that it needs approval.
+            from apps.notifications.tasks import notify_request_created
+
+            transaction.on_commit(lambda: notify_request_created.delay(req.pk))
             messages.success(request, "Request raised.")
             return redirect("procurement:request_detail", pk=req.pk)
     else:

@@ -1,0 +1,74 @@
+"""Notification-settings page: permission-gated fields and saving preferences."""
+
+import pytest
+from django.urls import reverse
+
+from apps.tenancy.models import Membership, NotificationFrequency, User
+from apps.tenancy.services import add_member, create_lab
+
+URL = reverse("tenancy:notification_settings")
+
+
+@pytest.fixture
+def lab(db):
+    return create_lab(name="AG Baumann", item_id_prefix="AGB")
+
+
+def _user(lab, email: str, roles: list[str]) -> User:
+    user = User.objects.create_user(username="", email=email, password="pw")
+    add_member(user=user, lab=lab, role_names=roles)
+    return user
+
+
+@pytest.mark.django_db
+def test_manager_sees_both_settings(client, lab):
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    resp = client.get(URL)
+    assert resp.status_code == 200
+    assert b"needs approval" in resp.content
+    assert b"changes status" in resp.content
+
+
+@pytest.mark.django_db
+def test_member_sees_only_request_updates(client, lab):
+    # Member can raise requests but not approve, so only the update setting shows.
+    client.force_login(_user(lab, "member@x.de", ["Member"]))
+    resp = client.get(URL)
+    assert resp.status_code == 200
+    assert b"changes status" in resp.content
+    assert b"needs approval" not in resp.content
+
+
+@pytest.mark.django_db
+def test_viewer_has_no_settings(client, lab):
+    client.force_login(_user(lab, "viewer@x.de", ["Viewer"]))
+    resp = client.get(URL)
+    assert resp.status_code == 200
+    assert b"no notification preferences" in resp.content
+
+
+@pytest.mark.django_db
+def test_member_can_save_preference(client, lab):
+    user = _user(lab, "member@x.de", ["Member"])
+    client.force_login(user)
+    resp = client.post(URL, {"request_update_notifications": NotificationFrequency.OFF})
+    assert resp.status_code == 302
+    membership = Membership.objects.get(user=user, lab=lab)
+    assert membership.request_update_notifications == NotificationFrequency.OFF
+
+
+@pytest.mark.django_db
+def test_member_cannot_set_a_field_they_lack_rights_for(client, lab):
+    # A Member has no approve_request, so posting that field must not change it.
+    user = _user(lab, "member@x.de", ["Member"])
+    client.force_login(user)
+    client.post(
+        URL,
+        {
+            "request_update_notifications": NotificationFrequency.DAILY,
+            "approval_notifications": NotificationFrequency.OFF,  # should be ignored
+        },
+    )
+    membership = Membership.objects.get(user=user, lab=lab)
+    assert membership.request_update_notifications == NotificationFrequency.DAILY
+    assert membership.approval_notifications == NotificationFrequency.IMMEDIATE  # unchanged

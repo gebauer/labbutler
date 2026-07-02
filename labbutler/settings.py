@@ -137,11 +137,15 @@ CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/1")
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 
-# Daily item-expiry digest (run by `celery -A labbutler beat`). Hour is local time.
+# Daily digests (run by `celery -A labbutler beat`). Hours are local time.
 CELERY_BEAT_SCHEDULE = {
     "expiry-digest-daily": {
         "task": "apps.notifications.tasks.send_expiry_digests",
         "schedule": crontab(hour=env.int("EXPIRY_DIGEST_HOUR", default=7), minute=0),
+    },
+    "procurement-digest-daily": {
+        "task": "apps.notifications.tasks.send_notification_digests",
+        "schedule": crontab(hour=env.int("NOTIFY_DIGEST_HOUR", default=7), minute=30),
     },
 }
 

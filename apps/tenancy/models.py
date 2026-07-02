@@ -115,6 +115,14 @@ class Role(TimeStampedModel):
         return f"{self.name} ({scope})"
 
 
+class NotificationFrequency(models.TextChoices):
+    """How often a member wants a given category of procurement email."""
+
+    IMMEDIATE = "immediate", "Every email"
+    DAILY = "daily", "Daily summary"
+    OFF = "off", "No email"
+
+
 class Membership(TimeStampedModel):
     """A user's participation in one lab, carrying that lab's roles."""
 
@@ -122,6 +130,20 @@ class Membership(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name="memberships")
     roles = models.ManyToManyField(Role, related_name="memberships", blank=True)
     joined_at = models.DateTimeField(auto_now_add=True)
+
+    # Per-lab email preferences. "Approval" fires for members who can approve, when a
+    # request needs approval; "request update" fires for a request's requester/orderer as
+    # it changes status. Default is every email; members tune it in their settings.
+    approval_notifications = models.CharField(
+        max_length=16,
+        choices=NotificationFrequency.choices,
+        default=NotificationFrequency.IMMEDIATE,
+    )
+    request_update_notifications = models.CharField(
+        max_length=16,
+        choices=NotificationFrequency.choices,
+        default=NotificationFrequency.IMMEDIATE,
+    )
 
     class Meta:
         constraints = [

@@ -35,6 +35,7 @@ x-app-environment: &app-environment
   LABBUTLER_BASE_URL: ${LABBUTLER_BASE_URL:-}
   EXPIRY_DIGEST_DAYS: ${EXPIRY_DIGEST_DAYS:-30}
   EXPIRY_DIGEST_HOUR: ${EXPIRY_DIGEST_HOUR:-7}
+  NOTIFY_DIGEST_HOUR: ${NOTIFY_DIGEST_HOUR:-7}
   AXES_FAILURE_LIMIT: ${AXES_FAILURE_LIMIT:-5}
   AXES_COOLOFF_HOURS: ${AXES_COOLOFF_HOURS:-1}
   # Behind a reverse proxy (Coolify's Traefik = 1) so lockouts use the real client IP.
