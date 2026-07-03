@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "apps.audit",
     "apps.notifications",
     "apps.comments",
+    "apps.attachments",
     # Login brute-force protection (keep last so it can wrap auth signals).
     "axes",
 ]

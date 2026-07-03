@@ -61,6 +61,53 @@ def test_happy_path_to_checked_in_creates_linked_item(lab):
     assert req.created_item.human_id.startswith("LB-")
 
 
+@pytest.fixture
+def _tmp_media(settings, tmp_path):
+    settings.MEDIA_ROOT = str(tmp_path / "media")
+
+
+def _attach_pdf(lab, req, by):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.attachments.models import Attachment
+
+    return Attachment.objects.create(
+        lab=lab,
+        uploaded_by=by,
+        target=req,
+        file=SimpleUploadedFile("po.pdf", b"po body"),
+        original_name="po.pdf",
+        size=7,
+    )
+
+
+@pytest.mark.django_db
+def test_receive_does_not_carry_attachments_by_default(lab, _tmp_media):
+    from apps.attachments.models import Attachment
+
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member, status=Status.ORDERED)
+    _attach_pdf(lab, req, member)
+
+    services.receive(req, actor=member, create_item=True)
+    assert not Attachment.for_object(req.created_item).exists()
+    assert Attachment.for_object(req).count() == 1  # stays on the request
+
+
+@pytest.mark.django_db
+def test_receive_carries_attachments_when_asked(lab, _tmp_media):
+    from apps.attachments.models import Attachment
+
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member, status=Status.ORDERED)
+    _attach_pdf(lab, req, member)
+
+    services.receive(req, actor=member, create_item=True, carry_attachments=True)
+    copy = Attachment.for_object(req.created_item).get()
+    assert copy.original_name == "po.pdf"
+    assert Attachment.for_object(req).count() == 1  # copied, not moved
+
+
 @pytest.mark.django_db
 def test_receive_without_item_marks_delivered(lab):
     manager = _user(lab, "m@x.de", ["Lab manager"])

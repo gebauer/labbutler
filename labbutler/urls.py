@@ -10,6 +10,7 @@ urlpatterns = [
     path("imports/", include("apps.imports.urls")),
     path("requests/", include("apps.procurement.urls")),
     path("comments/", include("apps.comments.urls")),
+    path("attachments/", include("apps.attachments.urls")),
     path("manage/", include("apps.tenancy.manage_urls")),
     path("", include("apps.tenancy.urls")),
     path("healthz", views.healthz, name="healthz"),

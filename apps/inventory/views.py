@@ -17,6 +17,7 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
+from apps.attachments.models import Attachment
 from apps.audit.models import AuditEntry
 from apps.comments.models import Comment
 from apps.procurement.models import Vendor
@@ -145,6 +146,7 @@ def item_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "can_manage": request.user.can(request.lab, "manage_inventory"),
             "entries": entries,
             "comments": Comment.for_object(item),
+            "attachments": Attachment.for_object(item),
         },
     )
 

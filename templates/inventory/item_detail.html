@@ -75,7 +75,10 @@
     </dl>
   {% endif %}
 
-  {% include "comments/_thread.html" with comments=comments target=item comment_model="item" %}
+  <div class="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
+    <div>{% include "comments/_thread.html" with comments=comments target=item comment_model="item" %}</div>
+    <div>{% include "attachments/_list.html" with attachments=attachments target=item attach_model="item" can_attach=can_manage %}</div>
+  </div>
 
   {% include "_audit_trail.html" %}
 {% endblock %}

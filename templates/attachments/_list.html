@@ -1,0 +1,31 @@
+{% comment %}Attachment list + upload box. Params: attachments, target, attach_model, can_attach.{% endcomment %}
+<h2 id="attachments" class="text-sm font-semibold uppercase tracking-wide text-gray-500">Attachments</h2>
+<div class="mt-2 space-y-2">
+  {% for attachment in attachments %}
+    <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+      <div class="min-w-0">
+        <a href="{% url 'attachments:download' attachment.pk %}" class="block truncate text-sm font-medium text-teal-700 hover:underline">📎 {{ attachment.original_name }}</a>
+        <p class="text-xs text-gray-500">{{ attachment.size|filesizeformat }} · {{ attachment.uploaded_by.display_name|default:"—" }} · {{ attachment.created_at|date:"Y-m-d H:i" }}</p>
+      </div>
+      {% if can_attach %}
+        <form method="post" action="{% url 'attachments:delete' attachment.pk %}"
+              data-confirm="Delete “{{ attachment.original_name }}”?">
+          {% csrf_token %}
+          <button type="submit" title="Delete attachment" class="rounded px-2 py-1 text-sm text-gray-400 hover:bg-red-50 hover:text-red-600">✕</button>
+        </form>
+      {% endif %}
+    </div>
+  {% empty %}
+    <p class="text-sm text-gray-400">No attachments.</p>
+  {% endfor %}
+</div>
+
+{% if can_attach %}
+  <form method="post" action="{% url 'attachments:add' attach_model target.pk %}" enctype="multipart/form-data" class="mt-3 flex items-center gap-2">
+    {% csrf_token %}
+    <input type="file" name="file" required
+           class="block w-full max-w-sm text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200">
+    <button type="submit" class="shrink-0 rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700">Upload</button>
+  </form>
+  <p class="mt-1 text-xs text-gray-500">PDF, images, or office documents up to 25 MB — e.g. the PO, an SDS, or a manual.</p>
+{% endif %}

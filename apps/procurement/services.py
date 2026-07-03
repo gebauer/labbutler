@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from django.db import transaction
 
+from apps.attachments.models import Attachment
 from apps.audit.models import AuditEntry
 from apps.inventory import ids
 from apps.inventory.models import Item
@@ -192,9 +193,7 @@ def self_approve(req: Request, *, actor, note: str = "") -> Request:
     :class:`TransitionError` if the request is not awaiting approval.
     """
     if req.status != Status.REQUESTED:
-        raise TransitionError(
-            f"cannot self-approve a request that is {req.get_status_display()!r}"
-        )
+        raise TransitionError(f"cannot self-approve a request that is {req.get_status_display()!r}")
 
     previous = req.status
     req.approver = actor
@@ -223,7 +222,13 @@ def self_approve(req: Request, *, actor, note: str = "") -> Request:
 
 @transaction.atomic
 def receive(
-    req: Request, *, actor, create_item: bool, location=None, human_id: str = ""
+    req: Request,
+    *,
+    actor,
+    create_item: bool,
+    location=None,
+    human_id: str = "",
+    carry_attachments: bool = False,
 ) -> Request:
     """Receive a delivered order.
 
@@ -232,6 +237,10 @@ def receive(
     request to Checked in); ``create_item=False`` records delivery of something we don't
     track (software, services) and moves it to Delivered. Raises :class:`TransitionError`
     if the request is not awaiting delivery.
+
+    ``carry_attachments`` copies the request's attachments onto the new item. Off by
+    default: POs and invoices usually don't belong on the inventory item, only things
+    like an SDS or manual do.
     """
     if req.status not in (Status.ORDERED, Status.DELIVERED):
         raise TransitionError(f"cannot receive a request that is {req.get_status_display()!r}")
@@ -239,6 +248,9 @@ def receive(
     previous = req.status
     if create_item:
         _create_item_from(req, location=location, human_id=human_id)
+        if carry_attachments:
+            for attachment in Attachment.for_object(req):
+                attachment.copy_to(req.created_item)
         req.status = Status.CHECKED_IN
         action = "checked_in"
         changes = {"from": previous, "to": req.status, "item": req.created_item.human_id}

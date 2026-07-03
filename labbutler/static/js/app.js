@@ -6,7 +6,13 @@
                               template URL, replacing "__value__" with the chosen value
    - [data-print]             open the browser print dialog on click
    - [data-stop-propagation]  keep clicks from bubbling (e.g. actions inside a <summary>)
+   - form[data-confirm]       ask for confirmation before submitting (destructive actions)
 */
+document.addEventListener('submit', function (event) {
+  var form = event.target.closest('form[data-confirm]');
+  if (form && !window.confirm(form.getAttribute('data-confirm'))) event.preventDefault();
+});
+
 document.addEventListener('change', function (event) {
   var el = event.target.closest('[data-autosubmit], [data-action-template]');
   if (!el || !el.form) return;
