@@ -3,6 +3,7 @@ module.exports = {
   content: [
     "./templates/**/*.html",
     "./apps/**/templates/**/*.html",
+    "./labbutler/static/js/**/*.js",
   ],
   theme: {
     extend: {},

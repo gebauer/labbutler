@@ -8,12 +8,14 @@ are intentionally absent: the ID is frozen at creation and never edited here.
 from __future__ import annotations
 
 from django import forms
+from django.db.models import Case, IntegerField, Value, When
+from django.templatetags.static import static
 
 from apps.procurement.models import Vendor
 from apps.tenancy.models import Lab, User
 
-from . import ids
-from .models import FieldDefinition, Item, Location, Tag
+from . import ghs, ids
+from .models import FieldDefinition, HazardStatement, Item, Location, Tag
 
 _INPUT_CLASS = (
     "w-full rounded border border-gray-300 px-3 py-2 text-sm "
@@ -22,6 +24,58 @@ _INPUT_CLASS = (
 
 # Prefix that marks a dynamically-added custom-field form field.
 _CUSTOM_PREFIX = "cf_"
+
+# Model fields rendered in a dedicated "Hazards (GHS)" template section, not the
+# core-fields grid.
+HAZARD_FIELDS = ("signal_word", "hazards")
+
+
+class HazardStatementMultipleChoiceField(forms.ModelMultipleChoiceField):
+    """Multi-select over the global GHS catalog, labelled ``code — official text``."""
+
+    def label_from_instance(self, obj: HazardStatement) -> str:
+        return f"{obj.code} — {obj.text_en}" if obj.text_en else obj.code
+
+
+class HazardSelect(forms.SelectMultiple):
+    """SelectMultiple that tags each option with its GHS pictogram codes.
+
+    The JS picker unions ``data-pictograms`` over the selected options to show the
+    pictograms the current selection implies — icons appear/disappear with the codes.
+    """
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(
+            name, value, label, selected, index, subindex=subindex, attrs=attrs
+        )
+        pictograms = ghs.pictograms_for(str(value))
+        if pictograms:
+            option["attrs"]["data-pictograms"] = " ".join(pictograms)
+        return option
+
+
+def hazard_statement_field() -> HazardStatementMultipleChoiceField:
+    """The shared hazard picker used by both the item and the request form.
+
+    All ~300 catalog entries are rendered as options; the ``data-hazards`` widget is
+    progressively enhanced into a typeahead pill picker (static/js/forms.js), and
+    degrades to a native multi-select without JS.
+    """
+    queryset = HazardStatement.objects.annotate(
+        kind_order=Case(
+            When(kind=HazardStatement.Kind.H, then=Value(0)),
+            When(kind=HazardStatement.Kind.EUH, then=Value(1)),
+            default=Value(2),
+            output_field=IntegerField(),
+        )
+    ).order_by("kind_order", "code")
+    return HazardStatementMultipleChoiceField(
+        queryset=queryset,
+        required=False,
+        label="GHS hazard statements",
+        help_text="H-, EUH- and P-statements. Type to search by code or text.",
+        widget=HazardSelect(attrs={"data-hazards": "", "data-icon-base": static("img/ghs/")}),
+    )
 
 
 def _custom_field(definition: FieldDefinition) -> forms.Field:
@@ -56,6 +110,7 @@ class ItemForm(forms.ModelForm):
             "price_currency",
             "expiration_date",
             "signal_word",
+            "hazards",
             "wgk",
             "storage_class",
             "tags",
@@ -71,6 +126,7 @@ class ItemForm(forms.ModelForm):
         self.fields["vendor"].queryset = Vendor.objects.filter(lab=lab)
         self.fields["tags"].queryset = Tag.objects.filter(lab=lab)
         self.fields["owner"].queryset = User.objects.filter(memberships__lab=lab).distinct()
+        self.fields["hazards"] = hazard_statement_field()
 
         # New items get a chosen ID (from the preprinted pool); existing IDs are frozen.
         self.creating = self.instance.pk is None
@@ -152,7 +208,13 @@ class ItemForm(forms.ModelForm):
 
     def core_fields(self) -> list:
         """Bound fields for the model's own columns (for template grouping)."""
-        return [f for f in self if not f.name.startswith(_CUSTOM_PREFIX)]
+        return [
+            f for f in self if not f.name.startswith(_CUSTOM_PREFIX) and f.name not in HAZARD_FIELDS
+        ]
+
+    def hazard_fields(self) -> list:
+        """Bound fields for the dedicated hazards section."""
+        return [self[name] for name in HAZARD_FIELDS]
 
     def custom_fields_bound(self) -> list:
         """Bound fields for the lab custom-field pool."""

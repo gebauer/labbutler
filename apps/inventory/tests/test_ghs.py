@@ -56,3 +56,44 @@ def test_migration_seeded_the_catalog():
     assert HazardStatement.objects.filter(code="H350i").exists()
     # A precautionary statement is classified as P.
     assert HazardStatement.objects.get(code="P280").kind == "P"
+
+
+def test_recommended_p_parts_for_corrosive():
+    parts = ghs.recommended_p_parts(["H314"])
+    # Old-revision CLP codes must match the newer-revision recommendation table.
+    assert ghs.is_recommended_p("P305+P351+P338", parts)
+    assert ghs.is_recommended_p("P303+P361+P353", parts)
+    assert ghs.is_recommended_p("P310", parts)
+    assert ghs.is_recommended_p("P280", parts)
+    # Unrelated prevention/storage codes are not recommended for corrosion alone.
+    assert not ghs.is_recommended_p("P210", parts)
+    assert not ghs.is_recommended_p("P410+P412", parts)
+
+
+def test_recommended_p_parts_unions_multiple_h_codes():
+    parts = ghs.recommended_p_parts(["H225", "H319"])
+    assert ghs.is_recommended_p("P210", parts)  # from flammability
+    assert ghs.is_recommended_p("P305+P351+P338", parts)  # from eye irritation
+
+
+def test_recommended_p_parts_fails_open_without_data():
+    assert ghs.recommended_p_parts([]) is None
+    assert ghs.recommended_p_parts(["EUH029"]) is None
+
+
+def test_pictograms_for_hazard_codes():
+    assert ghs.pictograms_for("H314") == ("GHS05",)
+    assert ghs.pictograms_for("H300+H310") == ("GHS06",)
+    # Aquatic Chronic 3 carries no pictogram; P/EUH statements never do.
+    assert ghs.pictograms_for("H412") == ()
+    assert ghs.pictograms_for("P210") == ()
+
+
+@pytest.mark.django_db
+def test_hazard_widget_tags_options_with_pictograms():
+    from apps.inventory.forms import hazard_statement_field
+
+    field = hazard_statement_field()
+    html = field.widget.render("hazards", [])
+    assert 'value="H314" data-pictograms="GHS05"' in html
+    assert 'value="H412"' in html and 'value="H412" data-pictograms' not in html

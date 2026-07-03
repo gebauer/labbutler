@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{{ title }} · LabButler{% endblock %}
 
@@ -30,6 +31,21 @@
       {% endfor %}
     </div>
 
+    <h2 class="mt-8 text-sm font-semibold uppercase tracking-wide text-gray-500">Hazards (GHS)</h2>
+    <div class="mt-2 space-y-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="button" data-ghs-lookup data-ghs-url="{% url 'inventory:ghs_lookup' %}"
+                class="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+          Look up by CAS number
+        </button>
+        <div data-ghs-status class="min-w-0 flex-1 self-center text-xs text-gray-500">Suggests statements from PubChem based on the CAS number above — a best-effort guess. Always verify against the vendor&rsquo;s SDS / product page.</div>
+      </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {% include "inventory/_form_field.html" with field=form.signal_word %}
+      </div>
+      {% include "inventory/_form_field.html" with field=form.hazards %}
+    </div>
+
     {% with custom=form.custom_fields_bound %}
       {% if custom %}
         <h2 class="mt-8 text-sm font-semibold uppercase tracking-wide text-gray-500">Custom fields</h2>
@@ -45,4 +61,5 @@
       <button type="submit" class="rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Save</button>
     </div>
   </form>
+  <script src="{% static 'js/forms.js' %}" defer></script>
 {% endblock %}

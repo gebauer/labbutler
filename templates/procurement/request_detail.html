@@ -67,6 +67,23 @@
     </div>
   </dl>
 
+  {% if req.signal_word or req.storage_class or req.hazards.all %}
+    <h2 class="mt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">Safety</h2>
+    <dl class="mt-2 grid grid-cols-1 gap-x-8 gap-y-4 rounded border bg-white p-4 sm:grid-cols-2">
+      {% include "inventory/_detail_row.html" with label="Signal word" value=req.get_signal_word_display %}
+      {% include "inventory/_detail_row.html" with label="Storage class" value=req.storage_class %}
+      <div>
+        <dt class="text-xs uppercase tracking-wide text-gray-500">Hazard statements</dt>
+        <dd class="mt-1 flex flex-wrap gap-1">
+          {% for hazard in req.hazards.all %}
+            <span class="cursor-help rounded px-2 py-0.5 text-xs {% if hazard.kind == 'P' %}bg-sky-100 text-sky-800{% else %}bg-amber-100 text-amber-800{% endif %}"
+                  title="{{ hazard.code }}{% if hazard.text_en %} — {{ hazard.text_en }}{% endif %}">{{ hazard.code }}</span>
+          {% empty %}<span class="text-sm text-gray-400">—</span>{% endfor %}
+        </dd>
+      </div>
+    </dl>
+  {% endif %}
+
   <h2 class="mt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">Costs</h2>
   <dl class="mt-2 grid grid-cols-2 gap-x-8 gap-y-4 rounded border bg-white p-4 sm:grid-cols-4">
     <div><dt class="text-xs uppercase tracking-wide text-gray-500">Unit price</dt><dd class="mt-1 text-sm">{{ req.unit_price }} {{ req.currency }}</dd></div>

@@ -113,6 +113,13 @@ class Request(TimeStampedModel):
     accounting-grade.
     """
 
+    class SignalWord(models.TextChoices):
+        # Values must stay in lockstep with inventory.Item.SignalWord — they are
+        # copied verbatim onto the created item at check-in.
+        NONE = "", "None"
+        WARNING = "warning", "Warning"
+        DANGER = "danger", "Danger"
+
     class Status(models.TextChoices):
         REQUESTED = "requested", "Requested"
         APPROVED = "approved", "Approved"
@@ -206,6 +213,16 @@ class Request(TimeStampedModel):
     date_received = models.DateField(null=True, blank=True)
 
     tags = models.ManyToManyField("inventory.Tag", related_name="requests", blank=True)
+
+    # Optional GHS hazard data captured at request time; carried onto the inventory
+    # item at check-in so safety info is known before the container arrives.
+    signal_word = models.CharField(
+        max_length=10, choices=SignalWord.choices, blank=True, default=""
+    )
+    storage_class = models.CharField("Lagerklasse (TRGS 510)", max_length=20, blank=True)
+    hazards = models.ManyToManyField(
+        "inventory.HazardStatement", related_name="requests", blank=True
+    )
 
     def __str__(self) -> str:
         return f"{self.item_name} [{self.get_status_display()}]"

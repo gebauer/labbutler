@@ -293,7 +293,10 @@ def _create_item_from(req: Request, *, location=None, human_id: str = "") -> Ite
         owner=req.requested_by,
         price_amount=req.unit_price,
         price_currency=req.currency,
+        signal_word=req.signal_word,
+        storage_class=req.storage_class,
     )
     item.tags.set(req.tags.all())
+    item.hazards.set(req.hazards.all())
     req.created_item = item
     return item

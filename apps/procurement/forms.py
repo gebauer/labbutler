@@ -17,6 +17,7 @@ from django import forms
 
 from apps.attachments.forms import MAX_SIZE_MB, MultipleFileField
 from apps.attachments.models import Attachment
+from apps.inventory.forms import hazard_statement_field
 from apps.inventory.models import Tag
 from apps.tenancy.models import Lab
 
@@ -43,6 +44,9 @@ class RequestForm(forms.ModelForm):
             "catalog_number",
             "cas_number",
             "product_url",
+            "signal_word",
+            "storage_class",
+            "hazards",
             "vendor",
             "budget",
             "shipping_address",
@@ -75,6 +79,7 @@ class RequestForm(forms.ModelForm):
             "label"
         )
         self.fields["tags"].queryset = Tag.objects.filter(lab=lab).order_by("name")
+        self.fields["hazards"] = hazard_statement_field()
 
         # Currency is a fixed dropdown; keep an off-list code (imported data) selectable.
         codes = list(CURRENCIES)

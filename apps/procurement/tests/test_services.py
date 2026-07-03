@@ -109,6 +109,21 @@ def test_receive_carries_attachments_when_asked(lab, _tmp_media):
 
 
 @pytest.mark.django_db
+def test_receive_carries_hazard_data_onto_the_item(lab):
+    from apps.inventory.models import HazardStatement
+
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member, status=Status.ORDERED, signal_word="danger", storage_class="8A")
+    req.hazards.set(HazardStatement.objects.filter(code__in=["H225", "P210"]))
+
+    services.receive(req, actor=member, create_item=True)
+    item = req.created_item
+    assert item.signal_word == "danger"
+    assert item.storage_class == "8A"
+    assert sorted(h.code for h in item.hazards.all()) == ["H225", "P210"]
+
+
+@pytest.mark.django_db
 def test_receive_without_item_marks_received(lab):
     manager = _user(lab, "m@x.de", ["Lab manager"])
     member = _user(lab, "u@x.de", ["Member"])

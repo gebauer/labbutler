@@ -345,3 +345,388 @@ for _code in STATEMENTS_EN:
     if _digits in ("360", "361") and _suffix and all(c in "FDfd" for c in _suffix):
         _signature = (_digits, frozenset((c.upper(), c.isupper()) for c in _suffix))
         _REPRODUCTIVE_BY_SIGNATURE[_signature] = _code
+
+# --- Recommended precautionary statements per hazard statement --------------------------
+# H-code -> P-statements the UN GHS assigns to that hazard class/category (prevention,
+# response, storage, disposal columns merged; categories of one code unioned). Extracted
+# from PubChem's GHS classification summary (https://pubchem.ncbi.nlm.nih.gov/ghs/),
+# which mirrors the official tables. Used to rank looked-up P-statement suggestions —
+# never to block anything.
+
+PRECAUTIONARY_FOR: dict[str, tuple[str, ...]] = {
+    "H200": ("P201", "P202", "P281", "P372", "P373", "P380", "P401", "P501"),
+    "H201": ("P210", "P230", "P240", "P250", "P280", "P370+P380", "P372", "P373", "P401", "P501"),
+    "H202": ("P210", "P230", "P240", "P250", "P280", "P370+P380", "P372", "P373", "P401", "P501"),
+    "H203": ("P210", "P230", "P240", "P250", "P280", "P370+P380", "P372", "P373", "P401", "P501"),
+    "H204": (
+        "P203",
+        "P210",
+        "P230",
+        "P234",
+        "P236",
+        "P240",
+        "P250",
+        "P280",
+        "P370+P372+P380+P373",
+        "P401",
+        "P503",
+        "P370+P380+P375",
+    ),
+    "H205": ("P210", "P230", "P240", "P250", "P280", "P370+P380", "P372", "P373", "P401", "P501"),
+    "H206": ("P210", "P212", "P230", "P233", "P280", "P370+P380+P375", "P401", "P501"),
+    "H207": ("P210", "P212", "P230", "P233", "P280", "P370+P380+P375", "P401", "P501"),
+    "H208": ("P210", "P212", "P230", "P233", "P280", "P371+P380+P375", "P401", "P501"),
+    "H209": (
+        "P230",
+        "P210",
+        "P240",
+        "P250",
+        "P280",
+        "P370+P372+P380+P373",
+        "P401",
+        "P503",
+        "P203",
+        "P234",
+        "P236",
+    ),
+    "H210": ("P230", "P210", "P240", "P250", "P280", "P370+P372+P380+P373", "P401", "P503"),
+    "H211": ("P230", "P210", "P240", "P250", "P280", "P370+P372+P380+P373", "P401", "P504"),
+    "H220": ("P203", "P210", "P222", "P280", "P377", "P381", "P403"),
+    "H221": ("P210", "P377", "P381", "P403"),
+    "H222": ("P210", "P211", "P251", "P410+P412"),
+    "H223": ("P210", "P211", "P251", "P410+P412"),
+    "H224": (
+        "P210",
+        "P233",
+        "P240",
+        "P241",
+        "P242",
+        "P243",
+        "P280",
+        "P303+P361+P353",
+        "P370+P378",
+        "P403+P235",
+        "P501",
+    ),
+    "H225": (
+        "P210",
+        "P233",
+        "P240",
+        "P241",
+        "P242",
+        "P243",
+        "P280",
+        "P303+P361+P353",
+        "P370+P378",
+        "P403+P235",
+        "P501",
+    ),
+    "H226": (
+        "P210",
+        "P233",
+        "P240",
+        "P241",
+        "P242",
+        "P243",
+        "P280",
+        "P303+P361+P353",
+        "P370+P378",
+        "P403+P235",
+        "P501",
+    ),
+    "H227": ("P210", "P280", "P370+P378", "P403", "P501"),
+    "H228": ("P210", "P240", "P241", "P280", "P370+P378"),
+    "H229": ("P210", "P211", "P251", "P410+P412"),
+    "H230": ("P203", "P210", "P337", "P381", "P403"),
+    "H231": ("P203", "P210", "P337", "P381", "P403"),
+    "H232": ("P210", "P222", "P280", "P377", "P381", "P403"),
+    "H240": (
+        "P210",
+        "P234",
+        "P235",
+        "P240",
+        "P280",
+        "P370+P372+P380+P373",
+        "P403",
+        "P410",
+        "P411",
+        "P420",
+        "P501",
+    ),
+    "H241": ("P210", "P234", "P235", "P240", "P280", "P403", "P410", "P411", "P420", "P501"),
+    "H242": (
+        "P210",
+        "P234",
+        "P235",
+        "P240",
+        "P280",
+        "P370+P378",
+        "P403",
+        "P410",
+        "P411",
+        "P420",
+        "P501",
+    ),
+    "H250": ("P210", "P222", "P231", "P233", "P280", "P302+P334", "P370+P378", "P302+P335+P334"),
+    "H251": ("P235", "P280", "P407", "P410", "P413", "P420"),
+    "H252": ("P235", "P280", "P407", "P410", "P413", "P420"),
+    "H260": ("P223", "P231+P232", "P280", "P302+P335+P334", "P370+P378", "P402+P404", "P501"),
+    "H261": ("P223", "P231+P232", "P280", "P302+P335+P334", "P370+P378", "P402+P404", "P501"),
+    "H270": ("P220", "P244", "P370+P376", "P403"),
+    "H271": (
+        "P210",
+        "P220",
+        "P280",
+        "P283",
+        "P306+P360",
+        "P371+P380+P375",
+        "P370+P378",
+        "P420",
+        "P501",
+    ),
+    "H272": ("P210", "P220", "P280", "P370+P378", "P501"),
+    "H280": ("P410+P403"),
+    "H281": ("P282", "P336+P317", "P403"),
+    "H282": ("P210", "P211", "P370+P378", "P376", "P381", "P410+P403"),
+    "H283": ("P210", "P211", "P370+P378", "P376", "P381", "P410+P403"),
+    "H284": ("P210", "P376", "P410+P403"),
+    "H290": ("P234", "P390", "P406"),
+    "H300": ("P264", "P270", "P301+P316", "P321", "P330", "P405", "P501"),
+    "H301": ("P264", "P270", "P301+P316", "P321", "P330", "P405", "P501"),
+    "H302": ("P264", "P270", "P301+P317", "P330", "P501"),
+    "H303": ("P301+P317"),
+    "H304": ("P301+P316", "P331", "P405", "P501"),
+    "H305": ("P301+P316", "P331", "P405", "P501"),
+    "H310": (
+        "P262",
+        "P264",
+        "P270",
+        "P280",
+        "P302+P352",
+        "P316",
+        "P321",
+        "P361+P364",
+        "P405",
+        "P501",
+    ),
+    "H311": (
+        "P262",
+        "P264",
+        "P270",
+        "P280",
+        "P302+P352",
+        "P316",
+        "P321",
+        "P361+P364",
+        "P405",
+        "P501",
+    ),
+    "H312": ("P280", "P302+P352", "P317", "P321", "P362+P364", "P501"),
+    "H313": ("P302+P317"),
+    "H314": (
+        "P260",
+        "P264",
+        "P280",
+        "P301+P330+P331",
+        "P302+P361+P354",
+        "P363",
+        "P304+P340",
+        "P316",
+        "P321",
+        "P305+P354+P338",
+        "P405",
+        "P501",
+    ),
+    "H315": ("P264", "P280", "P302+P352", "P321", "P332+P317", "P362+P364"),
+    "H316": ("P332+P317"),
+    "H317": ("P261", "P272", "P280", "P302+P352", "P333+P317", "P321", "P362+P364", "P501"),
+    "H318": ("P264+P265", "P280", "P305+P354+P338", "P317"),
+    "H319": ("P264+P265", "P280", "P305+P351+P338", "P337+P317"),
+    "H320": ("P264+P265", "P305+P351+P338", "P337+P317"),
+    "H330": ("P260", "P271", "P284", "P304+P340", "P316", "P320", "P403+P233", "P405", "P501"),
+    "H331": ("P261", "P271", "P304+P340", "P316", "P321", "P403+P233", "P405", "P501"),
+    "H332": ("P261", "P271", "P304+P340", "P317"),
+    "H333": ("P304+P317"),
+    "H334": ("P233", "P260", "P271", "P284", "P304+P340", "P342+P316", "P403", "P501"),
+    "H335": ("P261", "P271", "P304+P340", "P319", "P403+P233", "P405", "P501"),
+    "H336": ("P261", "P271", "P304+P340", "P319", "P403+P233", "P405", "P501"),
+    "H340": ("P203", "P280", "P318", "P405", "P501"),
+    "H341": ("P203", "P280", "P318", "P405", "P501"),
+    "H350": ("P203", "P280", "P318", "P405", "P501"),
+    "H351": ("P203", "P280", "P318", "P405", "P501"),
+    "H360": ("P203", "P280", "P318", "P405", "P501"),
+    "H361": ("P203", "P280", "P318", "P405", "P501"),
+    "H362": ("P203", "P260", "P263", "P264", "P270", "P318"),
+    "H370": ("P260", "P264", "P270", "P308+P316", "P321", "P405", "P501"),
+    "H371": ("P260", "P264", "P270", "P308+P316", "P405", "P501"),
+    "H372": ("P260", "P264", "P270", "P319", "P501"),
+    "H373": ("P260", "P319", "P501"),
+    "H400": ("P273", "P391", "P501"),
+    "H401": ("P273", "P501"),
+    "H402": ("P273", "P501"),
+    "H410": ("P273", "P391", "P501"),
+    "H411": ("P273", "P391", "P501"),
+    "H412": ("P273", "P501"),
+    "H413": ("P273", "P501"),
+    "H420": ("P502"),
+    "H421": ("P502"),
+}
+
+# The UN renumbered several response statements across GHS revisions (e.g. rev. 9/10:
+# P305+P351+P338 -> P305+P354+P338, P310/P311 -> P316), while EU CLP data still uses the
+# older codes. Both generations map onto one bucket so recommendations match either.
+_P_EQUIVALENTS: dict[str, str] = {
+    "P302": "P302",
+    "P303": "P302",  # IF ON SKIN (or hair)
+    "P351": "P353",
+    "P352": "P353",
+    "P354": "P353",  # rinse/wash with water
+    "P310": "P310",
+    "P311": "P310",
+    "P316": "P310",  # immediate medical help
+    "P312": "P313",
+    "P314": "P313",
+    "P315": "P313",  # get medical advice
+    "P317": "P313",
+    "P318": "P313",
+    "P319": "P313",
+    "P332": "P332",
+    "P333": "P332",  # if skin irritation
+    "P337": "P337",
+    "P338": "P338",
+}
+
+
+def _p_signal_parts(code: str) -> set[str]:
+    """A P-code's constituent statements, folded onto revision-independent buckets."""
+    return {_P_EQUIVALENTS.get(part, part) for part in code.split("+")}
+
+
+def recommended_p_parts(h_codes: list[str]) -> set[str] | None:
+    """Bucketed P-statement parts the GHS recommends for the given H-codes.
+
+    ``None`` when no given code has recommendation data (unknown or EUH-only input) —
+    callers should fail open and treat every P-statement as plausible then.
+    """
+    parts: set[str] = set()
+    found_any = False
+    for h_code in h_codes:
+        for single in h_code.split("+"):
+            recommended = PRECAUTIONARY_FOR.get(single)
+            if not recommended:
+                continue
+            found_any = True
+            for p_code in recommended:
+                parts |= _p_signal_parts(p_code)
+    return parts if found_any else None
+
+
+def is_recommended_p(p_code: str, parts: set[str]) -> bool:
+    """Whether a (possibly combined) P-code shares any part with the recommended set."""
+    return bool(_p_signal_parts(p_code) & parts)
+
+
+# --- Pictograms per hazard statement ----------------------------------------------------
+# H-code -> GHS pictogram codes (GHS01..GHS09), from the same official table as
+# PRECAUTIONARY_FOR. Codes without an entry (all P/EUH, some H) carry no pictogram.
+# The SVGs live in static/img/ghs/<code>.svg.
+
+PICTOGRAMS_FOR: dict[str, tuple[str, ...]] = {
+    "H200": ("GHS01",),
+    "H201": ("GHS01",),
+    "H202": ("GHS01",),
+    "H203": ("GHS01",),
+    "H204": (
+        "GHS01",
+        "GHS07",
+    ),
+    "H205": ("GHS02",),
+    "H206": ("GHS02",),
+    "H207": ("GHS02",),
+    "H208": ("GHS02",),
+    "H209": ("GHS01",),
+    "H210": ("GHS01",),
+    "H211": ("GHS01",),
+    "H220": ("GHS02",),
+    "H221": ("GHS02",),
+    "H222": ("GHS02",),
+    "H223": ("GHS02",),
+    "H224": ("GHS02",),
+    "H225": ("GHS02",),
+    "H226": ("GHS02",),
+    "H228": ("GHS02",),
+    "H229": ("GHS02",),
+    "H230": ("GHS02",),
+    "H231": ("GHS02",),
+    "H232": ("GHS02",),
+    "H240": ("GHS01",),
+    "H241": (
+        "GHS01",
+        "GHS02",
+    ),
+    "H242": ("GHS02",),
+    "H250": ("GHS02",),
+    "H251": ("GHS02",),
+    "H252": ("GHS02",),
+    "H260": ("GHS02",),
+    "H261": ("GHS02",),
+    "H270": ("GHS03",),
+    "H271": ("GHS03",),
+    "H272": ("GHS03",),
+    "H280": ("GHS04",),
+    "H281": ("GHS04",),
+    "H282": (
+        "GHS02",
+        "GHS04",
+    ),
+    "H283": (
+        "GHS02",
+        "GHS04",
+    ),
+    "H284": ("GHS04",),
+    "H290": ("GHS05",),
+    "H300": ("GHS06",),
+    "H301": ("GHS06",),
+    "H302": ("GHS07",),
+    "H304": ("GHS08",),
+    "H305": ("GHS08",),
+    "H310": ("GHS06",),
+    "H311": ("GHS06",),
+    "H312": ("GHS07",),
+    "H314": ("GHS05",),
+    "H315": ("GHS07",),
+    "H317": ("GHS07",),
+    "H318": ("GHS05",),
+    "H319": ("GHS07",),
+    "H330": ("GHS06",),
+    "H331": ("GHS06",),
+    "H332": ("GHS07",),
+    "H334": ("GHS08",),
+    "H335": ("GHS07",),
+    "H336": ("GHS07",),
+    "H340": ("GHS08",),
+    "H341": ("GHS08",),
+    "H350": ("GHS08",),
+    "H351": ("GHS08",),
+    "H360": ("GHS08",),
+    "H361": ("GHS08",),
+    "H370": ("GHS08",),
+    "H371": ("GHS08",),
+    "H372": ("GHS08",),
+    "H373": ("GHS08",),
+    "H400": ("GHS09",),
+    "H410": ("GHS09",),
+    "H411": ("GHS09",),
+    "H420": ("GHS07",),
+    "H421": ("GHS07",),
+}
+
+
+def pictograms_for(code: str) -> tuple[str, ...]:
+    """GHS pictogram codes for a (possibly combined) hazard statement."""
+    seen: list[str] = []
+    for part in code.split("+"):
+        for pictogram in PICTOGRAMS_FOR.get(part, ()):
+            if pictogram not in seen:
+                seen.append(pictogram)
+    return tuple(seen)

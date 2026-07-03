@@ -189,6 +189,29 @@ def test_disallowed_form_attachment_is_a_validation_error(lab):
     assert "attachments" in form.errors
 
 
+def test_hazard_data_is_saved(lab):
+    form = RequestForm(
+        _form_data(signal_word="danger", storage_class="8A", hazards=["H225", "P210"]),
+        lab=lab,
+    )
+    req = _save(form)
+    assert req.signal_word == "danger"
+    assert req.storage_class == "8A"
+    assert sorted(h.code for h in req.hazards.all()) == ["H225", "P210"]
+
+
+def test_hazard_data_is_optional(lab):
+    req = _save(RequestForm(_form_data(), lab=lab))
+    assert req.signal_word == ""
+    assert not req.hazards.exists()
+
+
+def test_unknown_hazard_code_is_rejected(lab):
+    form = RequestForm(_form_data(hazards=["H999"]), lab=lab)
+    assert not form.is_valid()
+    assert "hazards" in form.errors
+
+
 def test_save_recalculates_nothing_but_view_does(lab):
     """The form itself leaves tax/total at defaults; the view recalculates before save."""
     form = RequestForm(_form_data(unit_price="100.00", pack_count="1"), lab=lab)

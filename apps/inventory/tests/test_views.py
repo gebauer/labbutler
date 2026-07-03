@@ -187,6 +187,20 @@ def test_edit_keeps_human_id_and_updates_fields(client, lab, manager):
 
 
 @pytest.mark.django_db
+def test_edit_saves_hazard_data(client, lab, manager):
+    item = _make_item(lab, name="Ethanol")
+    client.force_login(manager)
+    resp = client.post(
+        reverse("inventory:item_edit", args=[item.pk]),
+        {"name": "Ethanol", "tags": [], "signal_word": "danger", "hazards": ["H225", "P210"]},
+    )
+    assert resp.status_code == 302
+    item.refresh_from_db()
+    assert item.signal_word == "danger"
+    assert sorted(h.code for h in item.hazards.all()) == ["H225", "P210"]
+
+
+@pytest.mark.django_db
 def test_delete_removes_item_and_audits(client, lab, manager):
     item = _make_item(lab, name="Doomed")
     pk = item.pk

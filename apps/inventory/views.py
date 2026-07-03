@@ -11,11 +11,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from apps.attachments.models import Attachment
 from apps.audit.models import AuditEntry
@@ -24,8 +25,10 @@ from apps.procurement.models import Vendor
 from apps.tenancy.models import User
 from apps.tenancy.scoping import require_permission, set_current_lab, user_labs
 
+from . import ghs
+from . import ghs_lookup as ghs_lookup_client
 from .forms import ItemForm
-from .models import Item, Location, Tag
+from .models import HazardStatement, Item, Location, Tag
 
 PAGE_SIZE = 25
 
@@ -234,6 +237,87 @@ def item_delete(request: HttpRequest, pk: int) -> HttpResponse:
         messages.success(request, f"Deleted {human_id}.")
         return redirect("inventory:item_list")
     return render(request, "inventory/item_confirm_delete.html", {"item": item})
+
+
+@require_permission("view_inventory")
+@require_GET
+def ghs_lookup(request: HttpRequest) -> JsonResponse:
+    """Suggest GHS data (signal word, H/P statements, pictograms) for a CAS number.
+
+    Backs the "Look up by CAS" button on the item and request forms. Best-effort:
+    an unknown CAS or an unreachable PubChem yields ``{"found": false}``, never an
+    error the form would have to handle.
+    """
+    cas = ghs_lookup_client.normalize_cas(request.GET.get("cas", ""))
+    if not ghs_lookup_client.CAS_RE.match(cas):
+        return JsonResponse({"error": "invalid_cas"}, status=400)
+    suggestion = ghs_lookup_client.lookup_cas(cas)
+    if suggestion is None:
+        return JsonResponse({"found": False})
+
+    statements = HazardStatement.objects.in_bulk(suggestion.hazard_codes)
+    has_notifier_data = bool(suggestion.percentages)
+    ordered = [
+        code
+        for code in sorted(suggestion.hazard_codes, key=lambda c: (c.startswith("P"), c))
+        if code in statements
+    ]
+
+    harmonized = {code for code in suggestion.harmonized_codes if code in statements}
+
+    def h_suggested(code: str) -> bool:
+        # The EU harmonised classification (CLP Annex VI) is legally binding — when
+        # present it decides exactly which codes are auto-selected.
+        if harmonized:
+            return code in harmonized
+        percent = suggestion.percentages.get(code)
+        if percent is not None:
+            return percent >= ghs_lookup_client.SUGGEST_CUTOFF_PERCENT
+        # An unannotated H-code next to annotated ones comes from a minor side
+        # source — treat it as rare. With no notifier data at all, keep everything.
+        return not has_notifier_data
+
+    # P-statements carry no notifier shares; rank them by whether the GHS recommends
+    # them for the H-codes we just accepted. No mapping data -> keep them all.
+    accepted_h = [
+        code
+        for code in ordered
+        if statements[code].kind != HazardStatement.Kind.P and h_suggested(code)
+    ]
+    recommended = ghs.recommended_p_parts(accepted_h)
+
+    hazards = []
+    for code in ordered:
+        if statements[code].kind == HazardStatement.Kind.P:
+            suggested = recommended is None or ghs.is_recommended_p(code, recommended)
+        else:
+            suggested = h_suggested(code)
+        hazards.append(
+            {
+                "code": code,
+                "text": statements[code].text_en,
+                "kind": statements[code].kind,
+                "percent": suggestion.percentages.get(code),
+                "suggested": suggested,
+            }
+        )
+    return JsonResponse(
+        {
+            "found": True,
+            "signal_word": suggestion.signal_word,
+            "hazards": hazards,
+            "pictograms": [
+                {
+                    "name": name,
+                    "code": ghs_lookup_client.PICTOGRAM_CODES.get(name),
+                    "icon": static(f"img/ghs/{ghs_lookup_client.PICTOGRAM_CODES[name]}.svg")
+                    if name in ghs_lookup_client.PICTOGRAM_CODES
+                    else None,
+                }
+                for name in suggestion.pictograms
+            ],
+        }
+    )
 
 
 @login_required

@@ -33,6 +33,27 @@
         </div>
       </section>
 
+      {# ——— Hazards (optional) ——— #}
+      <details class="rounded-lg border border-gray-200 bg-white" {% if form.hazards.value or form.signal_word.value or form.storage_class.value %}open{% endif %}>
+        <summary class="cursor-pointer select-none p-5 text-sm font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700">
+          Hazard data (GHS) <span class="font-normal normal-case text-gray-400">— optional, carried onto the inventory item</span>
+        </summary>
+        <div class="space-y-4 px-5 pb-5">
+          <div class="flex flex-wrap items-start gap-3">
+            <button type="button" data-ghs-lookup data-ghs-url="{% url 'inventory:ghs_lookup' %}"
+                    class="shrink-0 rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+              Look up by CAS number
+            </button>
+            <div data-ghs-status class="min-w-0 flex-1 self-center text-xs text-gray-500">Suggests statements from PubChem based on the CAS number above — a best-effort guess. Always verify against the vendor&rsquo;s SDS / product page.</div>
+          </div>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {% include "procurement/_form_field.html" with field=form.signal_word %}
+            {% include "procurement/_form_field.html" with field=form.storage_class %}
+          </div>
+          {% include "procurement/_form_field.html" with field=form.hazards %}
+        </div>
+      </details>
+
       {# ——— Vendor & price ——— #}
       <section class="rounded-lg border border-gray-200 bg-white p-5">
         <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Vendor &amp; price</h2>
@@ -119,5 +140,5 @@
       </div>
     </form>
   </div>
-  <script src="{% static 'js/request-form.js' %}" defer></script>
+  <script src="{% static 'js/forms.js' %}" defer></script>
 {% endblock %}
