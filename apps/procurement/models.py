@@ -6,6 +6,10 @@ from django.db import models
 from apps.tenancy.models import Lab
 from labbutler.abstract import TimeStampedModel
 
+# Currencies offered in price dropdowns. The DB columns stay free-form CharFields so
+# imported historical data with other codes survives; these are just the typeable set.
+CURRENCIES = ["EUR", "USD", "GBP", "CHF", "JPY"]
+
 
 class Vendor(TimeStampedModel):
     """A supplier — just a name, quick-created inline during ordering."""
@@ -22,7 +26,38 @@ class Vendor(TimeStampedModel):
         return self.name
 
 
-class Budget(TimeStampedModel):
+class LabDefaultable(TimeStampedModel):
+    """Per-lab row where at most one can be the default (preselected on new requests).
+
+    Concrete models must add the partial unique constraint on (lab, is_default=True)
+    themselves so each carries a stable, explicit constraint name.
+    """
+
+    is_default = models.BooleanField(default=False)
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs) -> None:
+        # Becoming the default demotes the previous one, keeping the constraint happy.
+        if self.is_default:
+            type(self).objects.filter(lab=self.lab, is_default=True).exclude(pk=self.pk).update(
+                is_default=False
+            )
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def default_for(cls, lab: Lab):
+        """The lab's default row, or its only row if just one exists."""
+        rows = list(cls.objects.filter(lab=lab).order_by("-is_default")[:2])
+        if not rows:
+            return None
+        if rows[0].is_default or len(rows) == 1:
+            return rows[0]
+        return None
+
+
+class Budget(LabDefaultable):
     """A cost centre (Kostenstelle / grant). Each request is charged to exactly one."""
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name="budgets")
@@ -39,18 +74,32 @@ class Budget(TimeStampedModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["lab", "number"], name="unique_budget_number_per_lab"),
+            models.UniqueConstraint(
+                fields=["lab"],
+                condition=models.Q(is_default=True),
+                name="unique_default_budget_per_lab",
+            ),
         ]
 
     def __str__(self) -> str:
         return f"{self.number} · {self.name}"
 
 
-class ShippingAddress(TimeStampedModel):
+class ShippingAddress(LabDefaultable):
     """A delivery address; a request ships to one."""
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name="shipping_addresses")
     label = models.CharField(max_length=200)
     address = models.TextField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["lab"],
+                condition=models.Q(is_default=True),
+                name="unique_default_shipping_address_per_lab",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.label

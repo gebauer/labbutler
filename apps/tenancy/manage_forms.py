@@ -11,7 +11,7 @@ from decimal import Decimal
 from django import forms
 
 from apps.inventory.models import FieldDefinition
-from apps.procurement.models import Budget, ShippingAddress, Vendor
+from apps.procurement.models import CURRENCIES, Budget, ShippingAddress, Vendor
 
 from .models import Lab, Permission, Role, User
 
@@ -54,14 +54,20 @@ class VendorForm(_LabForm):
 class ShippingAddressForm(_LabForm):
     class Meta:
         model = ShippingAddress
-        fields = ["label", "address"]
+        fields = ["label", "address", "is_default"]
         widgets = {"address": forms.Textarea(attrs={"rows": 3})}
+        help_texts = {
+            "is_default": "Preselected on new requests. Only one address can be the default."
+        }
 
 
 class BudgetForm(_LabForm):
     class Meta:
         model = Budget
-        fields = ["number", "name", "owner"]
+        fields = ["number", "name", "owner", "is_default"]
+        help_texts = {
+            "is_default": "Preselected on new requests. Only one budget can be the default."
+        }
 
     def _scope(self, lab: Lab) -> None:
         self.fields["owner"].queryset = User.objects.filter(memberships__lab=lab).distinct()
@@ -86,11 +92,13 @@ class FieldDefinitionForm(_LabForm):
 class LabSettingsForm(forms.ModelForm):
     class Meta:
         model = Lab
-        fields = ["name", "default_vat_rate"]
+        fields = ["name", "default_vat_rate", "default_currency"]
+        widgets = {"default_currency": forms.Select(choices=[(c, c) for c in CURRENCIES])}
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.fields["default_vat_rate"].help_text = "Fraction, e.g. 0.19 for 19% VAT."
+        self.fields["default_currency"].help_text = "Preselected on new requests."
         _style(self)
 
     def clean_default_vat_rate(self) -> Decimal:

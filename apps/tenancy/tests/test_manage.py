@@ -89,11 +89,15 @@ def test_unknown_kind_is_404(client, lab):
 @pytest.mark.django_db
 def test_settings_update(client, lab):
     client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
-    resp = client.post(reverse("manage:settings"), {"name": "AG B New", "default_vat_rate": "0.07"})
+    resp = client.post(
+        reverse("manage:settings"),
+        {"name": "AG B New", "default_vat_rate": "0.07", "default_currency": "USD"},
+    )
     assert resp.status_code == 302
     lab.refresh_from_db()
     assert lab.name == "AG B New"
     assert lab.default_vat_rate == Decimal("0.07")
+    assert lab.default_currency == "USD"
 
 
 @pytest.mark.django_db

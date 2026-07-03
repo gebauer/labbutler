@@ -94,6 +94,8 @@ class Lab(TimeStampedModel):
     # Monotonic counter backing human-ID allocation; never decremented.
     next_item_number = models.PositiveIntegerField(default=1)
     default_vat_rate = models.DecimalField(max_digits=5, decimal_places=4, default=Decimal("0.19"))
+    # ISO 4217 code preselected on new procurement requests.
+    default_currency = models.CharField(max_length=3, default="EUR")
 
     def __str__(self) -> str:
         return self.name
