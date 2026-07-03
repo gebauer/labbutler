@@ -135,6 +135,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LOGIN_REDIRECT_URL = "/"
 LOGIN_URL = "/accounts/login/"
+# Without this, LogoutView renders Django's bare "Logged out" fallback page (whose
+# login link points at the admin login) instead of returning to the app's start page.
+LOGOUT_REDIRECT_URL = "/"
 
 # How long a password-reset / invite set-password link stays valid. Governs both the
 # self-service recovery flow and the welcome email sent to newly-added members.
