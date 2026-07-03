@@ -124,7 +124,7 @@ def test_receive_without_location_needs_confirmation(client, lab):
 
 
 @pytest.mark.django_db
-def test_receive_without_item_marks_delivered(client, lab):
+def test_receive_without_item_marks_received(client, lab):
     manager = _user(lab, "m@x.de", ["Lab manager"])
     req = Request.objects.create(
         lab=lab, item_name="Site licence", requested_by=manager, status=Status.ORDERED
@@ -135,9 +135,31 @@ def test_receive_without_item_marks_delivered(client, lab):
     )
     assert resp.status_code == 302
     req.refresh_from_db()
-    assert req.status == Status.DELIVERED
+    assert req.status == Status.RECEIVED
     assert req.created_item is None
     assert not Item.objects.filter(lab=lab).exists()
+
+
+@pytest.mark.django_db
+def test_received_request_cannot_be_received_again(client, lab):
+    """Issue #5: receiving without an item is final — the dialog rejects a second pass."""
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    req = Request.objects.create(
+        lab=lab, item_name="Site licence", requested_by=manager, status=Status.ORDERED
+    )
+    client.force_login(manager)
+    receive_url = reverse("procurement:request_receive", args=[req.pk])
+    client.post(receive_url, {"outcome": "no_item"})
+
+    detail_url = reverse("procurement:request_detail", args=[req.pk])
+    assert client.get(receive_url)["Location"] == detail_url
+    resp = client.post(receive_url, {"outcome": "check_in", "confirm_no_location": "1"})
+    assert resp["Location"] == detail_url
+    req.refresh_from_db()
+    assert req.status == Status.RECEIVED
+    assert not Item.objects.filter(lab=lab).exists()
+    # The detail page no longer offers the receive action.
+    assert b"Receive delivery" not in client.get(detail_url).content
 
 
 @pytest.mark.django_db

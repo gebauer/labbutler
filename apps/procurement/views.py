@@ -83,7 +83,7 @@ def _filtered_requests(
 
 # The happy-path pipeline shown as a stepper (off-path states handled separately).
 _PIPELINE = ["requested", "approved", "ordered", "delivered", "checked_in"]
-_OFF_PATH = ["rejected", "cancelled"]
+_OFF_PATH = ["received", "rejected", "cancelled"]
 
 
 def _status_overview(lab, selected: list[str]) -> tuple[list[dict], list[dict]]:
@@ -296,7 +296,7 @@ def request_receive(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method == "POST":
         if request.POST.get("outcome") == "no_item":
             services.receive(req, actor=request.user, create_item=False)
-            messages.success(request, "Recorded as delivered — no inventory item created.")
+            messages.success(request, "Recorded as received — no inventory item created.")
             return redirect("procurement:request_detail", pk=req.pk)
 
         raw_id = (request.POST.get("human_id") or "").strip()

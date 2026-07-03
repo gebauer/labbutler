@@ -109,14 +109,39 @@ def test_receive_carries_attachments_when_asked(lab, _tmp_media):
 
 
 @pytest.mark.django_db
-def test_receive_without_item_marks_delivered(lab):
+def test_receive_without_item_marks_received(lab):
     manager = _user(lab, "m@x.de", ["Lab manager"])
     member = _user(lab, "u@x.de", ["Member"])
     req = _request(lab, member, status=Status.ORDERED)
     services.receive(req, actor=manager, create_item=False)
     req.refresh_from_db()
-    assert req.status == Status.DELIVERED
+    assert req.status == Status.RECEIVED
     assert req.created_item is None
+
+
+@pytest.mark.django_db
+def test_received_is_terminal(lab):
+    """Issue #5: a request received without an item is done — no re-receive, no cancel."""
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member, status=Status.ORDERED)
+    services.receive(req, actor=manager, create_item=False)
+
+    assert not services.can_receive(manager, req)
+    with pytest.raises(TransitionError):
+        services.receive(req, actor=manager, create_item=True)
+    assert not may_perform(manager, req, TRANSITIONS["cancel"])
+    assert available_transitions(manager, req) == []
+
+
+@pytest.mark.django_db
+def test_delivered_stays_receivable(lab):
+    """Imported orders land in Delivered (arrived, not yet checked in) and must remain
+    receivable — only the new Received status is terminal."""
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member, status=Status.DELIVERED)
+    assert services.can_receive(manager, req)
 
 
 @pytest.mark.django_db

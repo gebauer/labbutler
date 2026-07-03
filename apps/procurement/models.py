@@ -119,6 +119,7 @@ class Request(TimeStampedModel):
         REJECTED = "rejected", "Rejected"
         ORDERED = "ordered", "Ordered"
         DELIVERED = "delivered", "Delivered"
+        RECEIVED = "received", "Received"
         CHECKED_IN = "checked_in", "Checked in"
         CANCELLED = "cancelled", "Cancelled"
 

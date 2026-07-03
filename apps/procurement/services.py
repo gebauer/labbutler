@@ -234,9 +234,10 @@ def receive(
 
     Two outcomes: ``create_item=True`` checks it into inventory (creates the item at the
     given location, with the chosen ``human_id`` or the next free ID, and moves the
-    request to Checked in); ``create_item=False`` records delivery of something we don't
-    track (software, services) and moves it to Delivered. Raises :class:`TransitionError`
-    if the request is not awaiting delivery.
+    request to Checked in); ``create_item=False`` records receipt of something we don't
+    track (software, services) and moves it to Received. Both outcomes are terminal —
+    the request cannot be received again. Raises :class:`TransitionError` if the request
+    is not awaiting delivery.
 
     ``carry_attachments`` copies the request's attachments onto the new item. Off by
     default: POs and invoices usually don't belong on the inventory item, only things
@@ -255,7 +256,7 @@ def receive(
         action = "checked_in"
         changes = {"from": previous, "to": req.status, "item": req.created_item.human_id}
     else:
-        req.status = Status.DELIVERED
+        req.status = Status.RECEIVED
         action = "delivered_untracked"
         changes = {"from": previous, "to": req.status}
     req.save()
