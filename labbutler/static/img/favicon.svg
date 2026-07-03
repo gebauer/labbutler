@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Mirrors the header brand mark: teal-600 rounded square, white "L". -->
+  <rect width="32" height="32" rx="7" fill="#0d9488"/>
+  <path d="M11 7h4.5v13.5H24V25H11Z" fill="#fff"/>
+</svg>
