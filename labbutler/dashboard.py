@@ -47,7 +47,9 @@ def build(user, lab) -> list[Widget]:
         )
 
     if user.can(lab, "approve_request"):
-        qs = requests.filter(status=Status.REQUESTED).order_by("created_at")
+        # Newest first: with more entries than the limit, oldest-first pins the same
+        # stale rows at the top forever (#7). "View all" still has the full queue.
+        qs = requests.filter(status=Status.REQUESTED).order_by("-created_at")
         add(
             "approvals",
             "Requests to approve",
@@ -65,7 +67,7 @@ def build(user, lab) -> list[Widget]:
         qs = (
             requests.filter(status=Status.APPROVED)
             .filter(Q(assigned_to__isnull=True) | Q(assigned_to=user))
-            .order_by("created_at")
+            .order_by("-created_at")
         )
         add(
             "to_order",

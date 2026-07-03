@@ -121,6 +121,30 @@ def test_deliveries_widget_caps_items_at_ten(lab):
 
 
 @pytest.mark.django_db
+def test_request_widgets_list_newest_first(lab):
+    from labbutler import dashboard
+
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Member"])
+    for i in range(8):  # more than the widget limit of 6
+        Request.objects.create(
+            lab=lab, item_name=f"Approval {i}", requested_by=member, status=Status.REQUESTED
+        )
+        Request.objects.create(
+            lab=lab, item_name=f"Order {i}", requested_by=member, status=Status.APPROVED
+        )
+
+    widgets = {w.key: w for w in dashboard.build(manager, lab)}
+    # Newest first, so a full queue doesn't pin the same oldest rows forever (#7).
+    assert [r.item_name for r in widgets["approvals"].items] == [
+        f"Approval {i}" for i in range(7, 1, -1)
+    ]
+    assert [r.item_name for r in widgets["to_order"].items] == [
+        f"Order {i}" for i in range(7, 1, -1)
+    ]
+
+
+@pytest.mark.django_db
 def test_direct_approve_returns_to_dashboard(client, lab):
     manager = _user(lab, "m@x.de", ["Lab manager"])
     member = _user(lab, "u@x.de", ["Member"])
