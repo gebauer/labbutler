@@ -45,9 +45,12 @@
                   <div class="flex items-center justify-between gap-2">
                     <div class="min-w-0">
                       <a href="{% url 'procurement:request_detail' item.pk %}" class="block truncate font-medium text-gray-900 hover:text-teal-700">{{ item.item_name }}</a>
-                      <div class="text-xs text-gray-500">{{ item.vendor.name|default:"—" }} · {{ item.total }} {{ item.currency }}</div>
+                      <div class="text-xs text-gray-500">{{ item.vendor.name|default:"—" }} · {{ item.total }} {{ item.currency }}{% if item.assigned_to %} · with {{ item.assigned_to.display_name }}{% endif %}</div>
                     </div>
-                    {% include "dashboard/_action.html" with pk=item.pk action="order" label="Mark ordered" style="primary" %}
+                    <div class="flex shrink-0 items-center gap-1">
+                      <a href="{% url 'procurement:request_forward' item.pk %}" class="rounded border border-teal-300 px-2 py-1 text-xs font-medium text-teal-700 hover:bg-teal-50">Forward…</a>
+                      {% include "dashboard/_action.html" with pk=item.pk action="order" label="Mark ordered" style="primary" %}
+                    </div>
                   </div>
                 {% elif w.kind == 'deliveries' %}
                   <div class="flex items-center justify-between gap-2">

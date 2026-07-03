@@ -44,8 +44,9 @@ def test_dashboard_is_empty_for_viewer(client, lab):
 
 
 @pytest.mark.django_db
-def test_forwarded_widget_lists_requests_assigned_to_me(client, lab):
+def test_order_widget_lists_unassigned_and_my_forwarded_requests(client, lab):
     coord = _user(lab, "c@x.de", ["Purchase coordinator"])
+    other_coord = _user(lab, "c2@x.de", ["Purchase coordinator"])
     member = _user(lab, "u@x.de", ["Member"])
     Request.objects.create(
         lab=lab,
@@ -54,10 +55,23 @@ def test_forwarded_widget_lists_requests_assigned_to_me(client, lab):
         assigned_to=coord,
         status=Status.APPROVED,
     )
+    Request.objects.create(
+        lab=lab, item_name="Nobody ordered yet", requested_by=member, status=Status.APPROVED
+    )
+    Request.objects.create(
+        lab=lab,
+        item_name="Someone else handles",
+        requested_by=member,
+        assigned_to=other_coord,
+        status=Status.APPROVED,
+    )
     client.force_login(coord)
     resp = client.get(reverse("home"))
-    assert b"Forwarded to you to order" in resp.content
+    assert b"Requests to order" in resp.content
     assert b"Assigned to me" in resp.content
+    assert b"Nobody ordered yet" in resp.content
+    assert b"Someone else handles" not in resp.content
+    assert b"Mark ordered" in resp.content
 
 
 @pytest.mark.django_db
@@ -139,11 +153,20 @@ def test_offsite_next_is_ignored(client, lab):
 
 
 @pytest.mark.django_db
-def test_forwarded_widget_hidden_for_non_coordinator(client, lab):
-    # A manager has place_order (via "*") but isn't in the Purchase coordinator role.
+def test_order_widget_gated_on_place_order_permission(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    Request.objects.create(
+        lab=lab, item_name="Waiting", requested_by=member, status=Status.APPROVED
+    )
+    # Anyone holding place_order can order — the widget must not require the literal
+    # "Purchase coordinator" role (#10): a manager has place_order via "*".
     client.force_login(_user(lab, "m@x.de", ["Lab manager"]))
     resp = client.get(reverse("home"))
-    assert b"Forwarded to you to order" not in resp.content
+    assert b"Requests to order" in resp.content
+
+    client.force_login(member)  # no place_order -> no widget
+    resp = client.get(reverse("home"))
+    assert b"Requests to order" not in resp.content
 
 
 @pytest.mark.django_db

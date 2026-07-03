@@ -20,12 +20,6 @@ from apps.procurement.models import Request
 
 Status = Request.Status
 _LIMIT = 6  # items shown per widget before "View all"
-_COORDINATOR_ROLE = "Purchase coordinator"
-
-
-def _is_purchase_coordinator(user, lab) -> bool:
-    """Whether the user actually holds the Purchase coordinator role in this lab."""
-    return user.memberships.filter(lab=lab, roles__name=_COORDINATOR_ROLE).exists()
 
 
 @dataclass
@@ -63,15 +57,23 @@ def build(user, lab) -> list[Widget]:
             "Nothing waiting for approval.",
         )
 
-    if _is_purchase_coordinator(user, lab):
-        assigned = requests.filter(assigned_to=user, status=Status.APPROVED).order_by("created_at")
+    if user.can(lab, "place_order"):
+        # Approved requests this user could place: unassigned ones plus those forwarded
+        # to them — but not work already forwarded to somebody else. Gated on the
+        # permission (not the Purchase coordinator role name) so anyone who may order
+        # can actually do so from here (#10).
+        qs = (
+            requests.filter(status=Status.APPROVED)
+            .filter(Q(assigned_to__isnull=True) | Q(assigned_to=user))
+            .order_by("created_at")
+        )
         add(
             "to_order",
-            "Forwarded to you to order",
+            "Requests to order",
             "to_order",
-            assigned,
-            f"{list_url}?assignee={user.pk}&status=approved",
-            "Nothing forwarded to you.",
+            qs,
+            f"{list_url}?status=approved",
+            "Nothing waiting to be ordered.",
         )
 
     if user.can(lab, "check_in"):
