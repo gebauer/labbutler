@@ -44,10 +44,11 @@ _SEARCH_FIELDS = (
 )
 
 # Query param -> the item field it filters on. Tag filters by name (a type-in combobox
-# offers the lab's tags, which are too many to show as pills); the rest match by pk.
+# offers the lab's tags, which are too many to show as pills); location is handled
+# separately because it matches the whole subtree; the rest match by pk.
 _FACETS = {
     "tag": "tags__name__icontains",
-    "location": "location__pk",
+    "location": None,
     "owner": "owner__pk",
     "vendor": "vendor__pk",
 }
@@ -68,7 +69,14 @@ def _filtered_items(lab, query: str, facets: dict[str, str]):
         items = items.filter(lookup)
     for param, lookup_field in _FACETS.items():
         value = facets.get(param)
-        if value:
+        if not value:
+            continue
+        if param == "location":
+            # A location filter means "everything stored in there", so it matches the
+            # picked location and its whole subtree ("what's in room 376?").
+            if value.isdigit():
+                items = items.filter(location_id__in=Location.subtree_pks(lab, int(value)))
+        else:
             items = items.filter(**{lookup_field: value})
     return items.distinct()
 
@@ -105,6 +113,8 @@ def item_list(request: HttpRequest) -> HttpResponse:
     items = _filtered_items(lab, query, facets)
 
     page = Paginator(items, PAGE_SIZE).get_page(request.GET.get("page"))
+    # One bulk pass so each row can render its location's full path without extra queries.
+    Location.attach_path_names(lab, [item.location for item in page if item.location])
     context = {
         "page": page,
         "query": query,
@@ -113,7 +123,7 @@ def item_list(request: HttpRequest) -> HttpResponse:
         "filter_qs": _filter_querystring(request),
         "has_filters": bool(query.strip()) or any(facets.values()),
         "tags": Tag.objects.filter(lab=lab).order_by("name"),
-        "locations": Location.objects.filter(lab=lab).order_by("name"),
+        "locations": Location.tree_for_lab(lab),
         "vendors": Vendor.objects.filter(lab=lab).order_by("name"),
         "owners": User.objects.filter(owned_items__lab=lab).distinct().order_by("email"),
         "can_manage": request.user.can(lab, "manage_inventory"),

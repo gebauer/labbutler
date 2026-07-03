@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from django import forms
 
-from apps.inventory.models import FieldDefinition
+from apps.inventory.models import FieldDefinition, Location
 from apps.procurement.models import CURRENCIES, Budget, ShippingAddress, Vendor
 
 from .models import Lab, Permission, Role, User
@@ -72,6 +72,43 @@ class BudgetForm(_LabForm):
     def _scope(self, lab: Lab) -> None:
         self.fields["owner"].queryset = User.objects.filter(memberships__lab=lab).distinct()
         self.fields["owner"].required = False
+
+
+class LocationForm(_LabForm):
+    class Meta:
+        model = Location
+        fields = ["name", "parent", "room_number"]
+        help_texts = {
+            "parent": "Where this location sits, e.g. the room a fridge is in. "
+            "Leave empty for a top-level location.",
+            "room_number": "Optional room number, matched during imports.",
+        }
+
+    def _scope(self, lab: Lab) -> None:
+        parent = self.fields["parent"]
+        parent.queryset = Location.objects.filter(lab=lab)
+        # Depth-first full-path labels; when editing, hide the location's own subtree
+        # so it can't be moved inside itself.
+        excluded = set(Location.subtree_pks(lab, self.instance.pk)) if self.instance.pk else set()
+        parent.choices = [
+            ("", parent.empty_label),
+            *(
+                (location.pk, location.full_path)
+                for location in Location.tree_for_lab(lab)
+                if location.pk not in excluded
+            ),
+        ]
+
+    def clean_parent(self) -> Location | None:
+        parent = self.cleaned_data["parent"]
+        # Backstop for the choice filtering above: reject any cycle-creating move.
+        if (
+            parent
+            and self.instance.pk
+            and parent.pk in Location.subtree_pks(self.lab, self.instance.pk)
+        ):
+            raise forms.ValidationError("A location cannot be placed inside itself.")
+        return parent
 
 
 class FieldDefinitionForm(_LabForm):

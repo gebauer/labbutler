@@ -123,6 +123,12 @@ class ItemForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.lab = lab
         self.fields["location"].queryset = Location.objects.filter(lab=lab)
+        # Depth-first order with full paths so nested locations read unambiguously
+        # ("Room 376 / Fridge A / Shelf 2"); the queryset above still validates the pick.
+        self.fields["location"].choices = [
+            ("", self.fields["location"].empty_label),
+            *((location.pk, location.full_path) for location in Location.tree_for_lab(lab)),
+        ]
         self.fields["vendor"].queryset = Vendor.objects.filter(lab=lab)
         self.fields["tags"].queryset = Tag.objects.filter(lab=lab)
         self.fields["owner"].queryset = User.objects.filter(memberships__lab=lab).distinct()

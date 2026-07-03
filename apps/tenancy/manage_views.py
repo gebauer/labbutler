@@ -1,8 +1,9 @@
 """Lab administration screens (the ``manage_lab`` area), so a lab can be run without the
 Django admin.
 
-The four lab-owned lists (suppliers, budgets, shipping addresses, custom fields) share
-one registry-driven set of CRUD views; members, roles and settings have bespoke views.
+The lab-owned lists (locations, suppliers, budgets, shipping addresses, custom fields)
+share one registry-driven set of CRUD views; members, roles and settings have bespoke
+views.
 Every view is gated on ``manage_lab`` and scoped to ``request.lab``.
 """
 
@@ -18,13 +19,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
-from apps.inventory.models import FieldDefinition
+from apps.inventory.models import FieldDefinition, Location
 from apps.procurement.models import Budget, ShippingAddress, Vendor
 
 from .manage_forms import (
     BudgetForm,
     FieldDefinitionForm,
     LabSettingsForm,
+    LocationForm,
     MemberAddForm,
     MemberRolesForm,
     RoleForm,
@@ -45,6 +47,7 @@ class CrudConfig:
 
 
 CRUD: dict[str, CrudConfig] = {
+    "locations": CrudConfig(Location, LocationForm, "location", "Locations", "name"),
     "suppliers": CrudConfig(Vendor, VendorForm, "supplier", "Suppliers", "name"),
     "budgets": CrudConfig(Budget, BudgetForm, "budget", "Budgets", "number"),
     "addresses": CrudConfig(
@@ -75,7 +78,11 @@ def index(request: HttpRequest) -> HttpResponse:
 @require_permission("manage_lab")
 def crud_list(request: HttpRequest, kind: str) -> HttpResponse:
     config = _config(kind)
-    objects = config.model.objects.filter(lab=request.lab).order_by(config.order_by)
+    if config.model is Location:
+        # Depth-first order with cached full paths, so the list reads as a tree.
+        objects = Location.tree_for_lab(request.lab)
+    else:
+        objects = config.model.objects.filter(lab=request.lab).order_by(config.order_by)
     return render(request, "manage/list.html", {"kind": kind, "config": config, "objects": objects})
 
 
@@ -126,10 +133,18 @@ def crud_delete(request: HttpRequest, kind: str, pk: int) -> HttpResponse:
         obj.delete()
         messages.success(request, f"Deleted {config.singular} “{label}”.")
         return redirect("manage:list", kind=kind)
+    delete_warning = ""
+    if config.model is Location:
+        nested = len(Location.subtree_pks(request.lab, obj.pk)) - 1
+        if nested:
+            delete_warning = (
+                f"This also deletes {nested} nested location{'s' if nested != 1 else ''}. "
+                "Items stored anywhere inside lose their location but are kept."
+            )
     return render(
         request,
         "manage/confirm_delete.html",
-        {"kind": kind, "config": config, "object": obj},
+        {"kind": kind, "config": config, "object": obj, "delete_warning": delete_warning},
     )
 
 

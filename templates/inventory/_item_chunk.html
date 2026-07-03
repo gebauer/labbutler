@@ -13,7 +13,7 @@ when scrolled into view, appending after itself — HTMX infinite scroll.{% endc
       </div>
       <p class="mt-1 font-mono text-xs text-gray-500">{{ item.human_id }}</p>
       <dl class="mt-3 space-y-1.5 text-sm text-gray-600">
-        <div class="flex justify-between gap-2"><dt class="text-gray-400">Location</dt><dd class="truncate text-right">{{ item.location.name|default:"—" }}</dd></div>
+        <div class="flex justify-between gap-2"><dt class="text-gray-400">Location</dt><dd class="truncate text-right" title="{{ item.location.full_path }}">{{ item.location.full_path|default:"—" }}</dd></div>
         <div class="flex justify-between gap-2"><dt class="text-gray-400">Supplier</dt><dd class="truncate text-right">{{ item.vendor.name|default:"—" }}</dd></div>
         <div class="flex justify-between gap-2"><dt class="text-gray-400">Expires</dt><dd class="text-right">{{ item.expiration_date|date:"Y-m-d"|default:"—" }}</dd></div>
       </dl>
@@ -29,7 +29,7 @@ when scrolled into view, appending after itself — HTMX infinite scroll.{% endc
       <td class="px-4 py-2.5">
         <a href="{% url 'inventory:item_detail' item.pk %}" class="font-medium text-gray-900 hover:text-teal-700">{{ item.name }}</a>
       </td>
-      <td class="px-4 py-2.5 text-gray-600">{{ item.location.name|default:"—" }}</td>
+      <td class="px-4 py-2.5 text-gray-600">{{ item.location.full_path|default:"—" }}</td>
       <td class="px-4 py-2.5 text-gray-600">{{ item.vendor.name|default:"—" }}</td>
       <td class="whitespace-nowrap px-4 py-2.5 text-gray-600">{{ item.expiration_date|date:"Y-m-d"|default:"—" }}</td>
     </tr>

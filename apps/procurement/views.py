@@ -281,7 +281,8 @@ def request_receive(request: HttpRequest, pk: int) -> HttpResponse:
         messages.error(request, "Only an ordered request can be received.")
         return redirect("procurement:request_detail", pk=req.pk)
 
-    locations = Location.objects.filter(lab=request.lab).order_by("name")
+    # Depth-first with cached paths, so the dropdown shows unambiguous full paths.
+    locations = Location.tree_for_lab(request.lab)
 
     def dialog(**extra):
         context = {
@@ -309,7 +310,9 @@ def request_receive(request: HttpRequest, pk: int) -> HttpResponse:
             if ids.item_id_taken(request.lab, human_id):
                 return dialog(id_error=f"{human_id} is already in use.", entered_id=raw_id)
 
-        location = locations.filter(pk=request.POST.get("location") or 0).first()
+        location = Location.objects.filter(
+            lab=request.lab, pk=request.POST.get("location") or 0
+        ).first()
         if location is None and not request.POST.get("confirm_no_location"):
             # Checking in with no location is allowed, but only after an explicit confirm.
             return dialog(warn_no_location=True, entered_id=human_id)
