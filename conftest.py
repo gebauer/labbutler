@@ -13,9 +13,7 @@ import pytest
 def _plain_static_storage(settings):
     settings.STORAGES = {
         **settings.STORAGES,
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
-        },
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
     }
 
 
