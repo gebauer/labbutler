@@ -19,6 +19,7 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
+from apps.attachments.models import Attachment
 from apps.audit.models import AuditEntry
 from apps.comments.models import Comment
 from apps.inventory import ids
@@ -176,6 +177,8 @@ def request_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "editable": editable,
             "entries": entries,
             "comments": Comment.for_object(req),
+            "attachments": Attachment.for_object(req),
+            "can_attach": request.user.can(request.lab, "create_request"),
         },
     )
 
@@ -183,7 +186,7 @@ def request_detail(request: HttpRequest, pk: int) -> HttpResponse:
 @require_permission("create_request")
 def request_create(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
-        form = RequestForm(request.POST, lab=request.lab)
+        form = RequestForm(request.POST, request.FILES, lab=request.lab)
         if form.is_valid():
             req = form.save(commit=False)
             req.lab = request.lab
@@ -191,6 +194,7 @@ def request_create(request: HttpRequest) -> HttpResponse:
             req.recalculate_totals()
             req.save()
             form.save_m2m()
+            form.save_attachments(user=request.user)
             AuditEntry.record(
                 lab=request.lab,
                 actor=request.user,
@@ -222,12 +226,13 @@ def request_edit(request: HttpRequest, pk: int) -> HttpResponse:
         return redirect("procurement:request_detail", pk=req.pk)
 
     if request.method == "POST":
-        form = RequestForm(request.POST, instance=req, lab=request.lab)
+        form = RequestForm(request.POST, request.FILES, instance=req, lab=request.lab)
         if form.is_valid():
             req = form.save(commit=False)
             req.recalculate_totals()
             req.save()
             form.save_m2m()
+            form.save_attachments(user=request.user)
             messages.success(request, "Request updated.")
             return redirect("procurement:request_detail", pk=req.pk)
     else:
@@ -283,6 +288,7 @@ def request_receive(request: HttpRequest, pk: int) -> HttpResponse:
             "req": req,
             "locations": locations,
             "id_suggestions": ids.suggest_ids(request.lab),
+            "attachment_count": Attachment.for_object(req).count(),
         }
         context.update(extra)
         return render(request, "procurement/receive.html", context)
@@ -309,7 +315,12 @@ def request_receive(request: HttpRequest, pk: int) -> HttpResponse:
             return dialog(warn_no_location=True, entered_id=human_id)
 
         services.receive(
-            req, actor=request.user, create_item=True, location=location, human_id=human_id
+            req,
+            actor=request.user,
+            create_item=True,
+            location=location,
+            human_id=human_id,
+            carry_attachments=bool(request.POST.get("carry_attachments")),
         )
         messages.success(request, f"Checked in as {req.created_item.human_id}.")
         return redirect("inventory:item_label", pk=req.created_item_id)

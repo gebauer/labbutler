@@ -1,35 +1,123 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{{ title }} · LabButler{% endblock %}
 
 {% block content %}
-  <div class="flex items-center justify-between gap-4">
-    <h1 class="text-2xl font-semibold tracking-tight">{{ title }}</h1>
-    {% if req %}
-      <a href="{% url 'procurement:request_detail' req.pk %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Cancel</a>
-    {% else %}
-      <a href="{% url 'procurement:request_list' %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Cancel</a>
-    {% endif %}
-  </div>
-  <p class="mt-1 text-sm text-gray-500">VAT and total are calculated automatically from the prices below.</p>
+  <div class="mx-auto max-w-3xl">
+    <div class="flex items-center justify-between gap-4">
+      <h1 class="text-2xl font-semibold tracking-tight">{{ title }}</h1>
+      {% if req %}
+        <a href="{% url 'procurement:request_detail' req.pk %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Cancel</a>
+      {% else %}
+        <a href="{% url 'procurement:request_list' %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Cancel</a>
+      {% endif %}
+    </div>
 
-  <form method="post" class="mt-6 max-w-3xl">
-    {% csrf_token %}
-    {% if form.non_field_errors %}
-      <div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>
-    {% endif %}
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      {% for field in form %}
-        <div class="{% if field.name == 'item_name' or field.name == 'comment' or field.name == 'tags' or field.name == 'product_url' %}sm:col-span-2{% endif %}">
-          <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
-          <div class="mt-1">{{ field }}</div>
-          {% if field.help_text %}<p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>{% endif %}
-          {% for error in field.errors %}<p class="mt-1 text-xs text-red-600">{{ error }}</p>{% endfor %}
+    <form method="post" enctype="multipart/form-data" class="mt-6 space-y-6" data-request-form data-vat-rate="{{ form.lab.default_vat_rate|stringformat:'f' }}">
+      {% csrf_token %}
+      {{ form.new_vendor }}
+      {% for name in form.new_tag_names %}<input type="hidden" name="new_tags" value="{{ name }}">{% endfor %}
+      {% if form.non_field_errors %}
+        <div class="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      {# ——— What ——— #}
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Item</h2>
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div class="sm:col-span-2">{% include "procurement/_form_field.html" with field=form.item_name %}</div>
+          <div class="sm:col-span-2">{% include "procurement/_form_field.html" with field=form.product_url %}</div>
+          {% include "procurement/_form_field.html" with field=form.catalog_number %}
+          {% include "procurement/_form_field.html" with field=form.cas_number %}
         </div>
-      {% endfor %}
-    </div>
-    <div class="mt-6">
-      <button type="submit" class="rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Save request</button>
-    </div>
-  </form>
+      </section>
+
+      {# ——— Vendor & price ——— #}
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Vendor &amp; price</h2>
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {% include "procurement/_form_field.html" with field=form.vendor %}
+          {% include "procurement/_form_field.html" with field=form.quote_id label="Quote #" %}
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+          <div class="space-y-4">
+            <div class="flex items-start gap-2">
+              <div class="w-24 shrink-0">
+                <label for="{{ form.pack_count.id_for_label }}" class="block text-sm font-medium text-gray-700">Packs</label>
+                <div class="mt-1">{{ form.pack_count }}</div>
+              </div>
+              <span class="pt-8 text-gray-400">×</span>
+              <div class="min-w-0 flex-1">
+                <label for="{{ form.unit_price.id_for_label }}" class="block text-sm font-medium text-gray-700">Price per pack</label>
+                <div class="mt-1 flex gap-2">
+                  {{ form.unit_price }}
+                  <div class="w-24 shrink-0">{{ form.currency }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-start gap-2">
+              <div class="min-w-0 flex-1">
+                <label for="{{ form.shipping_cost.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                  Shipping cost <span class="font-normal text-gray-400">(<span data-currency-echo>{{ form.currency.value|default:'EUR' }}</span>)</span>
+                </label>
+                <div class="mt-1">{{ form.shipping_cost }}</div>
+              </div>
+            </div>
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              {{ form.includes_taxes }} VAT is already included in the prices
+            </label>
+            {% for error in form.pack_count.errors|add:form.unit_price.errors|add:form.currency.errors|add:form.shipping_cost.errors %}
+              <p class="text-xs text-red-600">{{ error }}</p>
+            {% endfor %}
+          </div>
+
+          <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-right">
+            <div class="text-xs font-medium uppercase tracking-wide text-gray-500">Estimated total</div>
+            <div class="mt-1 text-3xl font-semibold tabular-nums text-gray-900" data-total-display>
+              {% if req %}{{ req.total }} {{ req.currency }}{% else %}—{% endif %}
+            </div>
+            <div class="mt-1 text-xs text-gray-500" data-vat-display>Calculated from the prices on the left.</div>
+          </div>
+        </div>
+      </section>
+
+      {# ——— Delivery & booking ——— #}
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Delivery &amp; booking</h2>
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {% include "procurement/_form_field.html" with field=form.budget %}
+          {% include "procurement/_form_field.html" with field=form.shipping_address %}
+          <div>
+            {% include "procurement/_form_field.html" with field=form.expected_delivery %}
+            <div class="mt-1.5 flex gap-1.5">
+              <button type="button" data-delivery-days="3" class="rounded-full border border-gray-300 px-2.5 py-0.5 text-xs text-gray-600 hover:bg-gray-100">+3 d</button>
+              <button type="button" data-delivery-days="7" class="rounded-full border border-gray-300 px-2.5 py-0.5 text-xs text-gray-600 hover:bg-gray-100">+1 wk</button>
+              <button type="button" data-delivery-days="14" class="rounded-full border border-gray-300 px-2.5 py-0.5 text-xs text-gray-600 hover:bg-gray-100">+2 wks</button>
+              <button type="button" data-delivery-days="30" class="rounded-full border border-gray-300 px-2.5 py-0.5 text-xs text-gray-600 hover:bg-gray-100">+1 mo</button>
+            </div>
+          </div>
+          <label class="flex items-center gap-2 self-end pb-2 text-sm text-gray-700">
+            {{ form.is_urgent }} Urgent — needs to be ordered as soon as possible
+          </label>
+        </div>
+      </section>
+
+      {# ——— Notes ——— #}
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Tags, notes &amp; attachments</h2>
+        <div class="mt-4 space-y-4">
+          {% include "procurement/_form_field.html" with field=form.tags %}
+          {% include "procurement/_form_field.html" with field=form.comment %}
+          {% include "procurement/_form_field.html" with field=form.attachments %}
+        </div>
+      </section>
+
+      <div class="flex items-center justify-end gap-3">
+        <button type="submit" class="rounded bg-teal-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-teal-700">Save request</button>
+      </div>
+    </form>
+  </div>
+  <script src="{% static 'js/request-form.js' %}" defer></script>
 {% endblock %}

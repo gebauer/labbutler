@@ -97,7 +97,10 @@
     </div>
   {% endif %}
 
-  {% include "comments/_thread.html" with comments=comments target=req comment_model="request" %}
+  <div class="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
+    <div>{% include "comments/_thread.html" with comments=comments target=req comment_model="request" %}</div>
+    <div>{% include "attachments/_list.html" with attachments=attachments target=req attach_model="request" can_attach=can_attach %}</div>
+  </div>
 
   {% include "_audit_trail.html" %}
 {% endblock %}

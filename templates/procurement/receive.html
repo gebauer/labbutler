@@ -39,6 +39,14 @@
         {% for loc in locations %}<option value="{{ loc.pk }}">{{ loc }}</option>{% endfor %}
       </select>
 
+      {% if attachment_count %}
+        <label class="mt-3 flex items-start gap-2 text-sm text-gray-700">
+          <input type="checkbox" name="carry_attachments" value="1" class="mt-0.5 h-4 w-4 rounded text-teal-600">
+          <span>Copy the request's {{ attachment_count }} attachment{{ attachment_count|pluralize }} to the inventory item
+            <span class="block text-xs text-gray-500">Usually not needed — POs and invoices belong on the request, not the item. Tick for an SDS or manual.</span></span>
+        </label>
+      {% endif %}
+
       {% if warn_no_location %}
         <label class="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           <input type="checkbox" name="confirm_no_location" value="1" class="mt-0.5 h-4 w-4 rounded text-teal-600">
