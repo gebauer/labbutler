@@ -49,7 +49,12 @@ x-app-environment: &app-environment
 # Shared base for the app services (web / worker / beat): same image, env, restart policy
 # and startup ordering. Each service only overrides its command (and web its healthcheck).
 x-app: &app
-  build: .
+  build:
+    context: .
+    args:
+      # Shown in the footer's build link. Compose can't run git, so pass it in:
+      #   GIT_COMMIT=$(git rev-parse --short HEAD) docker compose build
+      GIT_COMMIT: ${GIT_COMMIT:-}
   environment: *app-environment
   restart: unless-stopped
   depends_on:

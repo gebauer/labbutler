@@ -42,5 +42,10 @@ RUN useradd --system --create-home labbutler \
     && chown -R labbutler:labbutler /data/media
 USER labbutler
 
+# Commit hash for the footer's build link; .git is not in the image, so it must
+# be passed at build time (see docker-compose.yml / CI).
+ARG GIT_COMMIT=""
+ENV LABBUTLER_COMMIT=$GIT_COMMIT
+
 EXPOSE 8000
 CMD ["gunicorn", "labbutler.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

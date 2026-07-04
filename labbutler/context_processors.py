@@ -9,4 +9,6 @@ def version_info(request: HttpRequest) -> dict:
     return {
         "app_version": version.git_tag,
         "app_release_url": version.release_url,
+        "app_commit": version.commit,
+        "app_commit_url": version.commit_url,
     }

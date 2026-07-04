@@ -73,7 +73,8 @@ configured yet; if one is added, wire it in here and run it too.)
 
 ## Versioning & the version footer
 
-- Every page shows a footer with the app version, linking to that version's GitHub release page. The footer derives everything from `version` in `pyproject.toml` (read by `labbutler/version.py`) — **never hardcode the version anywhere else**.
+- Every page shows a footer with the app version (linking to that version's GitHub release page) and the build commit in parentheses (linking to the commit on GitHub). The footer derives everything from `version` in `pyproject.toml` and git (read by `labbutler/version.py`) — **never hardcode the version or commit anywhere else**.
+- The commit is resolved at startup from `$LABBUTLER_COMMIT` or `git rev-parse`. Docker images have no `.git`, so builds must pass it: `GIT_COMMIT=$(git rev-parse --short HEAD) docker compose build`.
 - **On every commit, check the footer stays correct:** if the commit changes what users get (features, fixes), bump `version` in `pyproject.toml` (PEP 440, e.g. `1.0.0rc1`, `1.1.0`) as part of the commit.
 - When a version is final, tag it `v<version>` with a hyphen before any pre-release segment (`1.0.0rc1` → `v1.0.0-rc1`), push the tag, and create the matching GitHub release (`gh release create <tag> --generate-notes`, add `--prerelease` for rc/alpha/beta) so the footer link resolves.
 

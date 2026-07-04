@@ -22,9 +22,23 @@ def test_git_tag_uses_hyphenated_prerelease():
     assert version.release_url.endswith(f"/releases/tag/{version.git_tag}")
 
 
+def test_commit_prefers_baked_env_var(monkeypatch):
+    monkeypatch.setenv("LABBUTLER_COMMIT", "abc1234")
+    assert version._resolve_commit() == "abc1234"
+
+
+def test_commit_falls_back_to_git(monkeypatch):
+    # Tests run inside the checkout, so git can answer.
+    monkeypatch.delenv("LABBUTLER_COMMIT", raising=False)
+    resolved = version._resolve_commit()
+    assert resolved and all(c in "0123456789abcdef" for c in resolved)
+
+
 @pytest.mark.django_db
-def test_footer_links_to_release_page(client):
+def test_footer_links_to_release_and_commit_pages(client):
     resp = client.get(reverse("login"))
     assert resp.status_code == 200
     assert version.git_tag.encode() in resp.content
     assert version.release_url.encode() in resp.content
+    assert version.commit is not None
+    assert version.commit_url.encode() in resp.content
