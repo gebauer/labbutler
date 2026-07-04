@@ -23,8 +23,12 @@ Every inventory item has a human-readable identifier like `AGB-04821` — a per-
 prefix plus a running number. This ID is assigned **once, when the item is created,
 and never changes**, no matter how the item is later renamed, moved, or reclassified.
 It is what you print on the physical label, so a container labelled years ago can
-always be found. Items migrated from LabSuit keep their original LabSuit serial as
-their frozen ID, so nothing needs relabelling.
+always be found. Keep the prefix **short — ideally around 3 letters** — so IDs stay
+compact and print well on small container labels.
+
+Data from another inventory system (LabSuit, Labguru, …) can be
+[imported](importing.md) and keeps its original IDs, so **no container ever needs
+relabelling**.
 
 ### Roles and permissions
 
@@ -35,6 +39,9 @@ here is missing for you, you simply don't hold that permission — ask your lab
 manager. The full catalog is listed in
 [Lab administration](lab-administration.md#permissions).
 
+A member can hold **several roles at once, and their permissions simply add up** —
+there are no "deny" rules, so combining roles can only ever grant more, never less.
+
 New labs start with four editable roles:
 
 | Role | Meant for |
@@ -43,6 +50,14 @@ New labs start with four editable roles:
 | **Member** | Everyday lab work: manage inventory, raise requests, check in/out |
 | **Viewer** | Read-only access to inventory and requests |
 | **Purchase coordinator** | Order-responsible staff: sees requests, places orders |
+
+The **purchase coordinators** deserve a special mention: when an approved request
+is [forwarded](procurement.md#forwarding-to-a-purchase-coordinator), the list of
+people it can be forwarded to is exactly **everyone who holds the `place_order`
+permission** — through the Purchase coordinator role or any other role that grants
+it. The role itself is just a convenient label for order-responsible staff: if your
+*Member* role already includes ordering rights, those members appear in the forward
+list too, and one person can of course hold both roles.
 
 ### The audit trail
 

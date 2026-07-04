@@ -55,8 +55,11 @@ Hazard information is structured, not free text:
 - **WGK** — Wassergefährdungsklasse (German water hazard class).
 - **Storage class** — Lagerklasse per TRGS 510.
 
-When creating an item you can look up GHS data to fill these fields quickly. Attach
-the SDS/MSDS PDF to the item so it is always one click away.
+When creating an item you can look up GHS data by CAS number to fill these fields
+quickly — but the lookup (via PubChem) is a **best-effort suggestion only; always
+verify it against the vendor's SDS or product page** (see
+[Getting started](getting-started.md#good-to-know-ghs-suggestions-are-only-a-best-guess)).
+Attach the SDS/MSDS PDF to the item so it is always one click away.
 
 ## Locations
 

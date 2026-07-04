@@ -52,16 +52,15 @@ name, catalog number, CAS number, product URL, vendor — and the commercial sid
   and a free-text comment.
 
 You can also record **GHS hazard data** (hazard statements, signal word, storage
-class) already at request time — it is carried onto the inventory item at check-in,
-so safety information is known *before* the container arrives.
+class) already at request time — the recommended moment: it is carried onto the
+inventory item at check-in, so safety information is in the system *before* the
+container arrives and stays with the record from then on. The CAS-based GHS lookup
+is a **best-effort suggestion from PubChem — always verify it against the vendor's
+SDS or product page**.
 
 Attach files (quotes, offers) to the request, and use the comment thread for
 discussion. A request can be **edited only while it is still *Requested***; after
 approval it is fixed and can only move through the workflow.
-
-!!! tip "Reordering"
-    An existing inventory item can be reordered — the new request is pre-filled
-    from the item and keeps a link to it.
 
 ## Approval
 
@@ -81,9 +80,12 @@ approve anything anyway just use the normal Approve button.
 ## Forwarding to a purchase coordinator
 
 In many labs a dedicated person (or office) places the actual orders. An approved
-request can be **forwarded** to any member who holds `place_order` — they get an
-email and see the request in their "forwarded to you" dashboard widget. The
-requester, approvers, coordinators, and lab managers may forward.
+request can be **forwarded**, and the list of people it can go to is exactly the
+lab's members **holding the `place_order` permission** — whether through the
+*Purchase coordinator* role or any other role that grants ordering. The chosen
+assignee gets an email and sees the request in their **Requests to order**
+dashboard widget. The requester, approvers, coordinators, and lab managers may
+forward.
 
 ## Ordering
 

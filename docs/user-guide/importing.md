@@ -1,8 +1,9 @@
 # Importing data
 
 The importer is what makes LabButler usable on day one: it migrates an existing
-LabSuit inventory — or any spreadsheet — without relabelling a single physical
-container. Running imports requires the `import_inventory` permission.
+inventory from another system (LabSuit, Labguru, or any spreadsheet export) and
+items keep their original IDs — so no physical container needs relabelling.
+Running imports requires the `import_inventory` permission.
 
 ## The import wizard
 
@@ -42,11 +43,13 @@ and re-importing the same export updates existing items instead of duplicating t
 
 ## The generic mapper
 
-For non-LabSuit spreadsheets, the generic path lets you map any column to any item
-field (name, location, prices, dates, tags, custom fields, …). Two differences from
-the LabSuit path:
+For any other source (Labguru, a home-grown Excel list, …), the generic path lets
+you map any column to any item field (name, location, prices, dates, tags, custom
+fields, …). Two differences from the LabSuit path:
 
-- Rows get a **freshly allocated frozen ID** (there is no serial to preserve).
+- Rows get a **freshly allocated frozen ID**. Map your old system's ID column to
+  the **Legacy ID / serial** field and it stays searchable, so containers still
+  labelled with the old ID remain findable — no relabelling needed here either.
 - Generic imports always **create** items — there is no deduplication, so importing
   the same file twice creates duplicates. Use the dry-run preview to check before
   committing.

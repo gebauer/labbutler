@@ -15,8 +15,9 @@ their data and run everything locally. No per-seat fees, no vendor shop.
   request, so the paper trail from "we need this" to "it's on shelf 2" is unbroken.
 - **Multi-lab, roles & audit** — everything is scoped per lab with per-lab roles and
   permissions, and every transaction lands in an immutable audit trail.
-- **Migration** — a spreadsheet importer moves existing LabSuit data over without
-  relabelling a single physical container.
+- **Migration** — a spreadsheet importer moves data over from your current
+  inventory system (LabSuit, Labguru, …); items keep their original IDs, so not a
+  single physical container needs relabelling.
 
 ## Where to go
 

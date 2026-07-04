@@ -39,6 +39,22 @@ If you are a member of more than one lab, the navigation bar shows a **lab
 switcher**. Everything you see — inventory, requests, settings — always belongs to
 the currently selected lab.
 
+## Good to know: GHS suggestions are only a best guess
+
+LabButler can suggest GHS hazard data (H/P statements, signal word, pictograms) by
+looking up a **CAS number** on PubChem. This is a **best-effort guess, nothing
+more** — the same substance can be classified differently between vendors,
+concentrations, and formulations.
+
+!!! warning "Always validate hazard data yourself"
+    Treat every suggestion as a starting point and **verify it against the
+    vendor's SDS or product page** before relying on it. LabButler fills fields;
+    *you* are responsible for the safety data being right.
+
+It pays to record GHS data **already on the procurement request**: it is carried
+onto the inventory item at check-in, so the safety information is in the system
+before the container arrives — and stays with the record from then on.
+
 ## Your account settings
 
 Under **Account settings** (your name in the navigation bar) you can:

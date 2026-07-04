@@ -20,10 +20,18 @@ Email addresses are treated case-insensitively.
 ## Roles and permissions
 
 Roles are **per lab and fully editable**: a role is just a named set of
-permissions, and a member can hold several roles (their permissions add up). New
-labs start with clones of the four template roles (Lab manager, Member, Viewer,
+permissions, and a member can hold several roles — **their permissions simply add
+up** (there are no deny rules, so extra roles only ever grant more). New labs
+start with clones of the four template roles (Lab manager, Member, Viewer,
 Purchase coordinator) — rename them, change their permissions, delete them, or
 create your own under **Manage → Roles**.
+
+Note that the *Purchase coordinator* role is a convention, not a mechanism: what
+makes someone appear in the
+[forward-to list](procurement.md#forwarding-to-a-purchase-coordinator) is holding
+the `place_order` permission, from whichever role. Give the role extra rights, or
+none beyond ordering, as suits your lab — and people can hold it alongside
+*Member* or any other role.
 
 ### Permissions
 
@@ -77,7 +85,8 @@ Storage locations (**Manage → Locations**) and custom item fields
 **Manage → Settings** holds the lab-wide defaults:
 
 - **Item ID prefix** — the frozen prefix for new item IDs (e.g. `AGB` →
-  `AGB-04821`). Chosen when the lab is created.
+  `AGB-04821`). Chosen when the lab is created; keep it **short (around 3
+  letters)** so IDs print well on small container labels.
 - **Default VAT rate** — used for the automatic tax calculation on requests
   (19% by default).
 - **Default currency** — preselected on new requests.
