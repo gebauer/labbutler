@@ -71,6 +71,12 @@ configured yet; if one is added, wire it in here and run it too.)
 - Small, atomic commits that each leave the tree green.
 - Never commit secrets, credentials, large binaries, or generated artifacts. Don't commit directly to the protected/main branch unless asked.
 
+## Versioning & the version footer
+
+- Every page shows a footer with the app version, linking to that version's GitHub release page. The footer derives everything from `version` in `pyproject.toml` (read by `labbutler/version.py`) — **never hardcode the version anywhere else**.
+- **On every commit, check the footer stays correct:** if the commit changes what users get (features, fixes), bump `version` in `pyproject.toml` (PEP 440, e.g. `1.0.0rc1`, `1.1.0`) as part of the commit.
+- When a version is final, tag it `v<version>` with a hyphen before any pre-release segment (`1.0.0rc1` → `v1.0.0-rc1`), push the tag, and create the matching GitHub release (`gh release create <tag> --generate-notes`, add `--prerelease` for rc/alpha/beta) so the footer link resolves.
+
 ## Dependencies
 
 - Prefer the standard library and what's already in the project. Justify any new dependency (maintenance, size, security, license).
