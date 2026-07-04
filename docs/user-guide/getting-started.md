@@ -65,6 +65,9 @@ Under **Account settings** (your name in the navigation bar) you can:
   receive. Only the categories you can actually act on are offered (approvers see
   approval notifications, requesters see status updates). See
   [Notifications](notifications.md).
+- See your **effective permissions** — the full permission catalog with a ✓ or ✗
+  for the current lab, plus the roles that grant them. If a button described in
+  this guide is missing for you, check here first, then ask a lab manager.
 
 ## Signing out
 

@@ -13,9 +13,10 @@ from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
 
+from .catalog import ALL_PERMISSION_CODES, PERMISSION_CATALOG
 from .forms import NotificationSettingsForm, ProfileForm
 from .middleware import SESSION_KEY
-from .models import Membership, User
+from .models import Membership, Permission, User
 from .scoping import get_current_lab
 
 
@@ -73,8 +74,35 @@ def account_settings(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "tenancy/settings.html",
-        {"lab": lab, "profile_form": profile_form, "notif_form": notif_form},
+        {
+            "lab": lab,
+            "profile_form": profile_form,
+            "notif_form": notif_form,
+            "effective_permissions": _effective_permissions(request.user, lab),
+            "role_names": (
+                list(membership.roles.values_list("name", flat=True)) if membership else []
+            ),
+        },
     )
+
+
+def _effective_permissions(user: User, lab) -> list[dict]:
+    """The full permission catalog with whether ``user`` holds each code in ``lab``.
+
+    Resolved as a set in one query (rather than ``user.can`` per code) and returned in
+    catalog order, so the settings page can render a stable granted/not-granted list.
+    """
+    if user.is_superuser:
+        held = set(ALL_PERMISSION_CODES)
+    else:
+        held = set(
+            Permission.objects.filter(
+                roles__memberships__user=user, roles__memberships__lab=lab
+            ).values_list("code", flat=True)
+        )
+    return [
+        {"code": code, "label": label, "held": code in held} for code, label in PERMISSION_CATALOG
+    ]
 
 
 def _record_impersonation(request: HttpRequest, action: str, target: User) -> None:

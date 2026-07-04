@@ -77,6 +77,38 @@ def test_member_can_save_preference(client, lab):
 
 
 @pytest.mark.django_db
+def test_effective_permissions_show_granted_and_missing(client, lab):
+    client.force_login(_user(lab, "viewer@x.de", ["Viewer"]))
+    resp = client.get(URL)
+    assert b"Effective permissions" in resp.content
+    held = {p["code"]: p["held"] for p in resp.context["effective_permissions"]}
+    assert held["view_inventory"] is True
+    assert held["view_requests"] is True
+    assert held["manage_lab"] is False
+    assert held["accept_forwards"] is False
+
+
+@pytest.mark.django_db
+def test_effective_permissions_cover_the_whole_catalog_in_order(client, lab):
+    from apps.tenancy.catalog import PERMISSION_CATALOG
+
+    client.force_login(_user(lab, "member@x.de", ["Member"]))
+    resp = client.get(URL)
+    codes = [p["code"] for p in resp.context["effective_permissions"]]
+    assert codes == [code for code, _ in PERMISSION_CATALOG]
+
+
+@pytest.mark.django_db
+def test_superuser_holds_every_permission(client, lab):
+    user = _user(lab, "root@x.de", ["Viewer"])
+    user.is_superuser = True
+    user.save()
+    client.force_login(user)
+    resp = client.get(URL)
+    assert all(p["held"] for p in resp.context["effective_permissions"])
+
+
+@pytest.mark.django_db
 def test_member_cannot_set_a_field_they_lack_rights_for(client, lab):
     # A Member has no approve_request, so posting that field must not change it.
     user = _user(lab, "member@x.de", ["Member"])

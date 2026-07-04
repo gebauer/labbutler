@@ -35,8 +35,9 @@ relabelling**.
 What you can see and do is controlled by the **roles** your lab manager has given
 you. Every action in this guide names the permission it needs (for example,
 *approving a request requires `approve_request`*). If a button or menu item described
-here is missing for you, you simply don't hold that permission — ask your lab
-manager. The full catalog is listed in
+here is missing for you, you simply don't hold that permission — check **Account
+settings → Effective permissions** to see exactly which rights you have (✓) and
+lack (✗), then ask your lab manager. The full catalog is listed in
 [Lab administration](lab-administration.md#permissions).
 
 A member can hold **several roles at once, and their permissions simply add up** —
