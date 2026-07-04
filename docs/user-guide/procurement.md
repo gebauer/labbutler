@@ -81,11 +81,12 @@ approve anything anyway just use the normal Approve button.
 
 In many labs a dedicated person (or office) places the actual orders. An approved
 request can be **forwarded**, and the list of people it can go to is exactly the
-lab's members **holding the `place_order` permission** — whether through the
-*Purchase coordinator* role or any other role that grants ordering. The chosen
-assignee gets an email and sees the request in their **Requests to order**
-dashboard widget. The requester, approvers, coordinators, and lab managers may
-forward.
+lab's members **holding the `accept_forwards` permission** — whether through the
+*Purchase coordinator* role or any other role that grants it. (Being *able to
+order* is separate: someone with `place_order` but not `accept_forwards` can place
+orders themselves yet never appears in the forward list.) The chosen assignee gets
+an email and sees the request in their **Requests to order** dashboard widget. The
+requester, approvers, people who may order, and lab managers may forward.
 
 ## Ordering
 

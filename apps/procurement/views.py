@@ -138,7 +138,7 @@ def request_list(request: HttpRequest) -> HttpResponse:
         or mine,
         "vendors": Vendor.objects.filter(lab=lab).order_by("name"),
         "requesters": User.objects.filter(requests_made__lab=lab).distinct().order_by("email"),
-        "assignees": services.purchase_coordinators(lab),
+        "assignees": services.forward_recipients(lab),
         "can_create": request.user.can(lab, "create_request"),
     }
     if request.GET.get("partial") == "chunk":
@@ -337,7 +337,7 @@ def request_forward(request: HttpRequest, pk: int) -> HttpResponse:
     req = get_object_or_404(Request, pk=pk, lab=request.lab)
     if not services.can_forward(request.user, req):
         raise PermissionDenied
-    coordinators = services.purchase_coordinators(request.lab)
+    coordinators = services.forward_recipients(request.lab)
 
     if request.method == "POST":
         assignee = coordinators.filter(pk=request.POST.get("assignee") or 0).first()

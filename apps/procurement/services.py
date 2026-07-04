@@ -121,12 +121,17 @@ def can_receive(user, req: Request) -> bool:
     return req.status in (Status.ORDERED, Status.DELIVERED) and user.can(req.lab, "check_in")
 
 
-def purchase_coordinators(lab):
-    """Lab members who can place orders — the people a request can be forwarded to."""
+def forward_recipients(lab):
+    """Lab members a request can be forwarded to: holders of ``accept_forwards``.
+
+    Deliberately its own permission rather than ``place_order`` — in labs where
+    everyone may order but only a few (e.g. the technicians) handle forwarded
+    requests, the forward-to list stays short.
+    """
     return (
         User.objects.filter(
             memberships__lab=lab,
-            memberships__roles__permissions__code="place_order",
+            memberships__roles__permissions__code="accept_forwards",
         )
         .exclude(email="")
         .distinct()

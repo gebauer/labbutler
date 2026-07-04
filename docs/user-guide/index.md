@@ -49,15 +49,16 @@ New labs start with four editable roles:
 | **Lab manager** | Full control: everything, including members, roles and settings |
 | **Member** | Everyday lab work: manage inventory, raise requests, check in/out |
 | **Viewer** | Read-only access to inventory and requests |
-| **Purchase coordinator** | Order-responsible staff: sees requests, places orders |
+| **Purchase coordinator** | Order-responsible staff: sees requests, places orders, accepts forwarded requests |
 
 The **purchase coordinators** deserve a special mention: when an approved request
 is [forwarded](procurement.md#forwarding-to-a-purchase-coordinator), the list of
-people it can be forwarded to is exactly **everyone who holds the `place_order`
-permission** — through the Purchase coordinator role or any other role that grants
-it. The role itself is just a convenient label for order-responsible staff: if your
-*Member* role already includes ordering rights, those members appear in the forward
-list too, and one person can of course hold both roles.
+people it can be forwarded to is exactly **everyone who holds the
+`accept_forwards` permission** — through the Purchase coordinator role or any
+other role that grants it. This is deliberately separate from the right to *order*
+(`place_order`): in a lab where everyone may order but only the technicians handle
+forwarded requests, only the technicians carry `accept_forwards`, and the forward
+list stays short. One person can of course hold several of these roles at once.
 
 ### The audit trail
 

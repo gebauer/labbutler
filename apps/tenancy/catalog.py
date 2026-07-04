@@ -14,6 +14,7 @@ PERMISSION_CATALOG: list[tuple[str, str]] = [
     ("approve_request", "Approve a request"),
     ("self_approve", "Approve your own requests (with confirmation)"),
     ("place_order", "Mark an approved request as ordered"),
+    ("accept_forwards", "Receive forwarded requests (appear in the forward-to list)"),
     ("check_in", "Receive/check items into inventory"),
     ("check_out", "Consume/remove items from inventory"),
     ("manage_lab", "Members, roles, suppliers, budgets, shipping addresses, settings"),
@@ -36,5 +37,5 @@ TEMPLATE_ROLES: dict[str, list[str]] = {
     ],
     "Viewer": ["view_inventory", "view_requests"],
     # Order-responsible staff: approved requests are forwarded to them to place.
-    "Purchase coordinator": ["view_requests", "place_order"],
+    "Purchase coordinator": ["view_requests", "place_order", "accept_forwards"],
 }

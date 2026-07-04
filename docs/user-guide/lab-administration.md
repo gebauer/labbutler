@@ -29,9 +29,12 @@ create your own under **Manage → Roles**.
 Note that the *Purchase coordinator* role is a convention, not a mechanism: what
 makes someone appear in the
 [forward-to list](procurement.md#forwarding-to-a-purchase-coordinator) is holding
-the `place_order` permission, from whichever role. Give the role extra rights, or
-none beyond ordering, as suits your lab — and people can hold it alongside
-*Member* or any other role.
+the `accept_forwards` permission, from whichever role. `place_order` and
+`accept_forwards` are deliberately separate: in a lab where *everyone* may order
+but only a few people (say, the technicians) handle forwarded requests, give
+`place_order` to your standard role and `accept_forwards` only to the
+coordinators — the forward list then stays short. People can of course hold the
+coordinator role alongside *Member* or any other role.
 
 ### Permissions
 
@@ -47,6 +50,7 @@ The permission catalog is fixed and installation-wide:
 | `approve_request` | Approve/reject requests |
 | `self_approve` | Approve your *own* requests (posts an on-the-record comment) |
 | `place_order` | Mark approved requests as ordered |
+| `accept_forwards` | Receive forwarded requests — appear in the forward-to list |
 | `check_in` | Receive deliveries / check items into inventory |
 | `check_out` | Consume/remove items from inventory |
 | `manage_lab` | Members, roles, suppliers, budgets, addresses, lab settings |

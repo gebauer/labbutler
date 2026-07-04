@@ -145,7 +145,7 @@ class Request(TimeStampedModel):
         blank=True,
         related_name="requests_to_approve",
     )
-    # Order-responsible person the request is deferred to (needs place_order).
+    # Order-responsible person the request is deferred to (needs accept_forwards).
     assigned_to = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

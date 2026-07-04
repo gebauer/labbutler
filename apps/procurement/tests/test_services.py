@@ -209,13 +209,28 @@ def test_available_transitions_for_requested(lab):
 
 
 @pytest.mark.django_db
-def test_purchase_coordinators_are_place_order_holders(lab):
-    _user(lab, "m@x.de", ["Lab manager"])  # place_order via "*"
+def test_forward_recipients_are_accept_forwards_holders(lab):
+    _user(lab, "m@x.de", ["Lab manager"])  # accept_forwards via "*"
     _user(lab, "c@x.de", ["Purchase coordinator"])
-    _user(lab, "u@x.de", ["Member"])  # no place_order
-    emails = set(services.purchase_coordinators(lab).values_list("email", flat=True))
+    _user(lab, "u@x.de", ["Member"])  # no accept_forwards
+    emails = set(services.forward_recipients(lab).values_list("email", flat=True))
     assert {"m@x.de", "c@x.de"} <= emails
     assert "u@x.de" not in emails
+
+
+@pytest.mark.django_db
+def test_place_order_alone_does_not_appear_in_forward_list(lab):
+    """Labs where everyone may order still get a short forward list: only the
+    designated accept_forwards holders (e.g. the technicians) are offered."""
+    from apps.tenancy.models import Permission, Role
+
+    orderer_role = Role.objects.create(lab=lab, name="Orderer")
+    orderer_role.permissions.add(Permission.objects.get(code="place_order"))
+    orderer = _user(lab, "o@x.de", ["Orderer"])
+
+    assert orderer.can(lab, "place_order")
+    emails = set(services.forward_recipients(lab).values_list("email", flat=True))
+    assert "o@x.de" not in emails
 
 
 @pytest.mark.django_db
