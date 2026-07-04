@@ -44,3 +44,6 @@ htmlcov/
 .idea/
 .DS_Store
 *.swp
+
+# MkDocs build output
+site/

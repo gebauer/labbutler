@@ -1,0 +1,80 @@
+site_name: LabButler
+site_description: >-
+  Self-hosted lab inventory and order procurement — documentation for users,
+  operators, and developers.
+site_url: https://gebauer.github.io/labbutler/
+repo_url: https://github.com/gebauer/labbutler
+repo_name: gebauer/labbutler
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - User guide:
+      - Overview: user-guide/index.md
+      - Getting started: user-guide/getting-started.md
+      - Inventory: user-guide/inventory.md
+      - Procurement requests: user-guide/procurement.md
+      - Importing data: user-guide/importing.md
+      - Lab administration: user-guide/lab-administration.md
+      - Notifications: user-guide/notifications.md
+  - Installation & operation:
+      - Overview: admin-guide/index.md
+      - Installation: admin-guide/installation.md
+      - Configuration reference: admin-guide/configuration.md
+      - Operation & maintenance: admin-guide/maintenance.md
+  - Developer guide:
+      - Overview: dev-guide/index.md
+      - Development setup: dev-guide/setup.md
+      - Architecture: dev-guide/architecture.md
+      - Testing: dev-guide/testing.md
+      - Conventions & contributing: dev-guide/conventions.md

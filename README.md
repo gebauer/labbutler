@@ -7,6 +7,10 @@ keep its data, and run everything locally — no per-seat fees, no vendor shop.
 > Status: **v1.0 — first release.** The conceptual design lives in
 > [`Buildv1.MD`](Buildv1.MD); this README covers what the software is and how to run it.
 
+**📖 Full documentation** (user guide, installation & operation, developer guide):
+<https://gebauer.github.io/labbutler/> — sources in [`docs/`](docs/), built with MkDocs
+Material and deployed to GitHub Pages on push to `main`.
+
 ---
 
 ## What it does

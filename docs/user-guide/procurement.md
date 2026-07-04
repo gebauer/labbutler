@@ -1,0 +1,120 @@
+# Procurement requests
+
+Procurement turns "we need this" into an inventory item with an unbroken paper
+trail. Each **request** covers one article and flows through a fixed workflow;
+every step is permission-checked and audit-logged, and the people involved are
+[notified by email](notifications.md).
+
+## The workflow at a glance
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Requested
+    Requested --> Approved: approve
+    Requested --> Rejected: reject
+    Approved --> Ordered: mark ordered
+    Ordered --> CheckedIn: receive & check in
+    Ordered --> Received: receive untracked
+    Requested --> Cancelled: cancel
+    Approved --> Cancelled: cancel
+    Ordered --> Cancelled: cancel
+    CheckedIn --> [*]
+    Received --> [*]
+```
+
+| Step | Who may do it (permission) |
+|---|---|
+| Raise a request | `create_request` |
+| Approve / reject | `approve_request` (or the requester with `self_approve`) |
+| Mark ordered | `place_order` |
+| Receive / check in | `check_in` |
+| Cancel | the requester themselves, or a lab manager (`manage_lab`) |
+
+The request detail page always shows exactly the action buttons *you* may use in
+the current status — if a button is missing, either the status doesn't allow the
+move or you lack the permission.
+
+## Raising a request
+
+**Requests → New request** (requires `create_request`). You describe the article —
+name, catalog number, CAS number, product URL, vendor — and the commercial side:
+
+- **Unit price × pack count + shipping cost**, in one of the offered currencies
+  (the lab default is preselected).
+- **VAT is calculated automatically** from the lab's VAT rate. If your quoted price
+  already includes taxes, tick *includes taxes* and the total is taken as-is (the
+  VAT portion is back-calculated for information). Totals are rough estimates for
+  budget tracking, never accounting-grade figures.
+- **Budget (Kostenstelle)** and **shipping address** — the lab's defaults are
+  preselected; the budget is what the cost is later reported against.
+- Optional extras: mark it **urgent**, a quote ID, expected delivery date, tags,
+  and a free-text comment.
+
+You can also record **GHS hazard data** (hazard statements, signal word, storage
+class) already at request time — it is carried onto the inventory item at check-in,
+so safety information is known *before* the container arrives.
+
+Attach files (quotes, offers) to the request, and use the comment thread for
+discussion. A request can be **edited only while it is still *Requested***; after
+approval it is fixed and can only move through the workflow.
+
+!!! tip "Reordering"
+    An existing inventory item can be reordered — the new request is pre-filled
+    from the item and keeps a link to it.
+
+## Approval
+
+Anyone with `approve_request` sees pending requests (dashboard widget and request
+list filter) and can **Approve** or **Reject** them. The approver is recorded on
+the request.
+
+### Self-approval
+
+Labs where members get verbal approval ("just order it") can grant the
+`self_approve` permission: the requester may then approve **their own** pending
+request. A self-approval behaves like a normal approval but additionally posts a
+visible comment on the request ("Self-approved — authorised by lab management in
+person", plus your optional note), so it always stays on the record. Users who can
+approve anything anyway just use the normal Approve button.
+
+## Forwarding to a purchase coordinator
+
+In many labs a dedicated person (or office) places the actual orders. An approved
+request can be **forwarded** to any member who holds `place_order` — they get an
+email and see the request in their "forwarded to you" dashboard widget. The
+requester, approvers, coordinators, and lab managers may forward.
+
+## Ordering
+
+Whoever places the order (permission `place_order`) presses **Mark ordered**,
+optionally recording the **PO number**. All approved requests are visible to
+everyone with `place_order`, assigned or not.
+
+## Receiving a delivery
+
+When the goods arrive, anyone with `check_in` opens the request and **receives**
+it. This is a dialog, not a one-click action, because you choose one of two
+outcomes — both terminal:
+
+- **Check in to inventory** — creates the inventory item from the request (name,
+  vendor, price, catalog/CAS number, tags, hazard data; the requester becomes the
+  owner), at the storage location you pick, with the next free frozen ID or one
+  you choose. The request moves to **Checked in** and links to the item — and the
+  item links back to its request forever. Optionally, the request's attachments
+  can be copied onto the item (useful for an SDS or manual; POs and invoices
+  usually stay on the request).
+- **Receive without tracking** — for software, services, or anything the lab does
+  not keep in inventory. The request simply moves to **Received**.
+
+## Cancelling
+
+The requester can cancel their own request at any point before it is received; a
+lab manager can cancel anyone's. Cancelled and rejected requests stay visible in
+the list for the record.
+
+## Finding requests
+
+The request list (requires `view_requests`) is filterable — by status, and by
+"mine": requests you raised or deliveries you are waiting for. The dashboard
+surfaces the same things proactively, newest first.
