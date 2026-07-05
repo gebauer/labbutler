@@ -43,13 +43,16 @@ def test_can_self_approve_only_own_pending_with_permission(lab):
 
 
 @pytest.mark.django_db
-def test_manager_does_not_get_self_approve_button(lab):
-    # A manager can already approve, so the self-approve path is hidden (no duplicate).
-    manager = _user(lab, "boss@x.de", ["Lab manager"])
-    req = _request(lab, manager)
-    assert services.can_self_approve(manager, req) is False
-    # ...but the normal approve transition is available to them on their own request.
-    assert any(t.action == "approve" for t in services.available_transitions(manager, req))
+def test_user_with_both_permissions_gets_both_actions_on_own_request(lab):
+    # Holding approve_request and self_approve (e.g. via Member + Lab manager roles)
+    # offers both actions: self-approve leaves an audit comment, plain approve does not.
+    approver = _user(lab, "boss@x.de", ["Member", "Lab manager"])
+    own = _request(lab, approver)
+    assert services.can_self_approve(approver, own) is True
+    assert any(t.action == "approve" for t in services.available_transitions(approver, own))
+    # Self-approve stays limited to one's own requests, even for approvers.
+    other = _request(lab, _user(lab, "other@x.de", ["Member"]))
+    assert services.can_self_approve(approver, other) is False
 
 
 @pytest.mark.django_db

@@ -188,15 +188,14 @@ def can_self_approve(user, req: Request) -> bool:
     """Whether ``user`` may self-approve ``req``.
 
     Allowed only for the requester's own still-pending request when they hold
-    ``self_approve``. Hidden from users who can already ``approve_request`` — they use the
-    normal one-click Approve, which already covers their own requests — so no duplicate
-    button appears.
+    ``self_approve``. Offered even to users who also hold ``approve_request``: unlike the
+    plain Approve, self-approval leaves an audit entry and a visible comment, so holders
+    of both permissions get both actions and choose which record to leave.
     """
     return (
         req.status == Status.REQUESTED
         and req.requested_by_id == user.pk
         and user.can(req.lab, "self_approve")
-        and not user.can(req.lab, "approve_request")
     )
 
 
