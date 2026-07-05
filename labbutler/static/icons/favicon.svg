@@ -1,0 +1,58 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LabButler">
+  <defs>
+    <linearGradient id="flask" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"    stop-color="#FDF8EC"/>
+      <stop offset="0.55" stop-color="#F4EEE1"/>
+      <stop offset="1"    stop-color="#D8CCB0"/>
+    </linearGradient>
+    <linearGradient id="knot" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"    stop-color="#CEC2A6"/>
+      <stop offset="0.25" stop-color="#F8F2E5"/>
+      <stop offset="0.5"  stop-color="#FFFBF1"/>
+      <stop offset="0.75" stop-color="#F8F2E5"/>
+      <stop offset="1"    stop-color="#CEC2A6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- flat brand teal -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="#12595E"/>
+
+  <g transform="translate(256,256) scale(1.25) translate(-256,-256)">
+    <g stroke-linejoin="round">
+      <path d="M 224,226 L 190,226 L 148,184
+               C 134,170 100,172 100,206
+               L 100,306
+               C 100,340 134,342 148,328
+               L 190,286 L 224,286 Z"
+            fill="url(#flask)" stroke="url(#flask)" stroke-width="6"/>
+      <path d="M 288,226 L 322,226 L 364,184
+               C 378,170 412,172 412,206
+               L 412,306
+               C 412,340 378,342 364,328
+               L 322,286 L 288,286 Z"
+            fill="url(#flask)" stroke="url(#flask)" stroke-width="6"/>
+    </g>
+
+    <g stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" opacity="0.55" fill="none">
+      <path d="M 186,224 L 150,188 C 140,178 118,176 108,192"/>
+      <path d="M 326,224 L 362,188 C 372,178 394,176 404,192"/>
+    </g>
+    <g stroke="#B4A683" stroke-width="7" stroke-linecap="round" opacity="0.5" fill="none">
+      <path d="M 188,288 L 150,326 C 140,336 116,336 106,318"/>
+      <path d="M 324,288 L 362,326 C 372,336 396,336 406,318"/>
+    </g>
+
+    <g stroke="#B9AB88" stroke-width="5" stroke-linecap="round" opacity="0.7" fill="none">
+      <line x1="150" y1="320" x2="150" y2="298"/>
+      <line x1="166" y1="304" x2="166" y2="282"/>
+      <line x1="182" y1="288" x2="182" y2="266"/>
+      <line x1="362" y1="320" x2="362" y2="298"/>
+      <line x1="346" y1="304" x2="346" y2="282"/>
+      <line x1="330" y1="288" x2="330" y2="266"/>
+    </g>
+
+    <rect x="222" y="194" width="68" height="124" rx="17" fill="url(#knot)"/>
+    <path d="M 232,200 Q 256,193 280,200" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" opacity="0.6" fill="none"/>
+    <path d="M 232,312 Q 256,319 280,312" stroke="#B4A683" stroke-width="6" stroke-linecap="round" opacity="0.55" fill="none"/>
+  </g>
+</svg>
