@@ -69,7 +69,13 @@ def _filtered_requests(
         for field_name in _REQ_SEARCH_FIELDS:
             lookup |= Q(**{f"{field_name}__icontains": query})
         requests = requests.filter(lookup)
-    valid_statuses = [s for s in statuses if s in Request.Status.values]
+    valid_statuses: list[str] = []
+    for code in statuses:
+        if code in _STAGE_STATUSES:
+            valid_statuses.extend(_STAGE_STATUSES[code])
+        elif code in Request.Status.values:
+            # Plain status codes (e.g. bookmarked pre-stage URLs) still filter.
+            valid_statuses.append(code)
     if valid_statuses:
         requests = requests.filter(status__in=valid_statuses)
     for param, lookup_field in _REQ_FACETS.items():
@@ -81,13 +87,24 @@ def _filtered_requests(
     return requests
 
 
+# Filter chips group statuses into stages: "delivered" covers every arrived state
+# (Delivered = awaiting check-in, Checked in, Received untracked) because the
+# distinction matters on the request detail, not when scanning the list.
+_STAGE_STATUSES: dict[str, tuple[str, ...]] = {
+    "requested": ("requested",),
+    "approved": ("approved",),
+    "ordered": ("ordered",),
+    "delivered": ("delivered", "checked_in", "received"),
+    "rejected": ("rejected",),
+    "cancelled": ("cancelled",),
+}
 # The happy-path pipeline shown as a stepper (off-path states handled separately).
-_PIPELINE = ["requested", "approved", "ordered", "delivered", "checked_in"]
-_OFF_PATH = ["received", "rejected", "cancelled"]
+_PIPELINE = ["requested", "approved", "ordered", "delivered"]
+_OFF_PATH = ["rejected", "cancelled"]
 
 
 def _status_overview(lab, selected: list[str]) -> tuple[list[dict], list[dict]]:
-    """Per-status counts (lab-wide) for the pipeline stepper and the off-path chips."""
+    """Per-stage counts (lab-wide) for the pipeline stepper and the off-path chips."""
     counts = dict(Request.objects.filter(lab=lab).values_list("status").annotate(n=Count("id")))
     labels = dict(Request.Status.choices)
 
@@ -95,7 +112,7 @@ def _status_overview(lab, selected: list[str]) -> tuple[list[dict], list[dict]]:
         return {
             "code": code,
             "label": labels[code],
-            "count": counts.get(code, 0),
+            "count": sum(counts.get(status, 0) for status in _STAGE_STATUSES[code]),
             "checked": code in selected,
         }
 

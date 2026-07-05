@@ -206,6 +206,31 @@ def test_filter_by_multiple_statuses(client, lab):
 
 
 @pytest.mark.django_db
+def test_delivered_stage_filters_all_arrived_states(client, lab):
+    """The Delivered chip is one stage over delivered, checked_in and received."""
+    member = _user(lab, "u@x.de", ["Member"])
+    Request.objects.create(lab=lab, item_name="DelA", requested_by=member, status=Status.DELIVERED)
+    Request.objects.create(lab=lab, item_name="ChkB", requested_by=member, status=Status.CHECKED_IN)
+    Request.objects.create(lab=lab, item_name="RecC", requested_by=member, status=Status.RECEIVED)
+    Request.objects.create(lab=lab, item_name="OrdD", requested_by=member, status=Status.ORDERED)
+    client.force_login(member)
+
+    resp = client.get(reverse("procurement:request_list"), {"status": "delivered"})
+    assert b"DelA" in resp.content
+    assert b"ChkB" in resp.content
+    assert b"RecC" in resp.content
+    assert b"OrdD" not in resp.content
+
+    delivered = next(s for s in resp.context["pipeline"] if s["code"] == "delivered")
+    assert delivered["count"] == 3
+
+    # Plain status codes from pre-stage bookmarks still filter narrowly.
+    old_url = client.get(reverse("procurement:request_list"), {"status": "checked_in"})
+    assert b"ChkB" in old_url.content
+    assert b"RecC" not in old_url.content
+
+
+@pytest.mark.django_db
 def test_request_search_and_vendor_filter(client, lab):
     from apps.procurement.models import Vendor
 
