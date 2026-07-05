@@ -246,6 +246,7 @@ def test_real_orders_dry_run_has_no_errors():
 
 @pytest.mark.django_db
 @pytest.mark.skipif(not SAMPLE.exists(), reason="sample_data orders export not present")
+@pytest.mark.slow
 def test_real_orders_commit():
     lab = create_lab(name="AG Baumann", item_id_prefix="AGB")
     plan = build_orders_plan(SAMPLE)

@@ -22,6 +22,7 @@ dev = [
     "mkdocs-material>=9.7.6",
     "pytest>=8.3",
     "pytest-django>=4.9",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.7",
 ]
 
@@ -36,4 +37,5 @@ select = ["E", "F", "I", "UP", "B", "DJ"]
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "labbutler.settings"
 python_files = ["test_*.py", "tests.py"]
-addopts = "--reuse-db"
+addopts = "--reuse-db -n auto"
+markers = ["slow: long-running integration tests (real LabSuit export commits)"]

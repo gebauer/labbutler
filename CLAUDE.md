@@ -21,7 +21,9 @@ This is a general engineering baseline; fill in the `[bracketed]` placeholders p
 - Install deps: `uv sync` (Python) · `npm install` (Tailwind build only)
 - Local Postgres: `scripts/pg.sh init` once, then `scripts/pg.sh start` / `stop`
 - Run (dev): `uv run python manage.py runserver` · CSS watch: `npm run dev` · worker: `uv run celery -A labbutler worker -l info`
-- Run tests: `uv run pytest`
+- Run tests (fast default: parallel via xdist, `slow`-marked tests skipped): `uv run pytest`
+- Run full suite incl. slow real-export commit tests: `uv run pytest --runslow`
+- Debug a test sequentially (xdist breaks `--pdb`, interleaves output): `uv run pytest -n 0 ...`
 - Lint / format: `uv run ruff check .` / `uv run ruff format .`
 - Type check: _(none configured yet — no type checker in the toolchain)_
 - Migrations: `uv run python manage.py makemigrations` / `migrate`
@@ -77,6 +79,7 @@ configured yet; if one is added, wire it in here and run it too.)
 - The commit is resolved at startup from `$LABBUTLER_COMMIT` or `git rev-parse`. Docker images have no `.git`, so builds must pass it: `GIT_COMMIT=$(git rev-parse --short HEAD) docker compose build`.
 - **On every commit, check the footer stays correct:** if the commit changes what users get (features, fixes), bump `version` in `pyproject.toml` (PEP 440, e.g. `1.0.0rc1`, `1.1.0`) as part of the commit.
 - When a version is final, tag it `v<version>` with a hyphen before any pre-release segment (`1.0.0rc1` → `v1.0.0-rc1`), push the tag, and create the matching GitHub release (`gh release create <tag> --generate-notes`, add `--prerelease` for rc/alpha/beta) so the footer link resolves.
+- **Before tagging any release, the full test suite must pass:** run `uv run pytest --runslow` (or ask the user to) as part of the tagging step — never tag on the fast suite alone.
 
 ## Dependencies
 

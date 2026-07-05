@@ -9,6 +9,31 @@ STATIC_URL + path) for every test.
 import pytest
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--runslow",
+        action="store_true",
+        default=False,
+        help="also run tests marked slow (real LabSuit export commits)",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--runslow"):
+        return
+    skip_slow = pytest.mark.skip(reason="needs --runslow")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip_slow)
+
+
+@pytest.fixture(autouse=True)
+def _fast_password_hasher(settings):
+    """The default PBKDF2 hasher costs ~0.25s per hash and dominates test runtime;
+    tests don't need secure hashes."""
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
 @pytest.fixture(autouse=True)
 def _plain_static_storage(settings):
     settings.STORAGES = {
