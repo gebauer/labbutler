@@ -3,6 +3,11 @@
 Querysets for related fields (location, vendor, owner, tags) are scoped to the active
 lab so a form can never reference another tenant's rows. The human ID and legacy serial
 are intentionally absent: the ID is frozen at creation and never edited here.
+
+Vendors and tags can be created on the fly: the page's combobox/tag widgets write the
+typed names into ``new_vendor`` / ``new_tags`` hidden inputs, and the rows are only
+created when the item itself saves (nothing is created for an abandoned form). Files
+uploaded with the form are stored as attachments on the saved item.
 """
 
 from __future__ import annotations
@@ -11,6 +16,8 @@ from django import forms
 from django.db.models import Case, IntegerField, Value, When
 from django.templatetags.static import static
 
+from apps.attachments.forms import MAX_SIZE_MB, MultipleFileField
+from apps.attachments.models import Attachment
 from apps.procurement.models import Vendor
 from apps.tenancy.models import Lab, User
 
@@ -24,10 +31,6 @@ _INPUT_CLASS = (
 
 # Prefix that marks a dynamically-added custom-field form field.
 _CUSTOM_PREFIX = "cf_"
-
-# Model fields rendered in a dedicated "Hazards (GHS)" template section, not the
-# core-fields grid.
-HAZARD_FIELDS = ("signal_word", "hazards")
 
 
 class HazardStatementMultipleChoiceField(forms.ModelMultipleChoiceField):
@@ -95,6 +98,13 @@ def _custom_field(definition: FieldDefinition) -> forms.Field:
 class ItemForm(forms.ModelForm):
     """Edit the editable, structured fields of an :class:`Item`."""
 
+    new_vendor = forms.CharField(required=False, max_length=200, widget=forms.HiddenInput)
+    attachments = MultipleFileField(
+        required=False,
+        label="Attachments",
+        help_text=f"SDS, CoA, manual … (PDF, images, office docs; {MAX_SIZE_MB} MB each)",
+    )
+
     class Meta:
         model = Item
         fields = [
@@ -134,6 +144,18 @@ class ItemForm(forms.ModelForm):
         self.fields["owner"].queryset = User.objects.filter(memberships__lab=lab).distinct()
         self.fields["hazards"] = hazard_statement_field()
 
+        self.fields["vendor"].widget.attrs.update(
+            {"data-combobox": "", "data-combobox-create": "new_vendor"}
+        )
+        self.fields["location"].widget.attrs["data-combobox"] = ""
+        self.fields["owner"].widget.attrs["data-combobox"] = ""
+        self.fields["tags"].widget.attrs["data-tags"] = ""
+        self.fields["attachments"].widget.attrs["class"] = (
+            "block w-full text-sm text-gray-600 file:mr-3 file:rounded file:border-0 "
+            "file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium "
+            "file:text-gray-700 hover:file:bg-gray-200"
+        )
+
         # New items get a chosen ID (from the preprinted pool); existing IDs are frozen.
         self.creating = self.instance.pk is None
         if self.creating:
@@ -161,16 +183,47 @@ class ItemForm(forms.ModelForm):
             field.initial = stored.get(definition.key)
             self.fields[f"{_CUSTOM_PREFIX}{definition.key}"] = field
 
-        if self.creating:
-            self.order_fields(["human_id", *[f for f in self.fields if f != "human_id"]])
-
         for field in self.fields.values():
             if isinstance(field.widget, forms.SelectMultiple):
                 field.widget.attrs.setdefault("class", _INPUT_CLASS + " h-32")
-            elif isinstance(field.widget, forms.CheckboxInput):
+            elif isinstance(field.widget, forms.CheckboxInput | forms.HiddenInput):
                 continue
             else:
                 field.widget.attrs.setdefault("class", _INPUT_CLASS)
+
+    def clean(self) -> dict:
+        cleaned = super().clean()
+        if hasattr(self.data, "getlist"):
+            raw_names = self.data.getlist("new_tags")
+        else:  # plain-dict data (tests)
+            raw_names = self.data.get("new_tags") or []
+        new_tags = []
+        for raw_name in raw_names:
+            name = raw_name.strip()
+            if not name:
+                continue
+            if len(name) > 100:
+                self.add_error(None, f"Tag “{name[:40]}…” is too long (max 100 characters).")
+            elif name.casefold() not in {tag.casefold() for tag in new_tags}:
+                new_tags.append(name)
+        cleaned["new_tags"] = new_tags
+        return cleaned
+
+    def save_attachments(self, *, user) -> None:
+        """Store files uploaded with the form as attachments on the saved item."""
+        for upload in self.cleaned_data.get("attachments", []):
+            Attachment.objects.create(
+                lab=self.lab,
+                uploaded_by=user,
+                target=self.instance,
+                file=upload,
+                original_name=upload.name,
+                size=upload.size,
+            )
+
+    def new_tag_names(self) -> list[str]:
+        """Pending on-the-fly tag names, so a re-rendered invalid form keeps them."""
+        return getattr(self, "cleaned_data", {}).get("new_tags", [])
 
     def clean_human_id(self) -> str:
         raw = (self.cleaned_data.get("human_id") or "").strip()
@@ -197,6 +250,9 @@ class ItemForm(forms.ModelForm):
 
     def save(self, commit: bool = True) -> Item:
         item = super().save(commit=False)
+        vendor_name = self.cleaned_data.get("new_vendor", "").strip()
+        if vendor_name and item.vendor is None:
+            item.vendor, _ = Vendor.objects.get_or_create(lab=self.lab, name=vendor_name)
         if self.creating:
             item.human_id = self.cleaned_data.get("human_id") or ids.suggest_ids(self.lab, 1)[0]
         values = dict(item.custom_fields or {})
@@ -212,15 +268,11 @@ class ItemForm(forms.ModelForm):
             self.save_m2m()
         return item
 
-    def core_fields(self) -> list:
-        """Bound fields for the model's own columns (for template grouping)."""
-        return [
-            f for f in self if not f.name.startswith(_CUSTOM_PREFIX) and f.name not in HAZARD_FIELDS
-        ]
-
-    def hazard_fields(self) -> list:
-        """Bound fields for the dedicated hazards section."""
-        return [self[name] for name in HAZARD_FIELDS]
+    def _save_m2m(self) -> None:
+        super()._save_m2m()
+        for name in self.cleaned_data.get("new_tags", []):
+            tag, _ = Tag.objects.get_or_create(lab=self.lab, name=name)
+            self.instance.tags.add(tag)
 
     def custom_fields_bound(self) -> list:
         """Bound fields for the lab custom-field pool."""

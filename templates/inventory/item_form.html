@@ -4,62 +4,123 @@
 {% block title %}{{ title }} · LabButler{% endblock %}
 
 {% block content %}
-  <div class="flex items-center justify-between gap-4">
-    <h1 class="text-2xl font-semibold tracking-tight">{{ title }}</h1>
-    {% if item %}
-      <a href="{% url 'inventory:item_detail' item.pk %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Cancel</a>
-    {% else %}
-      <a href="{% url 'inventory:item_list' %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Cancel</a>
-    {% endif %}
-  </div>
-
-  {% if item %}
-    <p class="mt-1 font-mono text-xs text-gray-500">{{ item.human_id }} (frozen)</p>
-  {% endif %}
-
-  <form method="post" class="mt-6 max-w-3xl">
-    {% csrf_token %}
-    {% if form.id_suggestions %}
-      <datalist id="id-options">{% for suggestion in form.id_suggestions %}<option value="{{ suggestion }}"></option>{% endfor %}</datalist>
-    {% endif %}
-    {% if form.non_field_errors %}
-      <div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>
-    {% endif %}
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      {% for field in form.core_fields %}
-        {% include "inventory/_form_field.html" %}
-      {% endfor %}
-    </div>
-
-    <h2 class="mt-8 text-sm font-semibold uppercase tracking-wide text-gray-500">Hazards (GHS)</h2>
-    <div class="mt-2 space-y-4">
-      <div class="flex flex-wrap items-center gap-3">
-        <button type="button" data-ghs-lookup data-ghs-url="{% url 'inventory:ghs_lookup' %}"
-                class="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
-          Look up by CAS number
-        </button>
-        <div data-ghs-status class="min-w-0 flex-1 self-center text-xs text-gray-500">Suggests statements from PubChem based on the CAS number above — a best-effort guess. Always verify against the vendor&rsquo;s SDS / product page.</div>
-      </div>
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {% include "inventory/_form_field.html" with field=form.signal_word %}
-      </div>
-      {% include "inventory/_form_field.html" with field=form.hazards %}
-    </div>
-
-    {% with custom=form.custom_fields_bound %}
-      {% if custom %}
-        <h2 class="mt-8 text-sm font-semibold uppercase tracking-wide text-gray-500">Custom fields</h2>
-        <div class="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {% for field in custom %}
-            {% include "inventory/_form_field.html" %}
-          {% endfor %}
-        </div>
+  <div class="mx-auto max-w-3xl">
+    <div class="flex items-center justify-between gap-4">
+      <h1 class="text-2xl font-semibold tracking-tight">{{ title }}</h1>
+      {% if item %}
+        <a href="{% url 'inventory:item_detail' item.pk %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Cancel</a>
+      {% else %}
+        <a href="{% url 'inventory:item_list' %}" class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Cancel</a>
       {% endif %}
-    {% endwith %}
-
-    <div class="mt-8">
-      <button type="submit" class="rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Save</button>
     </div>
-  </form>
+
+    {% if item %}
+      <p class="mt-1 font-mono text-xs text-gray-500">{{ item.human_id }} (frozen)</p>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" class="mt-6 space-y-6">
+      {% csrf_token %}
+      {{ form.new_vendor }}
+      {% for name in form.new_tag_names %}<input type="hidden" name="new_tags" value="{{ name }}">{% endfor %}
+      {% if form.id_suggestions %}
+        <datalist id="id-options">{% for suggestion in form.id_suggestions %}<option value="{{ suggestion }}"></option>{% endfor %}</datalist>
+      {% endif %}
+      {% if form.non_field_errors %}
+        <div class="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      {# ——— What ——— #}
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Item</h2>
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {% if form.creating %}
+            <div class="sm:col-span-2">{% include "procurement/_form_field.html" with field=form.human_id %}</div>
+          {% endif %}
+          <div class="sm:col-span-2">{% include "procurement/_form_field.html" with field=form.name %}</div>
+          {% include "procurement/_form_field.html" with field=form.barcode %}
+          {% include "procurement/_form_field.html" with field=form.lot_number %}
+          {% include "procurement/_form_field.html" with field=form.catalog_number %}
+          {% include "procurement/_form_field.html" with field=form.cas_number %}
+        </div>
+      </section>
+
+      {# ——— Storage & ownership ——— #}
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Storage &amp; ownership</h2>
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {% include "procurement/_form_field.html" with field=form.location %}
+          {% include "procurement/_form_field.html" with field=form.owner %}
+          {% include "procurement/_form_field.html" with field=form.expiration_date %}
+        </div>
+      </section>
+
+      {# ——— Hazards (optional) ——— #}
+      <details class="rounded-lg border border-gray-200 bg-white" {% if form.hazards.value or form.signal_word.value or form.storage_class.value or form.wgk.value or form.hazards.errors %}open{% endif %}>
+        <summary class="cursor-pointer select-none p-5 text-sm font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700">
+          Hazard data (GHS) <span class="font-normal normal-case text-gray-400">— optional</span>
+        </summary>
+        <div class="space-y-4 px-5 pb-5">
+          <div class="flex flex-wrap items-start gap-3">
+            <button type="button" data-ghs-lookup data-ghs-url="{% url 'inventory:ghs_lookup' %}"
+                    class="shrink-0 rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+              Look up by CAS number
+            </button>
+            <div data-ghs-status class="min-w-0 flex-1 self-center text-xs text-gray-500">Suggests statements from PubChem based on the CAS number above — a best-effort guess. Always verify against the vendor&rsquo;s SDS / product page.</div>
+          </div>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {% include "procurement/_form_field.html" with field=form.signal_word %}
+            {% include "procurement/_form_field.html" with field=form.storage_class %}
+            {% include "procurement/_form_field.html" with field=form.wgk %}
+          </div>
+          {% include "procurement/_form_field.html" with field=form.hazards %}
+        </div>
+      </details>
+
+      {# ——— Vendor & price ——— #}
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Vendor &amp; price</h2>
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {% include "procurement/_form_field.html" with field=form.vendor %}
+          <div>
+            <label for="{{ form.price_amount.id_for_label }}" class="block text-sm font-medium text-gray-700">Price</label>
+            <div class="mt-1 flex gap-2">
+              {{ form.price_amount }}
+              <div class="w-24 shrink-0">{{ form.price_currency }}</div>
+            </div>
+            {% for error in form.price_amount.errors|add:form.price_currency.errors %}
+              <p class="mt-1 text-xs text-red-600">{{ error }}</p>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      {# ——— Custom fields ——— #}
+      {% with custom=form.custom_fields_bound %}
+        {% if custom %}
+          <section class="rounded-lg border border-gray-200 bg-white p-5">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Custom fields</h2>
+            <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {% for field in custom %}
+                {% include "procurement/_form_field.html" %}
+              {% endfor %}
+            </div>
+          </section>
+        {% endif %}
+      {% endwith %}
+
+      {# ——— Tags & attachments ——— #}
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Tags &amp; attachments</h2>
+        <div class="mt-4 space-y-4">
+          {% include "procurement/_form_field.html" with field=form.tags %}
+          {% include "procurement/_form_field.html" with field=form.attachments %}
+        </div>
+      </section>
+
+      <div class="flex items-center justify-end gap-3">
+        <button type="submit" class="rounded bg-teal-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-teal-700">Save item</button>
+      </div>
+    </form>
+  </div>
   <script src="{% static 'js/forms.js' %}" defer></script>
 {% endblock %}

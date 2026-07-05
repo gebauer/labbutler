@@ -182,12 +182,13 @@ def item_label(request: HttpRequest, pk: int) -> HttpResponse:
 @require_permission("manage_inventory")
 def item_create(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
-        form = ItemForm(request.POST, lab=request.lab)
+        form = ItemForm(request.POST, request.FILES, lab=request.lab)
         if form.is_valid():
             item = form.save(commit=False)  # form assigns the chosen/next-free human_id
             item.lab = request.lab
             item.save()
             form.save_m2m()
+            form.save_attachments(user=request.user)
             AuditEntry.record(
                 lab=request.lab,
                 actor=request.user,
@@ -210,9 +211,10 @@ def item_create(request: HttpRequest) -> HttpResponse:
 def item_edit(request: HttpRequest, pk: int) -> HttpResponse:
     item = get_object_or_404(Item, pk=pk, lab=request.lab)
     if request.method == "POST":
-        form = ItemForm(request.POST, instance=item, lab=request.lab)
+        form = ItemForm(request.POST, request.FILES, instance=item, lab=request.lab)
         if form.is_valid():
             form.save()
+            form.save_attachments(user=request.user)
             AuditEntry.record(
                 lab=request.lab,
                 actor=request.user,

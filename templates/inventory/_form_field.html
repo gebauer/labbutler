@@ -1,6 +1,0 @@
-<div class="{% if field.name == 'name' or field.name == 'tags' %}sm:col-span-2{% endif %}">
-  <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
-  <div class="mt-1">{{ field }}</div>
-  {% if field.help_text %}<p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>{% endif %}
-  {% for error in field.errors %}<p class="mt-1 text-xs text-red-600">{{ error }}</p>{% endfor %}
-</div>
