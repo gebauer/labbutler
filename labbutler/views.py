@@ -25,3 +25,8 @@ def home(request: HttpRequest) -> HttpResponse:
                 {"widgets": dashboard.build(request.user, lab), "today": timezone.localdate()},
             )
     return render(request, "home.html")
+
+
+def privacy(request: HttpRequest) -> HttpResponse:
+    """Static privacy notice, publicly reachable so it can be read before signing in."""
+    return render(request, "privacy.html")

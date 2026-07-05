@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy notice — LabButler{% endblock %}
+
+{% block content %}
+  <div class="mx-auto max-w-3xl">
+    <h1 class="text-2xl font-semibold tracking-tight">Privacy notice</h1>
+    <p class="mt-2 text-sm text-gray-500">
+      LabButler is self-hosted software. The organisation running this installation is the
+      data controller; contact them for requests about your data. This page describes what
+      the software itself stores and transmits.
+    </p>
+
+    <div class="mt-6 space-y-6 text-sm text-gray-700">
+      <section>
+        <h2 class="text-base font-semibold text-gray-900">Cookies</h2>
+        <p class="mt-1.5">
+          LabButler sets two first-party cookies, both strictly necessary to operate the
+          site: a session cookie that keeps you signed in, and a CSRF cookie that protects
+          forms against cross-site request forgery. No analytics, advertising, or other
+          third-party cookies are used, so no cookie consent is required.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-base font-semibold text-gray-900">Local storage</h2>
+        <p class="mt-1.5">
+          The dashboard remembers a short list of recently viewed entries in your
+          browser's local storage to personalise your start page. This data never leaves
+          your browser.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-base font-semibold text-gray-900">Account data</h2>
+        <p class="mt-1.5">
+          Your account stores your name, email address, and lab memberships with their
+          roles. This is required to provide the service and to scope what you can see and
+          do. Records you create or change (items, requests, comments, attachments) are
+          linked to your account.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-base font-semibold text-gray-900">Audit log</h2>
+        <p class="mt-1.5">
+          Changes to inventory and procurement data are recorded in an append-only audit
+          log together with the acting user and timestamp. This serves traceability and
+          accountability within your lab (legitimate interest) and cannot be edited or
+          deleted through the application.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-base font-semibold text-gray-900">Login protection</h2>
+        <p class="mt-1.5">
+          To defend against password guessing, failed sign-in attempts are recorded with
+          the IP address and the username used. After repeated failures the combination is
+          temporarily locked out. These records serve security (legitimate interest).
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-base font-semibold text-gray-900">External services</h2>
+        <p class="mt-1.5">
+          All pages are served entirely from this installation — no fonts, scripts, or
+          images are loaded from third parties, and no tracking takes place. One optional
+          feature contacts an external service: when you press the GHS suggestion button
+          on a chemical, the <em>server</em> queries PubChem (a service of the U.S.
+          National Institutes of Health) with the CAS number you entered. Your browser
+          never contacts PubChem, and no personal data is transmitted — only the CAS
+          number and the server's own address.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-base font-semibold text-gray-900">Email</h2>
+        <p class="mt-1.5">
+          The application may send emails (for example password resets) through the mail
+          server configured by the operator of this installation.
+        </p>
+      </section>
+    </div>
+  </div>
+{% endblock %}

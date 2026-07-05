@@ -14,5 +14,6 @@ urlpatterns = [
     path("manage/", include("apps.tenancy.manage_urls")),
     path("", include("apps.tenancy.urls")),
     path("healthz", views.healthz, name="healthz"),
+    path("privacy/", views.privacy, name="privacy"),
     path("", views.home, name="home"),
 ]

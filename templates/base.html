@@ -110,6 +110,8 @@
        class="hover:text-gray-600 hover:underline">{{ app_version }}</a>{% if app_commit %}
     (<a href="{{ app_commit_url }}" target="_blank" rel="noopener"
         class="hover:text-gray-600 hover:underline">{{ app_commit }}</a>){% endif %}
+    <span class="mx-1">·</span>
+    <a href="{% url 'privacy' %}" class="hover:text-gray-600 hover:underline">Privacy</a>
   </footer>
 </body>
 </html>
