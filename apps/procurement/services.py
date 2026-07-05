@@ -4,13 +4,18 @@ The allowed moves and the permission each requires live in one table (:data:`TRA
 so views and templates ask *this* module what a user may do next rather than hard-coding
 status logic. Transitions are applied inside a transaction; checking a request in creates
 the inventory item and links it back.
+
+Also home to vendor maintenance: duplicate detection and merging, so lab managers can
+sanitize supplier names that were typed in different spellings.
 """
 
 from __future__ import annotations
 
+import difflib
 from dataclasses import dataclass
 
 from django.db import transaction
+from django.db.models import Count
 from django.urls import reverse
 
 from apps.attachments.models import Attachment
@@ -19,7 +24,7 @@ from apps.inventory import ids
 from apps.inventory.models import Item
 from apps.tenancy.models import User
 
-from .models import Request
+from .models import Request, Vendor, normalize_vendor_name
 
 Status = Request.Status
 
@@ -320,3 +325,128 @@ def _create_item_from(req: Request, *, location=None, human_id: str = "") -> Ite
     item.hazards.set(req.hazards.all())
     req.created_item = item
     return item
+
+
+# --- Vendor maintenance -------------------------------------------------------------
+
+# Two normalized names at or above this SequenceMatcher ratio are suggested as duplicates.
+# Advisory only — the manager always confirms the merge — so false positives are cheap.
+VENDOR_SIMILARITY_THRESHOLD = 0.85
+
+
+def _vendor_key(name: str) -> str:
+    return normalize_vendor_name(name).casefold()
+
+
+def find_duplicate_vendors(lab) -> list[list[Vendor]]:
+    """Groups of a lab's vendors that look like spellings of the same supplier.
+
+    Vendors are grouped when their normalized names match exactly (case/whitespace
+    variants) or are similar per :mod:`difflib`. Pairwise comparison is fine here:
+    labs hold at most a few hundred vendors. Returns only groups of two or more,
+    each sorted by name.
+    """
+    vendors = list(Vendor.objects.filter(lab=lab).order_by("name"))
+    parent = {v.pk: v.pk for v in vendors}
+
+    def find(pk: int) -> int:
+        while parent[pk] != pk:
+            parent[pk] = parent[parent[pk]]
+            pk = parent[pk]
+        return pk
+
+    for i, a in enumerate(vendors):
+        key_a = _vendor_key(a.name)
+        for b in vendors[i + 1 :]:
+            key_b = _vendor_key(b.name)
+            if (
+                key_a == key_b
+                or difflib.SequenceMatcher(None, key_a, key_b).ratio()
+                >= VENDOR_SIMILARITY_THRESHOLD
+            ):
+                parent[find(a.pk)] = find(b.pk)
+
+    groups: dict[int, list[Vendor]] = {}
+    for vendor in vendors:
+        groups.setdefault(find(vendor.pk), []).append(vendor)
+    return sorted(
+        (sorted(g, key=lambda v: v.name) for g in groups.values() if len(g) > 1),
+        key=lambda g: g[0].name,
+    )
+
+
+@transaction.atomic
+def merge_vendors(
+    *, lab, winner: Vendor, losers: list[Vendor], actor, new_name: str = ""
+) -> Vendor:
+    """Merge ``losers`` into ``winner``: repoint their requests and items, delete them.
+
+    Optionally renames the winner in the same step (``new_name``). Everything runs in one
+    transaction and is recorded as a single audit entry. Raises :class:`ValueError` on an
+    invalid selection (wrong lab, winner among losers, empty losers, or a rename that
+    collides with a surviving vendor).
+    """
+    if not losers:
+        raise ValueError("Select at least one vendor to merge into the surviving one.")
+    if any(v.lab_id != lab.pk for v in [winner, *losers]):
+        raise ValueError("All vendors must belong to the current lab.")
+    if any(v.pk == winner.pk for v in losers):
+        raise ValueError("The surviving vendor cannot also be merged away.")
+
+    new_name = normalize_vendor_name(new_name)
+    renaming = bool(new_name) and new_name != winner.name
+    if renaming:
+        clash = (
+            Vendor.objects.filter(lab=lab, name__iexact=new_name)
+            .exclude(pk__in=[v.pk for v in [winner, *losers]])
+            .exists()
+        )
+        if clash:
+            raise ValueError(f"A supplier named “{new_name}” already exists.")
+
+    loser_pks = [v.pk for v in losers]
+    request_counts = dict(
+        Request.objects.filter(vendor_id__in=loser_pks)
+        .values_list("vendor_id")
+        .annotate(n=Count("id"))
+    )
+    item_counts = dict(
+        Item.objects.filter(vendor_id__in=loser_pks)
+        .values_list("vendor_id")
+        .annotate(n=Count("id"))
+    )
+
+    moved_requests = Request.objects.filter(vendor_id__in=loser_pks).update(vendor=winner)
+    moved_items = Item.objects.filter(vendor_id__in=loser_pks).update(vendor=winner)
+    # Delete before renaming, so the winner may take over a loser's exact name without
+    # tripping the (lab, name) unique constraint.
+    Vendor.objects.filter(pk__in=loser_pks).delete()
+
+    changes = {
+        "winner": winner.name,
+        "losers": [
+            {
+                "id": v.pk,
+                "name": v.name,
+                "requests": request_counts.get(v.pk, 0),
+                "items": item_counts.get(v.pk, 0),
+            }
+            for v in losers
+        ],
+        "moved_requests": moved_requests,
+        "moved_items": moved_items,
+    }
+    if renaming:
+        changes["renamed_from"] = winner.name
+        changes["winner"] = new_name
+        winner.name = new_name
+        winner.save(update_fields=["name", "updated_at"])
+
+    AuditEntry.record(
+        lab=lab,
+        actor=actor,
+        action="lab.suppliers_merged",
+        target=winner,
+        changes=changes,
+    )
+    return winner

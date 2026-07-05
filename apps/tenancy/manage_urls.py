@@ -16,6 +16,7 @@ urlpatterns = [
     path("roles/add/", views.role_form, name="role_add"),
     path("roles/<int:pk>/edit/", views.role_form, name="role_edit"),
     path("roles/<int:pk>/delete/", views.role_delete, name="role_delete"),
+    path("suppliers/merge/", views.supplier_merge, name="supplier_merge"),
     # Generic registry-driven CRUD (suppliers / budgets / addresses / fields).
     path("<slug:kind>/", views.crud_list, name="list"),
     path("<slug:kind>/add/", views.crud_form, name="add"),

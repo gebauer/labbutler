@@ -314,7 +314,7 @@ def commit_orders(
             vendor = _cached(
                 vendors,
                 row.vendor_name,
-                lambda n=row.vendor_name: Vendor.objects.get_or_create(lab=lab, name=n)[0],
+                lambda n=row.vendor_name: Vendor.objects.get_or_create_normalized(lab=lab, name=n),
             )
         budget = None
         if row.budget_number:

@@ -11,7 +11,13 @@ from decimal import Decimal
 from django import forms
 
 from apps.inventory.models import FieldDefinition, FieldPreset, Location
-from apps.procurement.models import CURRENCIES, Budget, ShippingAddress, Vendor
+from apps.procurement.models import (
+    CURRENCIES,
+    Budget,
+    ShippingAddress,
+    Vendor,
+    normalize_vendor_name,
+)
 
 from .models import Lab, Permission, Role, User
 
@@ -44,11 +50,24 @@ class _LabForm(forms.ModelForm):
     def _scope(self, lab: Lab) -> None:  # overridden where FK choices need scoping
         pass
 
+    def _get_validation_exclusions(self) -> set[str]:
+        # ``lab`` isn't a form field, so ModelForm excludes it and silently skips every
+        # per-lab unique constraint — duplicates then crash on the DB constraint at
+        # save(). ``lab`` is bound in __init__, so keep it in the validation and the
+        # constraints surface as form errors instead.
+        exclude = super()._get_validation_exclusions()
+        exclude.discard("lab")
+        return exclude
+
 
 class VendorForm(_LabForm):
     class Meta:
         model = Vendor
         fields = ["name"]
+
+    def clean_name(self) -> str:
+        # Whitespace variants of one supplier shouldn't become separate rows.
+        return normalize_vendor_name(self.cleaned_data["name"])
 
 
 class ShippingAddressForm(_LabForm):

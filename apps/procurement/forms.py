@@ -190,7 +190,9 @@ class RequestForm(forms.ModelForm):
         instance = super().save(commit=False)
         vendor_name = self.cleaned_data.get("new_vendor", "").strip()
         if vendor_name and instance.vendor is None:
-            instance.vendor, _ = Vendor.objects.get_or_create(lab=self.lab, name=vendor_name)
+            instance.vendor = Vendor.objects.get_or_create_normalized(
+                lab=self.lab, name=vendor_name
+            )
         if commit:
             instance.save()
             self.save_m2m()

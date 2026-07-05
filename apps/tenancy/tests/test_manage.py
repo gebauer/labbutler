@@ -47,6 +47,18 @@ def test_create_supplier(client, lab):
 
 
 @pytest.mark.django_db
+def test_duplicate_supplier_is_a_form_error_not_a_crash(client, lab):
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    Vendor.objects.create(lab=lab, name="Carl Roth")
+    # Exact and whitespace-variant duplicates both re-render with a validation error.
+    for name in ["Carl Roth", "  Carl   Roth "]:
+        resp = client.post(reverse("manage:add", args=["suppliers"]), {"name": name})
+        assert resp.status_code == 200
+        assert b"already exists" in resp.content
+    assert Vendor.objects.filter(lab=lab).count() == 1
+
+
+@pytest.mark.django_db
 def test_edit_then_delete_budget(client, lab):
     client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
     budget = Budget.objects.create(lab=lab, number="KST1", name="Grant")
@@ -282,3 +294,88 @@ def test_create_edit_delete_role_permissions(client, lab):
 
     client.post(reverse("manage:role_delete", args=[role.pk]))
     assert not Role.objects.filter(pk=role.pk).exists()
+
+
+# --- Supplier merge ----------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_supplier_merge_requires_manage_lab(client, lab):
+    client.force_login(_user(lab, "member@x.de", ["Member"]))
+    assert client.get(reverse("manage:supplier_merge")).status_code == 403
+
+
+@pytest.mark.django_db
+def test_supplier_merge_rejects_foreign_vendor(client, lab):
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    mine = Vendor.objects.create(lab=lab, name="Sigma")
+    other = create_lab(name="Other", item_id_prefix="OT")
+    foreign = Vendor.objects.create(lab=other, name="Foreign")
+    url = reverse("manage:supplier_merge")
+    assert client.get(url, {"vendors": [mine.pk, foreign.pk]}).status_code == 404
+    assert (
+        client.post(url, {"vendors": [mine.pk, foreign.pk], "winner": mine.pk}).status_code == 404
+    )
+
+
+@pytest.mark.django_db
+def test_supplier_merge_preview_shows_distinct_counts(client, lab):
+    from apps.inventory.models import Item
+    from apps.procurement.models import Request
+
+    boss = _user(lab, "boss@x.de", ["Lab manager"])
+    client.force_login(boss)
+    winner = Vendor.objects.create(lab=lab, name="Sigma Aldrich")
+    loser = Vendor.objects.create(lab=lab, name="sigma aldrich")
+    # Both a request and an item on one vendor — catches double-join count inflation.
+    Request.objects.create(lab=lab, item_name="Tips", requested_by=boss, vendor=winner)
+    Item.objects.create(lab=lab, human_id="AGB-1", name="Tips", vendor=winner)
+
+    resp = client.get(reverse("manage:supplier_merge"), {"vendors": [winner.pk, loser.pk]})
+    assert resp.status_code == 200
+    assert b"1 request" in resp.content and b"1 item" in resp.content
+
+
+@pytest.mark.django_db
+def test_supplier_merge_happy_path(client, lab):
+    from apps.procurement.models import Request
+
+    boss = _user(lab, "boss@x.de", ["Lab manager"])
+    client.force_login(boss)
+    winner = Vendor.objects.create(lab=lab, name="sigma aldrich")
+    loser = Vendor.objects.create(lab=lab, name="Sigma  Aldrich")
+    req = Request.objects.create(lab=lab, item_name="Tips", requested_by=boss, vendor=loser)
+
+    resp = client.post(
+        reverse("manage:supplier_merge"),
+        {"vendors": [winner.pk, loser.pk], "winner": winner.pk, "new_name": "Sigma Aldrich"},
+    )
+    assert resp.status_code == 302
+    assert resp.url == reverse("manage:list", kwargs={"kind": "suppliers"})
+    req.refresh_from_db()
+    winner.refresh_from_db()
+    assert req.vendor == winner
+    assert winner.name == "Sigma Aldrich"
+    assert not Vendor.objects.filter(pk=loser.pk).exists()
+
+
+@pytest.mark.django_db
+def test_supplier_merge_needs_two_vendors(client, lab):
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    vendor = Vendor.objects.create(lab=lab, name="Sigma")
+    resp = client.post(
+        reverse("manage:supplier_merge"), {"vendors": [vendor.pk], "winner": vendor.pk}
+    )
+    assert resp.status_code == 302
+    assert resp.url == reverse("manage:supplier_merge")
+    assert Vendor.objects.filter(pk=vendor.pk).exists()
+
+
+@pytest.mark.django_db
+def test_supplier_list_links_merge_with_duplicate_badge(client, lab):
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    Vendor.objects.create(lab=lab, name="Sigma")
+    Vendor.objects.create(lab=lab, name="sigma ")
+    resp = client.get(reverse("manage:list", args=["suppliers"]))
+    assert reverse("manage:supplier_merge").encode() in resp.content
+    assert b"Merge duplicates" in resp.content
