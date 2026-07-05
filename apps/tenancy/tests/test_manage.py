@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 from django.urls import reverse
 
-from apps.inventory.models import FieldDefinition
+from apps.inventory.models import FieldDefinition, FieldPreset
 from apps.procurement.models import Budget, Vendor
 from apps.tenancy.models import User
 from apps.tenancy.services import add_member, create_lab
@@ -35,6 +35,7 @@ def test_manager_sees_landing_with_sections(client, lab):
     resp = client.get(reverse("manage:index"))
     assert resp.status_code == 200
     assert b"Suppliers" in resp.content and b"Custom fields" in resp.content
+    assert b"Field presets" in resp.content
 
 
 @pytest.mark.django_db
@@ -70,6 +71,47 @@ def test_custom_field_key_is_frozen_on_edit(client, lab):
     fd.refresh_from_db()
     assert fd.key == "purity"  # disabled field: submitted key ignored
     assert fd.label == "Purity %"
+
+
+@pytest.mark.django_db
+def test_create_preset_with_fields(client, lab):
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    purity = FieldDefinition.objects.create(lab=lab, key="purity", label="Purity")
+    volume = FieldDefinition.objects.create(lab=lab, key="volume_ml", label="Volume (ml)")
+    resp = client.post(
+        reverse("manage:add", args=["presets"]),
+        {"name": "Chemical fields", "fields": [purity.pk, volume.pk]},
+    )
+    assert resp.status_code == 302
+    preset = FieldPreset.objects.get(name="Chemical fields")
+    assert preset.lab == lab
+    assert set(preset.fields.all()) == {purity, volume}
+
+
+@pytest.mark.django_db
+def test_preset_fields_are_lab_scoped(client, lab):
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    other = create_lab(name="Other", item_id_prefix="OT")
+    foreign = FieldDefinition.objects.create(lab=other, key="secret", label="Secret")
+    resp = client.post(
+        reverse("manage:add", args=["presets"]), {"name": "Sneaky", "fields": [foreign.pk]}
+    )
+    assert resp.status_code == 200  # re-rendered with a validation error
+    assert not FieldPreset.objects.filter(name="Sneaky").exists()
+
+
+@pytest.mark.django_db
+def test_edit_preset_replaces_fields(client, lab):
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    purity = FieldDefinition.objects.create(lab=lab, key="purity", label="Purity")
+    volume = FieldDefinition.objects.create(lab=lab, key="volume_ml", label="Volume (ml)")
+    preset = FieldPreset.objects.create(lab=lab, name="Chemical fields")
+    preset.fields.add(purity)
+    client.post(
+        reverse("manage:edit", args=["presets", preset.pk]),
+        {"name": "Chemical fields", "fields": [volume.pk]},
+    )
+    assert set(preset.fields.all()) == {volume}
 
 
 @pytest.mark.django_db

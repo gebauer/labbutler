@@ -16,6 +16,9 @@
                                       the chosen currency echoed into [data-currency-echo];
                                       a unit price of 0 asks for confirmation on submit
    - button[data-delivery-days]       sets the expected-delivery date to today + N days
+   - section[data-preset-fields]      collapses empty custom fields; preset buttons and
+                                      "Show all fields" reveal them, echoed back to the
+                                      server as hidden cf_revealed inputs
 
    Without JS the native selects stay usable; only the typeahead pickers, live preview
    and CAS lookup are missing. */
@@ -563,6 +566,80 @@
     });
   }
 
+  /* ——— Custom-field presets: collapse empty fields until a preset reveals them ——— */
+
+  function bindPresetFields(section) {
+    // Map wrappers by field name to avoid attribute-selector escaping for odd keys.
+    var wrappers = Array.prototype.slice.call(section.querySelectorAll('[data-cf-field]'));
+    var byName = {};
+    wrappers.forEach(function (wrapper) {
+      byName[wrapper.getAttribute('data-cf-field')] = wrapper;
+    });
+
+    function isHidden(wrapper) { return wrapper.classList.contains('hidden'); }
+
+    function markRevealed(name) {
+      // Echoed back by the server so an invalid re-render keeps the field open.
+      var already = Array.prototype.some.call(
+        section.querySelectorAll('input[name="cf_revealed"]'),
+        function (input) { return input.value === name; }
+      );
+      if (already) return;
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'cf_revealed';
+      input.value = name;
+      section.appendChild(input);
+    }
+
+    function reveal(name) {
+      var wrapper = byName[name];
+      if (!wrapper || !isHidden(wrapper)) return null;
+      wrapper.classList.remove('hidden');
+      markRevealed(name);
+      return wrapper;
+    }
+
+    function refreshButtons() {
+      section.querySelectorAll('button[data-preset-apply]').forEach(function (button) {
+        var targets = (button.getAttribute('data-preset-targets') || '').split(' ');
+        button.disabled = !targets.some(function (name) {
+          return byName[name] && isHidden(byName[name]);
+        });
+      });
+      var showAll = section.querySelector('button[data-preset-show-all]');
+      if (showAll) showAll.classList.toggle('hidden', !wrappers.some(isHidden));
+    }
+
+    wrappers.forEach(function (wrapper) {
+      if (!wrapper.hasAttribute('data-cf-filled')) wrapper.classList.add('hidden');
+    });
+
+    section.querySelectorAll('button[data-preset-apply]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var first = null;
+        (button.getAttribute('data-preset-targets') || '').split(' ').forEach(function (name) {
+          var wrapper = reveal(name);
+          if (wrapper && !first) first = wrapper;
+        });
+        refreshButtons();
+        var input = first && first.querySelector('input, select, textarea');
+        if (input) input.focus();
+      });
+    });
+    var showAll = section.querySelector('button[data-preset-show-all]');
+    if (showAll) {
+      showAll.addEventListener('click', function () {
+        Object.keys(byName).forEach(reveal);
+        refreshButtons();
+      });
+    }
+
+    var buttonRow = section.querySelector('[data-preset-buttons]');
+    if (buttonRow) buttonRow.hidden = false;
+    refreshButtons();
+  }
+
   function bindDeliveryShortcuts(form) {
     var input = form.querySelector('input[name="expected_delivery"]');
     if (!input) return;
@@ -582,6 +659,7 @@
     document.querySelectorAll('select[data-tags]').forEach(enhanceTags);
     document.querySelectorAll('select[data-hazards]').forEach(enhanceHazards);
     document.querySelectorAll('button[data-ghs-lookup]').forEach(bindGhsLookup);
+    document.querySelectorAll('section[data-preset-fields]').forEach(bindPresetFields);
     var form = document.querySelector('form[data-request-form]');
     if (form) {
       bindTotals(form);

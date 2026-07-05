@@ -81,10 +81,15 @@ finds useful and filter the item list by them. Tags never affect an item's ID.
 ## Custom fields
 
 Each lab can define **custom fields** (text, number, date, or boolean) under
-**Manage → Custom fields**; values are stored per item. **Field presets** bundle
-several fields under a name (e.g. *Chemical fields*) so a whole set can be applied
-to an item in one step — a preset is pure convenience and is never stored as the
-item's identity or type.
+**Manage → Custom fields**; values are stored per item. **Field presets**
+(**Manage → Field presets**) bundle several fields under a name (e.g. *Chemical
+fields*) so a whole set can be applied to an item in one step — a preset is pure
+convenience and is never stored as the item's identity or type.
+
+On the item form, once the lab has at least one preset, custom fields without a
+value start collapsed: click a preset button (e.g. *+ Chemical fields*) to reveal
+its fields, or *Show all fields* to see everything. Fields that already hold a
+value are always shown.
 
 ## Editing and deleting
 

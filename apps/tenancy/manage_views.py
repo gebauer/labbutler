@@ -1,9 +1,9 @@
 """Lab administration screens (the ``manage_lab`` area), so a lab can be run without the
 Django admin.
 
-The lab-owned lists (locations, suppliers, budgets, shipping addresses, custom fields)
-share one registry-driven set of CRUD views; members, roles and settings have bespoke
-views.
+The lab-owned lists (locations, suppliers, budgets, shipping addresses, custom fields,
+field presets) share one registry-driven set of CRUD views; members, roles and settings
+have bespoke views.
 Every view is gated on ``manage_lab`` and scoped to ``request.lab``.
 """
 
@@ -19,12 +19,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
-from apps.inventory.models import FieldDefinition, Location
+from apps.inventory.models import FieldDefinition, FieldPreset, Location
 from apps.procurement.models import Budget, ShippingAddress, Vendor
 
 from .manage_forms import (
     BudgetForm,
     FieldDefinitionForm,
+    FieldPresetForm,
     LabSettingsForm,
     LocationForm,
     MemberAddForm,
@@ -56,6 +57,7 @@ CRUD: dict[str, CrudConfig] = {
     "fields": CrudConfig(
         FieldDefinition, FieldDefinitionForm, "custom field", "Custom fields", "label"
     ),
+    "presets": CrudConfig(FieldPreset, FieldPresetForm, "field preset", "Field presets", "name"),
 }
 
 

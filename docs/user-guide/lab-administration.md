@@ -77,12 +77,12 @@ history.
 **Manage → Shipping addresses** holds the delivery addresses selectable on
 requests; one can be the default.
 
-## Locations, custom fields
+## Locations, custom fields, field presets
 
-Storage locations (**Manage → Locations**) and custom item fields
-(**Manage → Custom fields**) are described in the
-[Inventory chapter](inventory.md#locations); note that managing these requires
-`manage_inventory` rather than `manage_lab`.
+Storage locations (**Manage → Locations**), custom item fields
+(**Manage → Custom fields**) and their named bundles (**Manage → Field presets**)
+are described in the [Inventory chapter](inventory.md#locations); note that
+managing these requires `manage_inventory` rather than `manage_lab`.
 
 ## Lab settings
 

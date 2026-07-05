@@ -95,15 +95,32 @@
       </section>
 
       {# ——— Custom fields ——— #}
-      {% with custom=form.custom_fields_bound %}
+      {% with custom=form.custom_fields_meta %}
         {% if custom %}
-          <section class="rounded-lg border border-gray-200 bg-white p-5">
+          <section class="rounded-lg border border-gray-200 bg-white p-5" {% if form.presets %}data-preset-fields{% endif %}>
             <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Custom fields</h2>
+            {% if form.presets %}
+              {# Inert without JS (all fields stay visible), so keep the row hidden until enhanced. #}
+              <div class="mt-3 flex flex-wrap items-center gap-2" data-preset-buttons hidden>
+                {% for preset, names in form.presets %}
+                  <button type="button" data-preset-apply data-preset-targets="{{ names|join:" " }}"
+                          class="rounded-full border border-teal-300 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-50 disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-white">
+                    + {{ preset.name }}
+                  </button>
+                {% endfor %}
+                <button type="button" data-preset-show-all class="text-xs text-gray-500 underline hover:text-gray-700">
+                  Show all fields
+                </button>
+              </div>
+            {% endif %}
             <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {% for field in custom %}
-                {% include "procurement/_form_field.html" %}
+              {% for entry in custom %}
+                <div data-cf-field="{{ entry.field.html_name }}" {% if entry.filled %}data-cf-filled{% endif %}>
+                  {% include "procurement/_form_field.html" with field=entry.field %}
+                </div>
               {% endfor %}
             </div>
+            {% for name in form.revealed_custom_names %}<input type="hidden" name="cf_revealed" value="{{ name }}">{% endfor %}
           </section>
         {% endif %}
       {% endwith %}

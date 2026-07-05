@@ -323,6 +323,63 @@ def test_edit_item_custom_fields_round_trip(client, lab, manager):
 
 
 @pytest.mark.django_db
+def test_item_form_renders_preset_buttons(client, lab, manager):
+    from apps.inventory.models import FieldDefinition, FieldPreset
+
+    purity = FieldDefinition.objects.create(lab=lab, key="purity", label="Purity")
+    preset = FieldPreset.objects.create(lab=lab, name="Chemical fields")
+    preset.fields.add(purity)
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_create"))
+    assert b"data-preset-fields" in resp.content
+    assert b"+ Chemical fields" in resp.content
+    assert b'data-preset-targets="cf_purity"' in resp.content
+    assert b'data-cf-field="cf_purity"' in resp.content
+
+
+@pytest.mark.django_db
+def test_item_form_without_presets_has_no_preset_ui(client, lab, manager):
+    from apps.inventory.models import FieldDefinition
+
+    FieldDefinition.objects.create(lab=lab, key="purity", label="Purity")
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_create"))
+    assert b'name="cf_purity"' in resp.content  # fields still render
+    assert b"data-preset-fields" not in resp.content
+
+
+@pytest.mark.django_db
+def test_edit_marks_filled_custom_fields(client, lab, manager):
+    from apps.inventory.models import FieldDefinition, FieldPreset
+
+    FieldDefinition.objects.create(lab=lab, key="purity", label="Purity")
+    FieldDefinition.objects.create(lab=lab, key="grade", label="Grade")
+    FieldPreset.objects.create(lab=lab, name="Chemical fields")
+    item = _make_item(lab, name="Ethanol", custom_fields={"purity": "99%"})
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_edit", args=[item.pk]))
+    assert b'data-cf-field="cf_purity" data-cf-filled' in resp.content
+    assert b'data-cf-field="cf_grade" data-cf-filled' not in resp.content
+
+
+@pytest.mark.django_db
+def test_invalid_submit_keeps_revealed_fields_open(client, lab, manager):
+    from apps.inventory.models import FieldDefinition, FieldPreset
+
+    FieldDefinition.objects.create(lab=lab, key="purity", label="Purity")
+    FieldPreset.objects.create(lab=lab, name="Chemical fields")
+    client.force_login(manager)
+    # Missing name -> invalid re-render; the revealed field must stay open.
+    resp = client.post(
+        reverse("inventory:item_create"),
+        {"name": "", "tags": [], "cf_revealed": ["cf_purity"]},
+    )
+    assert resp.status_code == 200
+    assert b'name="cf_revealed" value="cf_purity"' in resp.content
+    assert b'data-cf-field="cf_purity" data-cf-filled' in resp.content
+
+
+@pytest.mark.django_db
 def test_item_detail_shows_history(client, lab, manager):
     client.force_login(manager)
     client.post(reverse("inventory:item_create"), {"name": "Logged", "tags": []})

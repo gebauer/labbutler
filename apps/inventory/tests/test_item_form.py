@@ -1,4 +1,5 @@
-"""ItemForm behaviour: on-the-fly vendor/tag creation and form attachments."""
+"""ItemForm behaviour: on-the-fly vendor/tag creation, form attachments, and the
+custom-field preset metadata for the progressive-disclosure UI."""
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -6,7 +7,7 @@ from django.urls import reverse
 
 from apps.attachments.models import Attachment
 from apps.inventory.forms import ItemForm
-from apps.inventory.models import Item, Tag
+from apps.inventory.models import FieldDefinition, FieldPreset, Item, Tag
 from apps.procurement.models import Vendor
 from apps.tenancy.models import User
 from apps.tenancy.services import add_member, create_lab
@@ -105,6 +106,50 @@ def test_disallowed_form_attachment_is_a_validation_error(lab):
     form = ItemForm(_form_data(), {"attachments": [SimpleUploadedFile("run.exe", b"MZ")]}, lab=lab)
     assert not form.is_valid()
     assert "attachments" in form.errors
+
+
+def test_form_exposes_preset_metadata(lab):
+    purity = FieldDefinition.objects.create(lab=lab, key="purity", label="Purity")
+    FieldDefinition.objects.create(lab=lab, key="volume_ml", label="Volume")
+    preset = FieldPreset.objects.create(lab=lab, name="Chemical fields")
+    preset.fields.add(purity)
+
+    form = ItemForm(lab=lab)
+    assert form.presets == [(preset, ["cf_purity"])]
+    # Unbound form on a fresh item: nothing is filled, so both fields collapse.
+    assert [(e["field"].name, e["filled"]) for e in form.custom_fields_meta()] == [
+        ("cf_purity", False),
+        ("cf_volume_ml", False),
+    ]
+
+
+def test_custom_fields_meta_marks_values_errors_and_revealed(lab):
+    FieldDefinition.objects.create(lab=lab, key="purity", label="Purity")
+    FieldDefinition.objects.create(lab=lab, key="volume_ml", label="Volume", data_type="number")
+    FieldDefinition.objects.create(lab=lab, key="grade", label="Grade")
+
+    form = ItemForm(
+        _form_data(
+            cf_purity="99%",
+            cf_volume_ml="not a number",
+            cf_revealed=["cf_grade", "cf_bogus", "name"],
+        ),
+        lab=lab,
+    )
+    form.is_valid()
+    filled = {e["field"].name: e["filled"] for e in form.custom_fields_meta()}
+    assert filled == {
+        "cf_purity": True,  # holds a value
+        "cf_volume_ml": True,  # invalid -> has an error, must stay visible
+        "cf_grade": True,  # explicitly revealed before the submit
+    }
+    # Unknown / non-custom names are filtered out of the echo.
+    assert form.revealed_custom_names() == ["cf_grade"]
+
+
+def test_revealed_names_empty_on_unbound_form(lab):
+    FieldDefinition.objects.create(lab=lab, key="purity", label="Purity")
+    assert ItemForm(lab=lab).revealed_custom_names() == []
 
 
 @pytest.fixture

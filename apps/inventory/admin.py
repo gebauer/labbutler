@@ -32,6 +32,20 @@ class HazardStatementAdmin(admin.ModelAdmin):
     search_fields = ("code", "text_en", "text_de")
 
 
+@admin.register(FieldDefinition)
+class FieldDefinitionAdmin(admin.ModelAdmin):
+    list_display = ("label", "key", "data_type", "lab")
+    list_filter = ("lab", "data_type")
+    search_fields = ("label", "key")
+
+
+@admin.register(FieldPreset)
+class FieldPresetAdmin(admin.ModelAdmin):
+    list_display = ("name", "lab")
+    list_filter = ("lab",)
+    # fields__* so a preset can be found by any field it bundles.
+    search_fields = ("name", "fields__label", "fields__key")
+    filter_horizontal = ("fields",)
+
+
 admin.site.register(Tag)
-admin.site.register(FieldDefinition)
-admin.site.register(FieldPreset)

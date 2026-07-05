@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from django import forms
 
-from apps.inventory.models import FieldDefinition, Location
+from apps.inventory.models import FieldDefinition, FieldPreset, Location
 from apps.procurement.models import CURRENCIES, Budget, ShippingAddress, Vendor
 
 from .models import Lab, Permission, Role, User
@@ -124,6 +124,25 @@ class FieldDefinitionForm(_LabForm):
 
     def clean_key(self) -> str:
         return self.cleaned_data["key"].strip().lower().replace(" ", "_")
+
+
+class FieldPresetForm(_LabForm):
+    class Meta:
+        model = FieldPreset
+        fields = ["name", "fields"]
+        widgets = {
+            "fields": forms.CheckboxSelectMultiple(
+                attrs={"class": "mr-1.5 h-4 w-4 rounded border-gray-300 text-teal-600"}
+            )
+        }
+        help_texts = {
+            "fields": "Applying the preset on an item form reveals these fields in one click."
+        }
+
+    def _scope(self, lab: Lab) -> None:
+        field = self.fields["fields"]
+        field.queryset = FieldDefinition.objects.filter(lab=lab).order_by("label")
+        field.label_from_instance = lambda definition: f"{definition.label} ({definition.key})"
 
 
 class LabSettingsForm(forms.ModelForm):

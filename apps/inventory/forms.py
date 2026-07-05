@@ -22,7 +22,7 @@ from apps.procurement.models import Vendor
 from apps.tenancy.models import Lab, User
 
 from . import ghs, ids
-from .models import FieldDefinition, HazardStatement, Item, Location, Tag
+from .models import FieldDefinition, FieldPreset, HazardStatement, Item, Location, Tag
 
 _INPUT_CLASS = (
     "w-full rounded border border-gray-300 px-3 py-2 text-sm "
@@ -183,6 +183,18 @@ class ItemForm(forms.ModelForm):
             field.initial = stored.get(definition.key)
             self.fields[f"{_CUSTOM_PREFIX}{definition.key}"] = field
 
+        # Named field bundles: (preset, [cf_ input names]) for the progressive-disclosure
+        # UI on the item form (empty fields start collapsed; a preset reveals its bundle).
+        self.presets: list[tuple[FieldPreset, list[str]]] = []
+        if self.custom_definitions:
+            input_names = {d.pk: f"{_CUSTOM_PREFIX}{d.key}" for d in self.custom_definitions}
+            self.presets = [
+                (preset, [input_names[fd.pk] for fd in preset.fields.all() if fd.pk in input_names])
+                for preset in FieldPreset.objects.filter(lab=lab)
+                .prefetch_related("fields")
+                .order_by("name")
+            ]
+
         for field in self.fields.values():
             if isinstance(field.widget, forms.SelectMultiple):
                 field.widget.attrs.setdefault("class", _INPUT_CLASS + " h-32")
@@ -277,3 +289,31 @@ class ItemForm(forms.ModelForm):
     def custom_fields_bound(self) -> list:
         """Bound fields for the lab custom-field pool."""
         return [f for f in self if f.name.startswith(_CUSTOM_PREFIX)]
+
+    def revealed_custom_names(self) -> list[str]:
+        """cf_ inputs the user revealed client-side, echoed so an invalid re-render
+        keeps them open (same round-trip pattern as ``new_tags``)."""
+        if not self.is_bound:
+            return []
+        if hasattr(self.data, "getlist"):
+            raw = self.data.getlist("cf_revealed")
+        else:  # plain-dict data (tests)
+            raw = self.data.get("cf_revealed") or []
+        return sorted(
+            name for name in set(raw) if name.startswith(_CUSTOM_PREFIX) and name in self.fields
+        )
+
+    def custom_fields_meta(self) -> list[dict]:
+        """Each cf_ bound field plus whether it must stay visible: it holds a value,
+        has an error, or was revealed before an invalid submit."""
+        revealed = set(self.revealed_custom_names())
+        entries = []
+        for bound in self.custom_fields_bound():
+            value = bound.value()
+            filled = (
+                bool(bound.errors)
+                or bound.name in revealed
+                or not (value in (None, "") or value is False)
+            )
+            entries.append({"field": bound, "filled": filled})
+        return entries
