@@ -37,6 +37,12 @@
       </dd>
     </div>
     {% include "inventory/_detail_row.html" with label="Expires" value=item.expiration_date|date:"Y-m-d" %}
+    <div class="sm:col-span-2">
+      <dt class="text-xs uppercase tracking-wide text-gray-500">Product link</dt>
+      <dd class="mt-1 break-all text-sm">
+        {% if item.product_url %}<a href="{{ item.product_url }}" class="text-blue-700 hover:underline" rel="noopener" target="_blank">{{ item.product_url|truncatechars:100 }} ↗</a>{% else %}<span class="text-gray-400">—</span>{% endif %}
+      </dd>
+    </div>
   </dl>
 
   {% if item.signal_word or item.wgk or item.storage_class or item.hazards.all %}

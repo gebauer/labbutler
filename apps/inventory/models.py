@@ -243,6 +243,7 @@ class Item(TimeStampedModel):
     lot_number = models.CharField(max_length=128, blank=True)
     catalog_number = models.CharField(max_length=128, blank=True)
     cas_number = models.CharField(max_length=64, blank=True)
+    product_url = models.URLField(blank=True)
 
     # Structured hazard fields (parsed out of LabSuit's TAGS soup).
     signal_word = models.CharField(

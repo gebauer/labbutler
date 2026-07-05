@@ -252,6 +252,7 @@ def _initial_from_item(item: Item) -> dict:
         "item_name": item.name,
         "catalog_number": item.catalog_number,
         "cas_number": item.cas_number,
+        "product_url": item.product_url,
         "vendor": item.vendor_id,
         "unit_price": item.price_amount,
         "currency": item.price_currency,

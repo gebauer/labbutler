@@ -38,7 +38,15 @@ def _request(lab, by, **kwargs) -> Request:
 def test_happy_path_to_checked_in_creates_linked_item(lab):
     manager = _user(lab, "m@x.de", ["Lab manager"])
     member = _user(lab, "u@x.de", ["Member"])
-    req = _request(lab, member, unit_price=Decimal("10.00"), currency="EUR")
+    req = _request(
+        lab,
+        member,
+        unit_price=Decimal("10.00"),
+        currency="EUR",
+        catalog_number="T-200",
+        cas_number="7732-18-5",
+        product_url="https://vendor.example/tips-200",
+    )
 
     perform_transition(req, "approve", actor=manager)
     assert req.status == Status.APPROVED
@@ -59,6 +67,11 @@ def test_happy_path_to_checked_in_creates_linked_item(lab):
     assert req.created_item.owner == member
     assert req.created_item.location == fridge
     assert req.created_item.human_id.startswith("LB-")
+    assert req.created_item.catalog_number == "T-200"
+    assert req.created_item.cas_number == "7732-18-5"
+    assert req.created_item.product_url == "https://vendor.example/tips-200"
+    assert req.created_item.price_amount == Decimal("10.00")
+    assert req.created_item.price_currency == "EUR"
 
 
 @pytest.fixture

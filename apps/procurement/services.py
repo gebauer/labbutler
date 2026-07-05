@@ -308,6 +308,7 @@ def _create_item_from(req: Request, *, location=None, human_id: str = "") -> Ite
         location=location,
         catalog_number=req.catalog_number,
         cas_number=req.cas_number,
+        product_url=req.product_url,
         vendor=req.vendor,
         owner=req.requested_by,
         price_amount=req.unit_price,

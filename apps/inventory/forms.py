@@ -115,6 +115,7 @@ class ItemForm(forms.ModelForm):
             "barcode",
             "catalog_number",
             "cas_number",
+            "product_url",
             "lot_number",
             "price_amount",
             "price_currency",
@@ -128,6 +129,7 @@ class ItemForm(forms.ModelForm):
         widgets = {
             "expiration_date": forms.DateInput(attrs={"type": "date"}),
         }
+        labels = {"product_url": "Product URL"}
 
     def __init__(self, *args, lab: Lab, **kwargs) -> None:
         super().__init__(*args, **kwargs)

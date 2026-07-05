@@ -60,10 +60,10 @@
     {% include "inventory/_detail_row.html" with label="Assigned to" value=req.assigned_to.display_name %}
     {% include "inventory/_detail_row.html" with label="PO #" value=req.po_number %}
     {% include "inventory/_detail_row.html" with label="Expected delivery" value=req.expected_delivery|date:"Y-m-d" %}
-    <div>
+    <div class="sm:col-span-2">
       <dt class="text-xs uppercase tracking-wide text-gray-500">Product link</dt>
-      <dd class="mt-1 text-sm">
-        {% if req.product_url %}<a href="{{ req.product_url }}" class="text-blue-700 hover:underline" rel="noopener" target="_blank">open ↗</a>{% else %}—{% endif %}
+      <dd class="mt-1 break-all text-sm">
+        {% if req.product_url %}<a href="{{ req.product_url }}" class="text-blue-700 hover:underline" rel="noopener" target="_blank">{{ req.product_url|truncatechars:100 }} ↗</a>{% else %}<span class="text-gray-400">—</span>{% endif %}
       </dd>
     </div>
   </dl>
