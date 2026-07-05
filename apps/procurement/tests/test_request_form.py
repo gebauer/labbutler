@@ -16,9 +16,14 @@ def lab(db):
     return create_lab(name="Form Lab", item_id_prefix="FL")
 
 
-def _form_data(**overrides) -> dict:
+def _form_data(lab, **overrides) -> dict:
+    """Minimal valid payload; vendor and budget are required, so defaults are created."""
+    vendor, _ = Vendor.objects.get_or_create(lab=lab, name="ACME Supplies")
+    budget, _ = Budget.objects.get_or_create(lab=lab, number="KST-0", defaults={"name": "Core"})
     data = {
         "item_name": "Pipette tips",
+        "vendor": str(vendor.pk),
+        "budget": str(budget.pk),
         "unit_price": "10.00",
         "currency": "EUR",
         "pack_count": "2",
@@ -108,31 +113,49 @@ def test_new_default_address_demotes_previous_default(lab):
 
 
 def test_new_vendor_is_created_on_save(lab):
-    form = RequestForm(_form_data(new_vendor="Carl Roth"), lab=lab)
+    form = RequestForm(_form_data(lab, vendor="", new_vendor="Carl Roth"), lab=lab)
     req = _save(form)
     assert req.vendor == Vendor.objects.get(lab=lab, name="Carl Roth")
 
 
 def test_new_vendor_reuses_existing_name(lab):
     existing = Vendor.objects.create(lab=lab, name="Carl Roth")
-    form = RequestForm(_form_data(new_vendor="Carl Roth"), lab=lab)
+    form = RequestForm(_form_data(lab, vendor="", new_vendor="Carl Roth"), lab=lab)
     req = _save(form)
     assert req.vendor == existing
-    assert Vendor.objects.filter(lab=lab).count() == 1
+    assert Vendor.objects.filter(lab=lab, name="Carl Roth").count() == 1
 
 
 def test_selected_vendor_wins_over_new_vendor(lab):
     chosen = Vendor.objects.create(lab=lab, name="Sigma")
-    form = RequestForm(_form_data(vendor=chosen.pk, new_vendor="Carl Roth"), lab=lab)
+    form = RequestForm(_form_data(lab, vendor=chosen.pk, new_vendor="Carl Roth"), lab=lab)
     req = _save(form)
     assert req.vendor == chosen
     assert not Vendor.objects.filter(lab=lab, name="Carl Roth").exists()
 
 
+def test_vendor_is_required_without_a_new_vendor_name(lab):
+    form = RequestForm(_form_data(lab, vendor="", new_vendor="  "), lab=lab)
+    assert not form.is_valid()
+    assert "vendor" in form.errors
+
+
+def test_budget_is_required(lab):
+    form = RequestForm(_form_data(lab, budget=""), lab=lab)
+    assert not form.is_valid()
+    assert "budget" in form.errors
+
+
+def test_zero_price_is_valid_server_side(lab):
+    """0 stays allowed (free samples); the UI asks for confirmation instead."""
+    form = RequestForm(_form_data(lab, unit_price="0"), lab=lab)
+    assert form.is_valid(), form.errors
+
+
 def test_new_tags_are_created_and_attached(lab):
     existing = Tag.objects.create(lab=lab, name="antibody")
     form = RequestForm(
-        _form_data(tags=[existing.pk], new_tags=["urgent-order", "2026", " urgent-order "]),
+        _form_data(lab, tags=[existing.pk], new_tags=["urgent-order", "2026", " urgent-order "]),
         lab=lab,
     )
     req = _save(form)
@@ -141,13 +164,13 @@ def test_new_tags_are_created_and_attached(lab):
 
 def test_new_tag_reuses_existing_row(lab):
     Tag.objects.create(lab=lab, name="antibody")
-    form = RequestForm(_form_data(new_tags=["antibody"]), lab=lab)
+    form = RequestForm(_form_data(lab, new_tags=["antibody"]), lab=lab)
     _save(form)
     assert Tag.objects.filter(lab=lab).count() == 1
 
 
 def test_overlong_new_tag_is_rejected(lab):
-    form = RequestForm(_form_data(new_tags=["x" * 101]), lab=lab)
+    form = RequestForm(_form_data(lab, new_tags=["x" * 101]), lab=lab)
     assert not form.is_valid()
 
 
@@ -171,7 +194,7 @@ def test_attachments_uploaded_with_the_form_are_stored(lab, settings, tmp_path):
             SimpleUploadedFile("sds.pdf", b"%PDF sds"),
         ]
     }
-    form = RequestForm(_form_data(), files, lab=lab)
+    form = RequestForm(_form_data(lab), files, lab=lab)
     req = _save(form)
     form.save_attachments(user=user)
     names = sorted(a.original_name for a in Attachment.for_object(req))
@@ -183,7 +206,7 @@ def test_disallowed_form_attachment_is_a_validation_error(lab):
     from django.core.files.uploadedfile import SimpleUploadedFile
 
     form = RequestForm(
-        _form_data(), {"attachments": [SimpleUploadedFile("run.exe", b"MZ")]}, lab=lab
+        _form_data(lab), {"attachments": [SimpleUploadedFile("run.exe", b"MZ")]}, lab=lab
     )
     assert not form.is_valid()
     assert "attachments" in form.errors
@@ -191,7 +214,7 @@ def test_disallowed_form_attachment_is_a_validation_error(lab):
 
 def test_hazard_data_is_saved(lab):
     form = RequestForm(
-        _form_data(signal_word="danger", storage_class="8A", hazards=["H225", "P210"]),
+        _form_data(lab, signal_word="danger", storage_class="8A", hazards=["H225", "P210"]),
         lab=lab,
     )
     req = _save(form)
@@ -201,20 +224,20 @@ def test_hazard_data_is_saved(lab):
 
 
 def test_hazard_data_is_optional(lab):
-    req = _save(RequestForm(_form_data(), lab=lab))
+    req = _save(RequestForm(_form_data(lab), lab=lab))
     assert req.signal_word == ""
     assert not req.hazards.exists()
 
 
 def test_unknown_hazard_code_is_rejected(lab):
-    form = RequestForm(_form_data(hazards=["H999"]), lab=lab)
+    form = RequestForm(_form_data(lab, hazards=["H999"]), lab=lab)
     assert not form.is_valid()
     assert "hazards" in form.errors
 
 
 def test_save_recalculates_nothing_but_view_does(lab):
     """The form itself leaves tax/total at defaults; the view recalculates before save."""
-    form = RequestForm(_form_data(unit_price="100.00", pack_count="1"), lab=lab)
+    form = RequestForm(_form_data(lab, unit_price="100.00", pack_count="1"), lab=lab)
     req = _save(form)
     req.recalculate_totals()
     assert req.total == Decimal("119.00")

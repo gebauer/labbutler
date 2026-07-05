@@ -13,7 +13,8 @@
    - button[data-ghs-lookup]          fetches GHS suggestions for the form's CAS number
                                       from data-ghs-url and merges them into the pickers
    - form[data-request-form]          live total/VAT preview from the price fields, with
-                                      the chosen currency echoed into [data-currency-echo]
+                                      the chosen currency echoed into [data-currency-echo];
+                                      a unit price of 0 asks for confirmation on submit
    - button[data-delivery-days]       sets the expected-delivery date to today + N days
 
    Without JS the native selects stay usable; only the typeahead pickers, live preview
@@ -128,6 +129,12 @@
     select.setAttribute('tabindex', '-1');
 
     var input = textInput('Type to search…');
+    // A required attr on the now-hidden select would make the browser refuse to
+    // submit ("not focusable"); the visible input carries the constraint instead.
+    if (select.required) {
+      select.required = false;
+      input.required = true;
+    }
     wrapper.insertBefore(input, select);
     var panel = makePanel(wrapper);
 
@@ -545,6 +552,17 @@
     recalculate();
   }
 
+  /* A price of 0 is allowed (free samples) but almost always a mistake — ask. */
+  function bindZeroPriceConfirm(form) {
+    form.addEventListener('submit', function (event) {
+      var price = form.querySelector('[name="unit_price"]');
+      if (price && parseFloat(price.value) === 0 &&
+          !window.confirm('The price per pack is 0 — save the request anyway?')) {
+        event.preventDefault();
+      }
+    });
+  }
+
   function bindDeliveryShortcuts(form) {
     var input = form.querySelector('input[name="expected_delivery"]');
     if (!input) return;
@@ -568,6 +586,7 @@
     if (form) {
       bindTotals(form);
       bindDeliveryShortcuts(form);
+      bindZeroPriceConfirm(form);
     }
   });
 })();

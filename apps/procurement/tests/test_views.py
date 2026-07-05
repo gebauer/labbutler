@@ -6,7 +6,7 @@ import pytest
 from django.urls import reverse
 
 from apps.inventory.models import Item
-from apps.procurement.models import Request
+from apps.procurement.models import Budget, Request, Vendor
 from apps.tenancy.models import User
 from apps.tenancy.services import add_member, create_lab
 
@@ -27,11 +27,15 @@ def _user(lab, email: str, roles: list[str]) -> User:
 @pytest.mark.django_db
 def test_create_request_computes_totals(client, lab):
     member = _user(lab, "u@x.de", ["Member"])
+    vendor = Vendor.objects.create(lab=lab, name="ACME Supplies")
+    budget = Budget.objects.create(lab=lab, number="KST-1", name="Core")
     client.force_login(member)
     resp = client.post(
         reverse("procurement:request_create"),
         {
             "item_name": "Tips",
+            "vendor": vendor.pk,
+            "budget": budget.pk,
             "currency": "EUR",
             "unit_price": "100.00",
             "pack_count": "2",

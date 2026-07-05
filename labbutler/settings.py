@@ -91,6 +91,9 @@ AXES_USERNAME_CALLABLE = "labbutler.settings._axes_username"
 
 ROOT_URLCONF = "labbutler.urls"
 
+# Published user documentation (MkDocs site); templates link into it via {{ docs_url }}.
+DOCS_URL = "https://gebauer.github.io/labbutler/"
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",

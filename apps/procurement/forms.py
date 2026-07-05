@@ -7,6 +7,10 @@ are intentionally absent — those are computed or driven by the state machine, 
 Vendors and tags can be created on the fly: the page's combobox/tag widgets write the
 typed names into ``new_vendor`` / ``new_tags`` hidden inputs, and the rows are only
 created when the request itself saves (nothing is created for an abandoned form).
+
+Vendor and budget are required here (the model keeps them nullable for legacy rows and
+imports): budget via ``required=True``, vendor via ``clean()`` because a non-empty
+``new_vendor`` counts as providing one.
 """
 
 from __future__ import annotations
@@ -101,6 +105,14 @@ class RequestForm(forms.ModelForm):
                 if default is not None:
                     self.initial[field_name] = default
 
+        self.fields["budget"].required = True
+        self.fields["budget"].error_messages["required"] = (
+            "Pick the budget this purchase is booked against."
+        )
+        # Client-side signal only — the server-side rule lives in clean(), where a
+        # typed new_vendor name also satisfies it.
+        self.fields["vendor"].widget.attrs["required"] = "required"
+
         self.fields["vendor"].widget.attrs.update(
             {"data-combobox": "", "data-combobox-create": "new_vendor"}
         )
@@ -140,6 +152,8 @@ class RequestForm(forms.ModelForm):
             elif name.casefold() not in {tag.casefold() for tag in new_tags}:
                 new_tags.append(name)
         cleaned["new_tags"] = new_tags
+        if not cleaned.get("vendor") and not (cleaned.get("new_vendor") or "").strip():
+            self.add_error("vendor", "Pick a vendor or type a new name to create one.")
         return cleaned
 
     def save_attachments(self, *, user) -> None:

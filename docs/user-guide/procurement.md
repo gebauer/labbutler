@@ -38,7 +38,10 @@ move or you lack the permission.
 ## Raising a request
 
 **Requests → New request** (requires `create_request`). You describe the article —
-name, catalog number, CAS number, product URL, vendor — and the commercial side:
+name, catalog number, CAS number, product URL, vendor — and the commercial side.
+**Item name, vendor, budget and price are required** (for the vendor, typing a new
+name creates it when the request saves). A price of 0 is accepted — e.g. for free
+samples — but the form asks you to confirm it:
 
 - **Unit price × pack count + shipping cost**, in one of the offered currencies
   (the lab default is preselected).

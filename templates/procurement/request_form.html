@@ -26,7 +26,7 @@
       <section class="rounded-lg border border-gray-200 bg-white p-5">
         <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Item</h2>
         <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div class="sm:col-span-2">{% include "procurement/_form_field.html" with field=form.item_name %}</div>
+          <div class="sm:col-span-2">{% include "procurement/_form_field.html" with field=form.item_name tooltip="What you want to order, as named in the vendor's catalog — one item per request." help_url=docs_url|add:"user-guide/procurement/#raising-a-request" %}</div>
           <div class="sm:col-span-2">{% include "procurement/_form_field.html" with field=form.product_url %}</div>
           {% include "procurement/_form_field.html" with field=form.catalog_number %}
           {% include "procurement/_form_field.html" with field=form.cas_number %}
@@ -58,8 +58,8 @@
       <section class="rounded-lg border border-gray-200 bg-white p-5">
         <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Vendor &amp; price</h2>
         <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {% include "procurement/_form_field.html" with field=form.vendor %}
-          {% include "procurement/_form_field.html" with field=form.quote_id label="Quote #" %}
+          {% include "procurement/_form_field.html" with field=form.vendor required=True tooltip="Pick an existing vendor or type a new name to create it when the request saves." help_url=docs_url|add:"user-guide/lab-administration/#suppliers" %}
+          {% include "procurement/_form_field.html" with field=form.quote_id label="Quote #" tooltip="Reference of the vendor's quote, if you have one." %}
         </div>
 
         <div class="mt-4 grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
@@ -71,7 +71,13 @@
               </div>
               <span class="pt-8 text-gray-400">×</span>
               <div class="min-w-0 flex-1">
-                <label for="{{ form.unit_price.id_for_label }}" class="block text-sm font-medium text-gray-700">Price per pack</label>
+                <label for="{{ form.unit_price.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                  Price per pack<span class="text-red-600" aria-hidden="true"> *</span>
+                  <a href="{{ docs_url }}user-guide/procurement/#raising-a-request" target="_blank" rel="noopener"
+                     title="Price for one pack, excluding shipping — used for the estimated total. A price of 0 asks for confirmation."
+                     aria-label="Price help (opens documentation)"
+                     class="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-200 align-text-top text-[10px] font-semibold text-gray-500 hover:bg-gray-300 hover:text-gray-700">?</a>
+                </label>
                 <div class="mt-1 flex gap-2">
                   {{ form.unit_price }}
                   <div class="w-24 shrink-0">{{ form.currency }}</div>
@@ -108,10 +114,10 @@
       <section class="rounded-lg border border-gray-200 bg-white p-5">
         <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Delivery &amp; booking</h2>
         <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {% include "procurement/_form_field.html" with field=form.budget %}
-          {% include "procurement/_form_field.html" with field=form.shipping_address %}
+          {% include "procurement/_form_field.html" with field=form.budget tooltip="The budget (Kostenstelle) this purchase is booked against." help_url=docs_url|add:"user-guide/lab-administration/#budgets-kostenstellen" %}
+          {% include "procurement/_form_field.html" with field=form.shipping_address tooltip="Where the vendor should deliver — lab admins manage the address list." %}
           <div>
-            {% include "procurement/_form_field.html" with field=form.expected_delivery %}
+            {% include "procurement/_form_field.html" with field=form.expected_delivery tooltip="When the order is expected to arrive — used on the dashboard and for check-in." %}
             <div class="mt-1.5 flex gap-1.5">
               <button type="button" data-delivery-days="3" class="rounded-full border border-gray-300 px-2.5 py-0.5 text-xs text-gray-600 hover:bg-gray-100">+3 d</button>
               <button type="button" data-delivery-days="7" class="rounded-full border border-gray-300 px-2.5 py-0.5 text-xs text-gray-600 hover:bg-gray-100">+1 wk</button>

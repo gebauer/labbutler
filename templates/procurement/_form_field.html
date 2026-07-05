@@ -1,6 +1,19 @@
-{% comment %}One labelled form field with help text and errors. Params: field, optional label.{% endcomment %}
+{% comment %}One labelled form field with help text and errors.
+Params: field, optional label, required (force the asterisk for fields whose
+requiredness is enforced in clean(), e.g. vendor), tooltip (hover text on a "?"
+badge), help_url (makes the badge a link into the docs).{% endcomment %}
 <div>
-  <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ label|default:field.label }}</label>
+  <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">
+    {{ label|default:field.label }}{% if field.field.required or required %}<span class="text-red-600" aria-hidden="true"> *</span>{% endif %}
+    {% if tooltip %}
+      {% if help_url %}
+        <a href="{{ help_url }}" target="_blank" rel="noopener" title="{{ tooltip }}" aria-label="{{ tooltip }} (opens documentation)"
+           class="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-200 align-text-top text-[10px] font-semibold text-gray-500 hover:bg-gray-300 hover:text-gray-700">?</a>
+      {% else %}
+        <span title="{{ tooltip }}" class="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-gray-200 align-text-top text-[10px] font-semibold text-gray-500">?</span>
+      {% endif %}
+    {% endif %}
+  </label>
   <div class="mt-1">{{ field }}</div>
   {% if field.help_text %}<p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>{% endif %}
   {% for error in field.errors %}<p class="mt-1 text-xs text-red-600">{{ error }}</p>{% endfor %}
