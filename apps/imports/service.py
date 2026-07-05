@@ -244,7 +244,7 @@ def commit(plan: ImportPlan, *, lab: Lab, actor: User | None = None) -> ImportRe
 
         vendor = None
         if row.vendor_name:
-            vendor, _ = Vendor.objects.get_or_create(lab=lab, name=row.vendor_name)
+            vendor = Vendor.objects.get_or_create_normalized(lab=lab, name=row.vendor_name)
 
         owner = None
         if row.owner_email:

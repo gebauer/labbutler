@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from django.conf import settings
-from django.db import models
+from django.db import IntegrityError, models, transaction
 
 from apps.tenancy.models import Lab
 from labbutler.abstract import TimeStampedModel
@@ -11,11 +11,38 @@ from labbutler.abstract import TimeStampedModel
 CURRENCIES = ["EUR", "USD", "GBP", "CHF", "JPY"]
 
 
+def normalize_vendor_name(name: str) -> str:
+    """Trim and collapse internal whitespace; the canonical form for comparing names."""
+    return " ".join(name.split())
+
+
+class VendorManager(models.Manager):
+    def get_or_create_normalized(self, *, lab: Lab, name: str) -> "Vendor":
+        """Resolve a typed vendor name to an existing vendor or create one.
+
+        Whitespace is normalized and an existing vendor is reused case-insensitively,
+        so free-text entry (forms, imports) doesn't multiply spelling variants. The
+        (lab, name) constraint is case-sensitive, so the iexact match happens here in
+        the query; a concurrent create of the same name is retried as a lookup.
+        """
+        normalized = normalize_vendor_name(name)
+        existing = self.filter(lab=lab, name__iexact=normalized).first()
+        if existing is not None:
+            return existing
+        try:
+            with transaction.atomic():
+                return self.create(lab=lab, name=normalized)
+        except IntegrityError:
+            return self.get(lab=lab, name=normalized)
+
+
 class Vendor(TimeStampedModel):
     """A supplier — just a name, quick-created inline during ordering."""
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name="vendors")
     name = models.CharField(max_length=200)
+
+    objects = VendorManager()
 
     class Meta:
         constraints = [

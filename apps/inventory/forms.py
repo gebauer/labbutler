@@ -266,7 +266,7 @@ class ItemForm(forms.ModelForm):
         item = super().save(commit=False)
         vendor_name = self.cleaned_data.get("new_vendor", "").strip()
         if vendor_name and item.vendor is None:
-            item.vendor, _ = Vendor.objects.get_or_create(lab=self.lab, name=vendor_name)
+            item.vendor = Vendor.objects.get_or_create_normalized(lab=self.lab, name=vendor_name)
         if self.creating:
             item.human_id = self.cleaned_data.get("human_id") or ids.suggest_ids(self.lab, 1)[0]
         values = dict(item.custom_fields or {})

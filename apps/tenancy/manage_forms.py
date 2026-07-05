@@ -11,7 +11,13 @@ from decimal import Decimal
 from django import forms
 
 from apps.inventory.models import FieldDefinition, FieldPreset, Location
-from apps.procurement.models import CURRENCIES, Budget, ShippingAddress, Vendor
+from apps.procurement.models import (
+    CURRENCIES,
+    Budget,
+    ShippingAddress,
+    Vendor,
+    normalize_vendor_name,
+)
 
 from .models import Lab, Permission, Role, User
 
@@ -49,6 +55,10 @@ class VendorForm(_LabForm):
     class Meta:
         model = Vendor
         fields = ["name"]
+
+    def clean_name(self) -> str:
+        # Whitespace variants of one supplier shouldn't become separate rows.
+        return normalize_vendor_name(self.cleaned_data["name"])
 
 
 class ShippingAddressForm(_LabForm):

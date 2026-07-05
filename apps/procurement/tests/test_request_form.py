@@ -126,6 +126,14 @@ def test_new_vendor_reuses_existing_name(lab):
     assert Vendor.objects.filter(lab=lab, name="Carl Roth").count() == 1
 
 
+def test_new_vendor_reuses_case_and_whitespace_variants(lab):
+    existing = Vendor.objects.create(lab=lab, name="Carl Roth")
+    form = RequestForm(_form_data(lab, vendor="", new_vendor="  carl  ROTH "), lab=lab)
+    req = _save(form)
+    assert req.vendor == existing
+    assert Vendor.objects.filter(lab=lab, name__iexact="carl roth").count() == 1
+
+
 def test_selected_vendor_wins_over_new_vendor(lab):
     chosen = Vendor.objects.create(lab=lab, name="Sigma")
     form = RequestForm(_form_data(lab, vendor=chosen.pk, new_vendor="Carl Roth"), lab=lab)
