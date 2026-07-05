@@ -51,8 +51,18 @@ samples — but the form asks you to confirm it:
   budget tracking, never accounting-grade figures.
 - **Budget (Kostenstelle)** and **shipping address** — the lab's defaults are
   preselected; the budget is what the cost is later reported against.
-- Optional extras: mark it **urgent**, a quote ID, expected delivery date, tags,
-  and a free-text comment.
+- Optional extras: mark it **urgent**, pick who the order is
+  [handed over to after approval](#choosing-the-coordinator-already-when-raising-the-request),
+  a quote ID, expected delivery date, tags, and a free-text comment.
+
+!!! warning "What “urgent” actually does"
+    Urgent requests are highlighted in the request list, and the notification
+    emails to approvers and purchase coordinators go out **high-priority** —
+    flagged in the subject line, in the message body, and via mail headers, so
+    they stand out in the recipient's inbox. That makes it a loud signal:
+    reserve it for orders where a delay genuinely hurts. Flagging routine
+    orders as urgent trains everyone to ignore the flag and needlessly alarms
+    the people who process your requests.
 
 You can also record **GHS hazard data** (hazard statements, signal word, storage
 class) already at request time — the recommended moment: it is carried onto the
@@ -90,6 +100,16 @@ order* is separate: someone with `place_order` but not `accept_forwards` can pla
 orders themselves yet never appears in the forward list.) The chosen assignee gets
 an email and sees the request in their **Requests to order** dashboard widget. The
 requester, approvers, people who may order, and lab managers may forward.
+
+### Choosing the coordinator already when raising the request
+
+The request form offers **Hand over to (after approval)** with the same list of
+people. Pick someone there and the hand-over happens **automatically the moment
+the request is approved**: the coordinator gets the usual "please order" email,
+and you are told in your approval email that the request went to them as you
+requested. Until approval, nothing is assigned — **you remain responsible for
+the request**, including discussing it with your lab manager; only after
+approval does the purchase coordinator take over.
 
 ## Ordering
 

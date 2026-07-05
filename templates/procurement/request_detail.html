@@ -58,6 +58,9 @@
     {% include "inventory/_detail_row.html" with label="CAS no." value=req.cas_number %}
     {% include "inventory/_detail_row.html" with label="Approver" value=req.approver.display_name %}
     {% include "inventory/_detail_row.html" with label="Assigned to" value=req.assigned_to.display_name %}
+    {% if req.forward_to_id and not req.assigned_to_id %}
+      {% include "inventory/_detail_row.html" with label="Hand over after approval" value=req.forward_to.display_name %}
+    {% endif %}
     {% include "inventory/_detail_row.html" with label="PO #" value=req.po_number %}
     {% include "inventory/_detail_row.html" with label="Expected delivery" value=req.expected_delivery|date:"Y-m-d" %}
     <div class="sm:col-span-2">

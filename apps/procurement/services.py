@@ -118,6 +118,11 @@ def perform_transition(req: Request, action: str, *, actor, po_number: str = "")
         target=req,
         changes={"from": previous, "to": req.status},
     )
+    # Auto-forward chosen at request time: on approval the picked coordinator takes
+    # over. Runs in the same transaction, so the status email (sent after commit)
+    # already reports the request as forwarded.
+    if transition.action == "approve" and req.forward_to_id and not req.assigned_to_id:
+        forward(req, actor=actor, assignee=req.forward_to)
     _notify_transition(req.pk, previous, req.status)
     return req
 
@@ -173,7 +178,7 @@ def forward(req: Request, *, actor, assignee: User) -> Request:
     def _notify() -> None:
         from apps.notifications.tasks import notify_request_assigned
 
-        transaction.on_commit(lambda: notify_request_assigned.delay(req.pk))
+        transaction.on_commit(lambda: notify_request_assigned.delay(req.pk, actor.pk))
 
     _notify()
     return req

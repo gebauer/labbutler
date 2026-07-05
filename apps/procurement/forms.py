@@ -26,6 +26,7 @@ from apps.inventory.models import Tag
 from apps.tenancy.models import Lab
 
 from .models import CURRENCIES, Budget, Request, ShippingAddress, Vendor
+from .services import forward_recipients
 
 _INPUT_CLASS = (
     "w-full rounded border border-gray-300 px-3 py-2 text-sm "
@@ -60,6 +61,7 @@ class RequestForm(forms.ModelForm):
             "shipping_cost",
             "includes_taxes",
             "is_urgent",
+            "forward_to",
             "expected_delivery",
             "quote_id",
             "comment",
@@ -87,6 +89,11 @@ class RequestForm(forms.ModelForm):
         )
         self.fields["tags"].queryset = Tag.objects.filter(lab=lab).order_by("name")
         self.fields["hazards"] = hazard_statement_field()
+        # Optional hand-over wish: the pickable people mirror the manual forward list
+        # (accept_forwards holders). Applied only when the request gets approved.
+        self.fields["forward_to"].queryset = forward_recipients(lab)
+        self.fields["forward_to"].label = "Hand over to (after approval)"
+        self.fields["forward_to"].empty_label = "— I will handle the order myself —"
 
         # Currency is a fixed dropdown; keep an off-list code (imported data, or a
         # reorder prefill of such a request) selectable.

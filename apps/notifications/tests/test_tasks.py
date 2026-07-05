@@ -94,6 +94,24 @@ def test_notify_request_created_emails_immediate_approvers_only(lab, mailoutbox)
 
 
 @pytest.mark.django_db
+def test_approval_update_skips_the_auto_forwarded_coordinator(lab, mailoutbox):
+    member = _user(lab, "req@x.de", ["Member"])
+    coord = _user(lab, "coord@x.de", ["Purchase coordinator"])
+    req = Request.objects.create(
+        lab=lab, item_name="Tips", requested_by=member, assigned_to=coord, status=Status.APPROVED
+    )
+
+    # The coordinator just got the "please order" mail, so only the requester is told.
+    assert notify_request_transition(req.pk, Status.REQUESTED, Status.APPROVED) == 1
+    assert mailoutbox[0].to == ["req@x.de"]
+    assert "as you requested" in mailoutbox[0].body
+
+    # On later moves the coordinator is a normal update recipient again.
+    assert notify_request_transition(req.pk, Status.APPROVED, Status.ORDERED) == 2
+    assert set(mailoutbox[1].to) == {"req@x.de", "coord@x.de"}
+
+
+@pytest.mark.django_db
 def test_notify_task_is_noop_for_missing_request(mailoutbox):
     assert notify_request_transition(999_999, "requested", "approved") == 0
     assert mailoutbox == []
@@ -164,12 +182,35 @@ def test_perform_transition_enqueues_notification_on_commit(
 
 
 @pytest.mark.django_db
+def test_approve_with_auto_forward_mails_requester_and_coordinator(
+    lab, mailoutbox, monkeypatch, django_capture_on_commit_callbacks
+):
+    member = _user(lab, "req@x.de", ["Member"])
+    manager = _user(lab, "boss@x.de", ["Lab manager"])
+    coord = _user(lab, "coord@x.de", ["Purchase coordinator"])
+    req = Request.objects.create(lab=lab, item_name="Tips", requested_by=member, forward_to=coord)
+    for task in (tasks.notify_request_transition, tasks.notify_request_assigned):
+        monkeypatch.setattr(task, "delay", task)
+    with django_capture_on_commit_callbacks(execute=True):
+        perform_transition(req, "approve", actor=manager)
+
+    by_recipient = {m.to[0]: m for m in mailoutbox}
+    assert set(by_recipient) == {"req@x.de", "coord@x.de"}
+    # Requester: approved + handed over as wished. Coordinator: the normal forward mail.
+    assert "Approved" in by_recipient["req@x.de"].subject
+    assert "as you requested" in by_recipient["req@x.de"].body
+    assert "Please order" in by_recipient["coord@x.de"].subject
+    assert "boss@x.de has forwarded an approved request" in by_recipient["coord@x.de"].body
+
+
+@pytest.mark.django_db
 def test_notify_request_assigned_emails_the_coordinator(lab, mailoutbox):
     from apps.notifications.tasks import notify_request_assigned
     from apps.procurement.models import Request
 
     coord = _user(lab, "coord@x.de", ["Purchase coordinator"])
     member = _user(lab, "req@x.de", ["Member"])
+    manager = _user(lab, "boss@x.de", ["Lab manager"])
     req = Request.objects.create(
         lab=lab,
         item_name="Pipette tips",
@@ -177,10 +218,42 @@ def test_notify_request_assigned_emails_the_coordinator(lab, mailoutbox):
         assigned_to=coord,
         status=Request.Status.APPROVED,
     )
-    sent = notify_request_assigned(req.pk)
+    sent = notify_request_assigned(req.pk, manager.pk)
     assert sent == 1
-    assert mailoutbox[0].to == ["coord@x.de"]
-    assert "Please order" in mailoutbox[0].subject
+    mail = mailoutbox[0]
+    assert mail.to == ["coord@x.de"]
+    assert "Please order" in mail.subject
+    # The coordinator learns who forwarded it and who originally asked.
+    assert "boss@x.de has forwarded an approved request" in mail.body
+    assert "req@x.de" in mail.body
+    # Multipart: an HTML alternative rides along; not urgent -> no priority headers.
+    assert mail.alternatives and mail.alternatives[0][1] == "text/html"
+    assert "X-Priority" not in mail.extra_headers
+
+
+@pytest.mark.django_db
+def test_urgent_mails_carry_priority_headers_and_flagged_subject(lab, mailoutbox):
+    from apps.notifications.tasks import notify_request_assigned
+    from apps.procurement.models import Request
+
+    coord = _user(lab, "coord@x.de", ["Purchase coordinator"])
+    member = _user(lab, "req@x.de", ["Member"])
+    _user(lab, "boss@x.de", ["Lab manager"])
+    req = Request.objects.create(
+        lab=lab,
+        item_name="Dry ice",
+        requested_by=member,
+        assigned_to=coord,
+        is_urgent=True,
+    )
+
+    assert notify_request_created(req.pk) == 1
+    assert notify_request_assigned(req.pk, member.pk) == 1
+    for mail in mailoutbox:
+        assert "URGENT" in mail.subject
+        assert "URGENT" in mail.body
+        assert mail.extra_headers["X-Priority"] == "1"
+        assert mail.extra_headers["Importance"] == "high"
 
 
 @pytest.mark.django_db

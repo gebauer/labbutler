@@ -57,6 +57,24 @@ def test_expected_delivery_defaults_to_one_week(lab):
     assert form.initial["expected_delivery"] == date.today() + timedelta(weeks=1)
 
 
+def test_forward_to_offers_only_accept_forwards_holders(lab):
+    from apps.tenancy.models import User
+    from apps.tenancy.services import add_member
+
+    coord = User.objects.create_user(username="", email="coord@x.de", password="pw")
+    add_member(user=coord, lab=lab, role_names=["Purchase coordinator"])
+    member = User.objects.create_user(username="", email="member@x.de", password="pw")
+    add_member(user=member, lab=lab, role_names=["Member"])
+
+    form = RequestForm(lab=lab)
+    assert list(form.fields["forward_to"].queryset) == [coord]
+    assert form.fields["forward_to"].required is False
+
+    req = _save(RequestForm(_form_data(lab, forward_to=str(coord.pk)), lab=lab))
+    assert req.forward_to == coord
+    assert req.assigned_to is None  # hand-over only happens at approval
+
+
 def test_editing_keeps_the_stored_expected_delivery(lab):
     req = Request.objects.create(lab=lab, item_name="X", expected_delivery=date(2026, 8, 1))
     form = RequestForm(instance=req, lab=lab)

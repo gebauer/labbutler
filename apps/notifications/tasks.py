@@ -11,7 +11,7 @@ from datetime import timedelta
 from celery import shared_task
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives, send_mail
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_bytes
@@ -28,6 +28,21 @@ Frequency = NotificationFrequency
 
 def _base_url() -> str:
     return getattr(settings, "LABBUTLER_BASE_URL", "")
+
+
+def _send(content: emails.EmailContent, recipients: list[str]) -> None:
+    """Send builder output: multipart when an HTML alternative exists, high-priority
+    headers when the underlying request is marked urgent (all three header spellings,
+    since clients disagree on which one they honour)."""
+    headers = (
+        {"X-Priority": "1", "Priority": "urgent", "Importance": "high"} if content.urgent else None
+    )
+    message = EmailMultiAlternatives(
+        content.subject, content.body, settings.DEFAULT_FROM_EMAIL, recipients, headers=headers
+    )
+    if content.html:
+        message.attach_alternative(content.html, "text/html")
+    message.send()
 
 
 def _frequency(user: User, lab: Lab, field: str) -> str:
@@ -99,6 +114,10 @@ def notify_request_transition(req_pk: int, previous: str, new: str) -> int:
     if req is None:
         return 0
     recipients = request_update_recipients(req)
+    # On approval with an auto-forward, the coordinator gets the "please order" mail
+    # instead of a duplicate "your request is approved" update.
+    if new == Request.Status.APPROVED and req.assigned_to and req.assigned_to.email:
+        recipients = [email for email in recipients if email != req.assigned_to.email]
     if not recipients:
         return 0
     content = emails.build_status_change(req, previous, new, base_url=_base_url())
@@ -120,18 +139,24 @@ def notify_request_created(req_pk: int) -> int:
     if not recipients:
         return 0
     content = emails.build_approval_needed(req, base_url=_base_url())
-    send_mail(content.subject, content.body, settings.DEFAULT_FROM_EMAIL, recipients)
+    _send(content, recipients)
     return len(recipients)
 
 
 @shared_task
-def notify_request_assigned(req_pk: int) -> int:
-    """Email the coordinator a request was forwarded to. Returns count sent (0/1)."""
-    req = Request.objects.select_related("assigned_to", "vendor").filter(pk=req_pk).first()
+def notify_request_assigned(req_pk: int, forwarded_by_pk: int | None = None) -> int:
+    """Email the coordinator a request was forwarded to, naming who forwarded it.
+    Returns count sent (0/1)."""
+    req = (
+        Request.objects.select_related("assigned_to", "requested_by", "vendor")
+        .filter(pk=req_pk)
+        .first()
+    )
     if req is None or not req.assigned_to or not req.assigned_to.email:
         return 0
-    content = emails.build_assignment(req, base_url=_base_url())
-    send_mail(content.subject, content.body, settings.DEFAULT_FROM_EMAIL, [req.assigned_to.email])
+    forwarder = User.objects.filter(pk=forwarded_by_pk).first() if forwarded_by_pk else None
+    content = emails.build_assignment(req, forwarded_by=forwarder, base_url=_base_url())
+    _send(content, [req.assigned_to.email])
     return 1
 
 

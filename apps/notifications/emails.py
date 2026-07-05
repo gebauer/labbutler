@@ -1,14 +1,17 @@
 """Pure builders for notification email content.
 
-These take already-loaded objects and return a subject + plain-text body; they touch no
-database and send nothing, so they are trivially testable. Recipient resolution and the
-actual send live in :mod:`apps.notifications.tasks`.
+These take already-loaded objects and return a subject + plain-text body (workflow mails
+additionally carry an HTML alternative and an urgency flag); they touch no database and
+send nothing, so they are trivially testable. Recipient resolution and the actual send
+live in :mod:`apps.notifications.tasks`.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+
+from django.template.loader import render_to_string
 
 from apps.procurement.models import Request
 
@@ -17,12 +20,66 @@ from apps.procurement.models import Request
 class EmailContent:
     subject: str
     body: str
+    # Optional HTML alternative for multipart mails; None sends plain text only.
+    html: str | None = None
+    # When True the sender marks the mail high-priority (X-Priority / Importance headers).
+    urgent: bool = False
 
 
 def _link(base_url: str, path: str) -> str:
     if not base_url:
         return ""
     return f"\n\n{base_url.rstrip('/')}{path}"
+
+
+def _url(base_url: str, path: str) -> str:
+    return f"{base_url.rstrip('/')}{path}" if base_url else ""
+
+
+def _person(user) -> str:
+    """Identity line for email bodies: “Ada Lovelace (ada@x.de)”, or just the email."""
+    if user is None:
+        return ""
+    if user.friendly_name and user.email:
+        return f"{user.friendly_name} ({user.email})"
+    return user.email or user.friendly_name
+
+
+def _request_email(
+    *,
+    subject: str,
+    intro: str,
+    rows: list[tuple[str, str]],
+    closing: str,
+    action_url: str,
+    action_label: str,
+    urgent: bool,
+    urgent_note: str,
+) -> EmailContent:
+    """Assemble a workflow mail (text + HTML) from one shared set of parts."""
+    if urgent:
+        subject = subject.replace("[LabButler] ", "[LabButler] URGENT — ", 1)
+
+    width = max(len(label) for label, _ in rows) + 2
+    lines = ([f"{urgent_note}", ""] if urgent else []) + [intro, ""]
+    lines += [f"{(label + ':'):<{width}}{value}" for label, value in rows]
+    if action_url:
+        lines += ["", closing, action_url]
+    body = "\n".join(lines)
+
+    html = render_to_string(
+        "notifications/request_email.html",
+        {
+            "urgent": urgent,
+            "urgent_note": urgent_note,
+            "intro": intro,
+            "rows": rows,
+            "closing": closing,
+            "action_url": action_url,
+            "action_label": action_label,
+        },
+    )
+    return EmailContent(subject, body, html=html, urgent=urgent)
 
 
 def build_status_change(
@@ -42,6 +99,10 @@ def build_status_change(
         lines.append(f"Vendor:  {req.vendor.name}")
     if req.po_number:
         lines.append(f"PO #:    {req.po_number}")
+    if new == Request.Status.APPROVED and req.assigned_to_id:
+        # Only an auto-forward can have an assignee this early, so this reads as the
+        # requester's own wish being fulfilled.
+        lines.append(f"Forwarded to: {_person(req.assigned_to)} to order, as you requested.")
     if new == Request.Status.CHECKED_IN and req.created_item_id:
         lines.append(f"Checked in as: {req.created_item.human_id} · {req.created_item.name}")
 
@@ -51,19 +112,23 @@ def build_status_change(
 
 def build_approval_needed(req: Request, *, base_url: str = "") -> EmailContent:
     """Email telling an approver a newly-raised request is waiting for their decision."""
-    subject = f"[LabButler] Approval needed: “{req.item_name}”"
-    lines = [
-        "A new request is waiting for approval:",
-        "",
-        f"Request:   {req.item_name}",
-        f"Total:     {req.total} {req.currency}",
-    ]
-    if req.requested_by_id and req.requested_by.email:
-        lines.append(f"Requested: {req.requested_by.email}")
+    requester = _person(req.requested_by) if req.requested_by_id else ""
+    intro = f"{requester} asks to order:" if requester else "A new request is waiting for approval:"
+    rows = [("Request", req.item_name), ("Total", f"{req.total} {req.currency}")]
     if req.vendor_id:
-        lines.append(f"Vendor:    {req.vendor.name}")
-    body = "\n".join(lines) + _link(base_url, f"/requests/{req.pk}/")
-    return EmailContent(subject, body)
+        rows.append(("Vendor", req.vendor.name))
+    if req.catalog_number:
+        rows.append(("Catalog", req.catalog_number))
+    return _request_email(
+        subject=f"[LabButler] Approval needed: “{req.item_name}”",
+        intro=intro,
+        rows=rows,
+        closing="See the full details and approve or decline it here:",
+        action_url=_url(base_url, f"/requests/{req.pk}/"),
+        action_label="See request details",
+        urgent=req.is_urgent,
+        urgent_note="URGENT — the requester needs a decision as soon as possible.",
+    )
 
 
 def build_daily_digest(
@@ -88,21 +153,32 @@ def build_daily_digest(
     return EmailContent(subject, body)
 
 
-def build_assignment(req: Request, *, base_url: str = "") -> EmailContent:
+def build_assignment(req: Request, *, forwarded_by=None, base_url: str = "") -> EmailContent:
     """Email asking a purchase coordinator to place an approved, forwarded request."""
-    subject = f"[LabButler] Please order “{req.item_name}”"
-    lines = [
-        "An approved request has been forwarded to you to order:",
-        "",
-        f"Request: {req.item_name}",
-        f"Total:   {req.total} {req.currency}",
-    ]
+    forwarder = _person(forwarded_by)
+    intro = (
+        f"{forwarder} has forwarded an approved request to you to order:"
+        if forwarder
+        else "An approved request has been forwarded to you to order:"
+    )
+    rows = [("Request", req.item_name)]
+    if req.requested_by_id:
+        rows.append(("Requested by", _person(req.requested_by)))
+    rows.append(("Total", f"{req.total} {req.currency}"))
     if req.vendor_id:
-        lines.append(f"Vendor:  {req.vendor.name}")
+        rows.append(("Vendor", req.vendor.name))
     if req.catalog_number:
-        lines.append(f"Catalog: {req.catalog_number}")
-    body = "\n".join(lines) + _link(base_url, f"/requests/{req.pk}/")
-    return EmailContent(subject, body)
+        rows.append(("Catalog", req.catalog_number))
+    return _request_email(
+        subject=f"[LabButler] Please order “{req.item_name}”",
+        intro=intro,
+        rows=rows,
+        closing="See the full details and mark it ordered here:",
+        action_url=_url(base_url, f"/requests/{req.pk}/"),
+        action_label="See request details",
+        urgent=req.is_urgent,
+        urgent_note="URGENT — this needs to be ordered as soon as possible.",
+    )
 
 
 def build_welcome(user, lab, set_password_url: str) -> EmailContent:

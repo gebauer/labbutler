@@ -180,6 +180,17 @@ class Request(TimeStampedModel):
         blank=True,
         related_name="requests_assigned",
     )
+    # Coordinator picked at request time: the approve transition auto-forwards to them
+    # (copies into assigned_to). Until approval the requester stays responsible, so this
+    # deliberately does not make the coordinator an assignee yet.
+    forward_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="requests_to_forward",
+        verbose_name="forward to after approval",
+    )
 
     vendor = models.ForeignKey(
         Vendor, on_delete=models.SET_NULL, null=True, blank=True, related_name="requests"

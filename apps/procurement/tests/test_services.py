@@ -301,6 +301,35 @@ def test_can_forward_only_when_approved_and_involved(lab):
 
 
 @pytest.mark.django_db
+def test_approve_auto_forwards_to_the_pre_picked_coordinator(lab):
+    from apps.audit.models import AuditEntry
+
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Member"])
+    coord = _user(lab, "c@x.de", ["Purchase coordinator"])
+    req = _request(lab, member, forward_to=coord)
+
+    perform_transition(req, "approve", actor=manager)
+
+    req.refresh_from_db()
+    assert req.status == Status.APPROVED
+    assert req.assigned_to == coord
+    assert AuditEntry.objects.filter(
+        action="procurement.request_forwarded", target_id=str(req.pk)
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_approve_without_forward_wish_assigns_nobody(lab):
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member)
+    perform_transition(req, "approve", actor=manager)
+    req.refresh_from_db()
+    assert req.assigned_to is None
+
+
+@pytest.mark.django_db
 def test_forward_assigns_and_audits(lab):
     from apps.audit.models import AuditEntry
 
