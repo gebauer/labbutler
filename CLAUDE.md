@@ -83,6 +83,7 @@ configured yet; if one is added, wire it in here and run it too.)
 - Prefer the standard library and what's already in the project. Justify any new dependency (maintenance, size, security, license).
 - Pin/lock versions via the project's lockfile. Don't upgrade unrelated dependencies inside a feature change.
 - Avoid adding a library for something trivial you can write in a few lines.
+- Don't include any libaries from CDN, without prior consent by the user.
 
 ## Security
 
@@ -113,6 +114,6 @@ configured yet; if one is added, wire it in here and run it too.)
 ## Do / Don't (quick reference)
 
 **Do:** read first · match existing patterns · small focused diffs · test every change · run lint+tests+types before finishing · ask when truly blocked.
-Use Claude worktrees, whenever the user states their are multiple workers running - Suggest to merge the worktree at the end of the job.
+Use Claude worktrees, whenever the user states their are multiple workers running - always suggest to merge the worktree at the end of the job.
 
 **Don't:** invent APIs or paths · commit secrets · bundle unrelated changes · leave the build broken · disable/skip tests to make them pass · reformat files you aren't otherwise touching.
