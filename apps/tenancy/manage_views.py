@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -21,6 +21,7 @@ from django.views.decorators.http import require_POST
 from apps.audit.models import AuditEntry
 from apps.inventory.models import FieldDefinition, FieldPreset, Location
 from apps.procurement.models import Budget, ShippingAddress, Vendor
+from apps.procurement.services import find_duplicate_vendors, merge_vendors
 
 from .manage_forms import (
     BudgetForm,
@@ -85,7 +86,10 @@ def crud_list(request: HttpRequest, kind: str) -> HttpResponse:
         objects = Location.tree_for_lab(request.lab)
     else:
         objects = config.model.objects.filter(lab=request.lab).order_by(config.order_by)
-    return render(request, "manage/list.html", {"kind": kind, "config": config, "objects": objects})
+    context = {"kind": kind, "config": config, "objects": objects}
+    if config.model is Vendor:
+        context["duplicate_group_count"] = len(find_duplicate_vendors(request.lab))
+    return render(request, "manage/list.html", context)
 
 
 @require_permission("manage_lab")
@@ -147,6 +151,80 @@ def crud_delete(request: HttpRequest, kind: str, pk: int) -> HttpResponse:
         request,
         "manage/confirm_delete.html",
         {"kind": kind, "config": config, "object": obj, "delete_warning": delete_warning},
+    )
+
+
+# --- Suppliers: merge duplicates ---------------------------------------------------
+
+
+def _annotated_vendors(lab):
+    # distinct=True: the double reverse-FK join would otherwise multiply the counts.
+    return Vendor.objects.filter(lab=lab).annotate(
+        request_count=Count("requests", distinct=True),
+        item_count=Count("items", distinct=True),
+    )
+
+
+def _selected_vendors(request: HttpRequest, raw_ids: list[str]) -> list[Vendor]:
+    """Resolve submitted vendor ids against the current lab; unknown/foreign ids 404."""
+    try:
+        pks = {int(raw) for raw in raw_ids}
+    except ValueError:
+        raise Http404("Invalid supplier selection") from None
+    vendors = list(_annotated_vendors(request.lab).filter(pk__in=pks).order_by("name"))
+    if len(vendors) != len(pks):
+        raise Http404("Unknown supplier in selection")
+    return vendors
+
+
+@require_permission("manage_lab")
+def supplier_merge(request: HttpRequest) -> HttpResponse:
+    """Merge duplicate suppliers: pick vendors (GET), confirm winner and merge (POST)."""
+    if request.method == "POST":
+        selected = _selected_vendors(request, request.POST.getlist("vendors"))
+        winner_pk = request.POST.get("winner", "")
+        winner = next((v for v in selected if str(v.pk) == winner_pk), None)
+        if len(selected) < 2 or winner is None:
+            messages.error(request, "Select at least two suppliers and choose which one to keep.")
+            return redirect("manage:supplier_merge")
+        losers = [v for v in selected if v.pk != winner.pk]
+        try:
+            merge_vendors(
+                lab=request.lab,
+                winner=winner,
+                losers=losers,
+                actor=request.user,
+                new_name=request.POST.get("new_name", ""),
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect("manage:supplier_merge")
+        moved = sum(v.request_count for v in losers), sum(v.item_count for v in losers)
+        messages.success(
+            request,
+            f"Merged {len(losers)} supplier{'s' if len(losers) != 1 else ''} into "
+            f"“{winner.name}” ({moved[0]} requests, {moved[1]} items moved).",
+        )
+        return redirect("manage:list", kind="suppliers")
+
+    selected = _selected_vendors(request, request.GET.getlist("vendors"))
+    if len(selected) >= 2:
+        # Confirm step: default winner is the most-used vendor (oldest on a tie).
+        default_winner = max(selected, key=lambda v: (v.request_count + v.item_count, -v.pk))
+        return render(
+            request,
+            "manage/merge_suppliers.html",
+            {"mode": "confirm", "selected": selected, "default_winner": default_winner},
+        )
+
+    return render(
+        request,
+        "manage/merge_suppliers.html",
+        {
+            "mode": "select",
+            "vendors": _annotated_vendors(request.lab).order_by("name"),
+            "duplicate_groups": find_duplicate_vendors(request.lab),
+        },
     )
 
 
