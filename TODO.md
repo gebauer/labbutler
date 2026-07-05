@@ -37,6 +37,10 @@ Roadmap detail lives in [Buildspec.md §15](Buildspec.md) — single source; hea
 - [ ] Low-stock alerts · batch container generation.
 - [ ] Cross-lab sharing (`SharingGrant` + `cross_lab_search`) · institute tier.
 - [ ] SSO/LDAP · scheduled backup/export · invoice reconciliation field.
+      *SSO assessed 2026-07: Keycloak (AG Baumann realm) via `mozilla-django-oidc`,
+      hybrid with password login, invite-first (no auto-create), ~150-line diff,
+      ~1–1.5 days incl. tests/docs. Deferred — complexity vs. benefit. Plan:
+      `~/.claude/plans/i-have-a-keycloak-transient-unicorn.md`.*
 - [ ] Import gaps: CSV input for the generic mapper; optional serial dedup on generic
       imports; seed German GHS texts (`text_de`).
 
