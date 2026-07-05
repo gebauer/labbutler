@@ -113,5 +113,6 @@ configured yet; if one is added, wire it in here and run it too.)
 ## Do / Don't (quick reference)
 
 **Do:** read first · match existing patterns · small focused diffs · test every change · run lint+tests+types before finishing · ask when truly blocked.
+Use Claude worktrees, whenever the user states their are multiple workers running - Suggest to merge the worktree at the end of the job.
 
 **Don't:** invent APIs or paths · commit secrets · bundle unrelated changes · leave the build broken · disable/skip tests to make them pass · reformat files you aren't otherwise touching.

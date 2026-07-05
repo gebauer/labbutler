@@ -47,3 +47,6 @@ htmlcov/
 
 # MkDocs build output
 site/
+
+# Claude code
+.claude/worktrees/
