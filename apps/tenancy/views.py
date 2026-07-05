@@ -1,14 +1,17 @@
-"""Personal account views: notification preferences and superuser impersonation."""
+"""Personal account views: onboarding, notification preferences, superuser impersonation."""
 
 from __future__ import annotations
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import LoginView
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
-from django.utils.http import url_has_allowed_host_and_scheme
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
@@ -32,6 +35,44 @@ def _safe_next(request: HttpRequest) -> str:
     ):
         return target
     return "/"
+
+
+class FirstLoginView(LoginView):
+    """Standard login, except a user's very first sign-in lands on the welcome tour.
+
+    Any ``next`` destination is carried along so the tour's continue button still
+    reaches the page the user originally asked for.
+    """
+
+    def get_success_url(self) -> str:
+        target = super().get_success_url()
+        if self.request.user.onboarding_seen_at is None:
+            return reverse("tenancy:onboarding") + "?" + urlencode({"next": target})
+        return target
+
+
+@login_required
+def onboarding(request: HttpRequest) -> HttpResponse:
+    """Short welcome tour, shown automatically on the first sign-in.
+
+    Rendering the page stamps ``onboarding_seen_at`` so the login redirect fires only
+    once; the page stays reachable under /welcome/ for re-reading. While impersonating,
+    the stamp is skipped so "View as" never consumes someone else's first-visit tour.
+    """
+    user = request.user
+    if user.onboarding_seen_at is None and getattr(request, "impersonator", None) is None:
+        user.onboarding_seen_at = timezone.now()
+        user.save(update_fields=["onboarding_seen_at"])
+    next_url = request.GET.get("next", "")
+    if not next_url or not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        next_url = "/"
+    return render(
+        request,
+        "tenancy/onboarding.html",
+        {"lab": get_current_lab(request), "next_url": next_url},
+    )
 
 
 @login_required

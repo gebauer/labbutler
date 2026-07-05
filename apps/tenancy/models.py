@@ -49,6 +49,9 @@ class User(AbstractUser):
     email = models.EmailField("email address")
     # Display-only label chosen by the user; never an identifier. Blank -> show the email.
     friendly_name = models.CharField("friendly name", max_length=150, blank=True, default="")
+    # Stamped the first time the welcome tour is rendered; None means the next sign-in
+    # redirects to it. The page itself stays reachable for re-reading afterwards.
+    onboarding_seen_at = models.DateTimeField("onboarding seen at", null=True, blank=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]

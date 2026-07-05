@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome — LabButler{% endblock %}
+
+{% block content %}
+  <div class="mx-auto max-w-3xl">
+    <h1 class="text-2xl font-semibold tracking-tight">Welcome to LabButler 👋</h1>
+    <p class="mt-2 text-sm text-gray-500">
+      LabButler keeps your lab's inventory and purchasing in one place{% if lab %} —
+      you are a member of <strong class="font-medium text-gray-700">{{ lab.name }}</strong>{% endif %}.
+      Here is everything you need for your first ten minutes.
+    </p>
+
+    <ol class="mt-6 space-y-4 text-sm text-gray-700">
+      <li class="rounded-lg border border-gray-200 bg-white p-4">
+        <h2 class="font-semibold text-gray-900">1 · Introduce yourself</h2>
+        <p class="mt-1">
+          Set a <a href="{% url 'tenancy:settings' %}" class="font-medium text-teal-700 hover:underline">display name</a>
+          so colleagues see your name instead of your email address in lists, comments, and emails.
+        </p>
+      </li>
+      <li class="rounded-lg border border-gray-200 bg-white p-4">
+        <h2 class="font-semibold text-gray-900">2 · Find things</h2>
+        <p class="mt-1">
+          The <a href="{% url 'inventory:item_list' %}" class="font-medium text-teal-700 hover:underline">Inventory</a>
+          holds every item in the lab. Search by name, CAS number, or the item ID printed on the
+          container label — that ID never changes, so an old label always finds its record.
+        </p>
+      </li>
+      {% if can_view_requests %}
+        <li class="rounded-lg border border-gray-200 bg-white p-4">
+          <h2 class="font-semibold text-gray-900">3 · Order things</h2>
+          <p class="mt-1">
+            Need something the lab doesn't have? Raise a
+            <a href="{% url 'procurement:request_list' %}" class="font-medium text-teal-700 hover:underline">request</a>.
+            It moves through approval, ordering, and delivery — your dashboard shows where it stands,
+            and check-in puts the delivered item straight into the inventory.
+          </p>
+        </li>
+      {% endif %}
+      <li class="rounded-lg border border-gray-200 bg-white p-4">
+        <h2 class="font-semibold text-gray-900">{% if can_view_requests %}4{% else %}3{% endif %} · Know what you can do</h2>
+        <p class="mt-1">
+          What you see is governed by the roles your lab manager gave you. If a button mentioned in
+          the docs is missing, check your
+          <a href="{% url 'tenancy:settings' %}" class="font-medium text-teal-700 hover:underline">effective permissions</a>
+          in Account settings — that page also tunes which emails LabButler sends you.
+        </p>
+      </li>
+    </ol>
+
+    <div class="mt-8 flex flex-wrap items-center gap-4">
+      <a href="{{ next_url }}"
+         class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700">
+        Get started
+      </a>
+      <a href="{{ docs_url }}user-guide/" target="_blank" rel="noopener"
+         class="text-sm font-medium text-gray-500 hover:text-gray-900 hover:underline">
+        Read the full user guide →
+      </a>
+    </div>
+    <p class="mt-4 text-xs text-gray-400">
+      You can come back to this page anytime at <a href="{% url 'tenancy:onboarding' %}" class="hover:underline">/welcome/</a>.
+    </p>
+  </div>
+{% endblock %}

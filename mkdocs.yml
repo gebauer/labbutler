@@ -61,6 +61,7 @@ nav:
   - Home: index.md
   - User guide:
       - Overview: user-guide/index.md
+      - Welcome (first steps): user-guide/onboarding.md
       - Getting started: user-guide/getting-started.md
       - Inventory: user-guide/inventory.md
       - Procurement requests: user-guide/procurement.md

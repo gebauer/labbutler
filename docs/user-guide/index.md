@@ -69,6 +69,7 @@ or deleted afterwards.
 
 ## Chapters
 
+- [Welcome (first steps)](onboarding.md) — the ten-minute tour shown on your first sign-in.
 - [Getting started](getting-started.md) — signing in, the dashboard, your account.
 - [Inventory](inventory.md) — items, search, locations, tags, hazard data, labels.
 - [Procurement requests](procurement.md) — the request workflow from wish to shelf.
