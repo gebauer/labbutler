@@ -24,6 +24,6 @@ actions), and everything else is plain forms.
 - [Conventions & contributing](conventions.md) — style, commits, and the ground
   rules from `CLAUDE.md`.
 
-The original design rationale and data model live in
-[`Buildv1.MD`](https://github.com/gebauer/labbutler/blob/main/Buildv1.MD) at the
-repository root.
+The design rationale, data model, and roadmap live in
+[`Buildspec.md`](https://github.com/gebauer/labbutler/blob/main/Buildspec.md) at
+the repository root.

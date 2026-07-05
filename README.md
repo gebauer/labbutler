@@ -4,8 +4,8 @@ A free, self-hosted, Docker-deployable alternative to LabSuit for **lab inventor
 **order procurement**. Built for a single research institute that wants to leave LabSuit,
 keep its data, and run everything locally — no per-seat fees, no vendor shop.
 
-> Status: **v1.0 — first release.** The conceptual design lives in
-> [`Buildv1.MD`](Buildv1.MD); this README covers what the software is and how to run it.
+> Status: **v1.0 — first release.** The design & architecture spec lives in
+> [`Buildspec.md`](Buildspec.md); this README covers what the software is and how to run it.
 
 **📖 Full documentation** (user guide, installation & operation, developer guide):
 <https://gebauer.github.io/labbutler/> — sources in [`docs/`](docs/), built with MkDocs
@@ -32,7 +32,7 @@ Everything is **multi-lab capable** but collapses to a single lab at zero cost, 
 spreadsheet importer migrates existing LabSuit data without relabelling any physical
 container.
 
-See [`Buildv1.MD`](Buildv1.MD) for the full design rationale and data model.
+See [`Buildspec.md`](Buildspec.md) for the full design rationale, data model, and roadmap.
 
 ## Tech stack
 
@@ -180,7 +180,7 @@ German CSV exports (semicolon-delimited, comma decimals, latin-1) are supported.
 
 ```
 labbutler/
-├── Buildv1.MD            # conceptual spec & MVP outline (design rationale)
+├── Buildspec.md          # build spec & project context (design rationale, roadmap)
 ├── README.md             # this file
 ├── CLAUDE.md             # engineering guidance for contributors / AI assistants
 ├── pyproject.toml        # deps & tooling (managed by uv)
