@@ -1,0 +1,32 @@
+{# Shared shell for all LabButler HTML mails: card, brand header, footer. #}
+{# Email-client HTML: tables + inline styles only, no external assets. #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="margin:0; padding:0; background-color:#f3f4f6;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6; padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+               style="max-width:560px; background-color:#ffffff; border:1px solid #e5e7eb; border-radius:8px; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#111827;">
+          {% block banner %}{% endblock %}
+          <tr>
+            <td style="padding:24px 24px 20px;">
+              <p style="margin:0; font-size:13px; color:#0d9488; font-weight:bold;">Lab<span style="color:#111827;">Butler</span></p>
+              {% block content %}{% endblock %}
+            </td>
+          </tr>
+          <tr>
+            <td style="border-top:1px solid #e5e7eb; padding:12px 24px; font-size:12px; color:#9ca3af;">
+              {% block footer %}Sent by LabButler.{% endblock %}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

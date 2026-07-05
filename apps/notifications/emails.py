@@ -26,10 +26,10 @@ class EmailContent:
     urgent: bool = False
 
 
-def _link(base_url: str, path: str) -> str:
-    if not base_url:
-        return ""
-    return f"\n\n{base_url.rstrip('/')}{path}"
+#: Footer for procurement workflow mails, whose frequency members can tune themselves.
+_PROCUREMENT_FOOTER = (
+    "Sent by LabButler. You can tune which procurement emails you receive under Account settings."
+)
 
 
 def _url(base_url: str, path: str) -> str:
@@ -45,38 +45,60 @@ def _person(user) -> str:
     return user.email or user.friendly_name
 
 
-def _request_email(
-    *,
+def _email(
     subject: str,
+    *,
     intro: str,
-    rows: list[tuple[str, str]],
-    closing: str,
-    action_url: str,
-    action_label: str,
-    urgent: bool,
-    urgent_note: str,
+    greeting: str = "",
+    rows: list[tuple[str, str]] | None = None,
+    sections: list[dict] | None = None,
+    closing: str = "",
+    action_url: str = "",
+    action_label: str = "See details",
+    postscript: str = "",
+    urgent: bool = False,
+    urgent_note: str = "",
+    footer: str = "",
 ) -> EmailContent:
-    """Assemble a workflow mail (text + HTML) from one shared set of parts."""
+    """Assemble any notification mail (text + HTML) from one shared set of parts.
+
+    ``rows`` are label/value pairs rendered as an aligned table; ``sections`` are
+    titled lists (``{"title": ..., "lines": [...]}``) for digest-style mails.
+    """
+    rows = rows or []
+    sections = sections or []
     if urgent:
         subject = subject.replace("[LabButler] ", "[LabButler] URGENT — ", 1)
 
-    width = max(len(label) for label, _ in rows) + 2
-    lines = ([f"{urgent_note}", ""] if urgent else []) + [intro, ""]
-    lines += [f"{(label + ':'):<{width}}{value}" for label, value in rows]
+    lines: list[str] = [urgent_note, ""] if urgent else []
+    if greeting:
+        lines += [greeting, ""]
+    lines.append(intro)
+    if rows:
+        width = max(len(label) for label, _ in rows) + 2
+        lines += [""] + [f"{(label + ':'):<{width}}{value}" for label, value in rows]
+    for section in sections:
+        lines += ["", f"{section['title']}:"] + [f"  {line}" for line in section["lines"]]
     if action_url:
-        lines += ["", closing, action_url]
+        lines += ["", closing, action_url] if closing else ["", action_url]
+    if postscript:
+        lines += ["", postscript]
     body = "\n".join(lines)
 
     html = render_to_string(
-        "notifications/request_email.html",
+        "notifications/email.html",
         {
             "urgent": urgent,
             "urgent_note": urgent_note,
+            "greeting": greeting,
             "intro": intro,
             "rows": rows,
+            "sections": sections,
             "closing": closing,
             "action_url": action_url,
             "action_label": action_label,
+            "postscript": postscript,
+            "footer": footer,
         },
     )
     return EmailContent(subject, body, html=html, urgent=urgent)
@@ -88,26 +110,30 @@ def build_status_change(
     """Email announcing that a request moved from ``previous`` to ``new`` status."""
     previous_label = Request.Status(previous).label
     new_label = Request.Status(new).label
-    subject = f"[LabButler] Request “{req.item_name}” is now {new_label}"
-
-    lines = [
-        f"Request: {req.item_name}",
-        f"Status:  {previous_label} → {new_label}",
-        f"Total:   {req.total} {req.currency}",
+    rows = [
+        ("Request", req.item_name),
+        ("Status", f"{previous_label} → {new_label}"),
+        ("Total", f"{req.total} {req.currency}"),
     ]
     if req.vendor_id:
-        lines.append(f"Vendor:  {req.vendor.name}")
+        rows.append(("Vendor", req.vendor.name))
     if req.po_number:
-        lines.append(f"PO #:    {req.po_number}")
+        rows.append(("PO #", req.po_number))
     if new == Request.Status.APPROVED and req.assigned_to_id:
         # Only an auto-forward can have an assignee this early, so this reads as the
         # requester's own wish being fulfilled.
-        lines.append(f"Forwarded to: {_person(req.assigned_to)} to order, as you requested.")
+        rows.append(("Forwarded to", f"{_person(req.assigned_to)} to order, as you requested."))
     if new == Request.Status.CHECKED_IN and req.created_item_id:
-        lines.append(f"Checked in as: {req.created_item.human_id} · {req.created_item.name}")
-
-    body = "\n".join(lines) + _link(base_url, f"/requests/{req.pk}/")
-    return EmailContent(subject, body)
+        rows.append(("Checked in as", f"{req.created_item.human_id} · {req.created_item.name}"))
+    return _email(
+        f"[LabButler] Request “{req.item_name}” is now {new_label}",
+        intro=f"A request you are involved in is now {new_label}:",
+        rows=rows,
+        closing="See the full details here:",
+        action_url=_url(base_url, f"/requests/{req.pk}/"),
+        action_label="See request details",
+        footer=_PROCUREMENT_FOOTER,
+    )
 
 
 def build_approval_needed(req: Request, *, base_url: str = "") -> EmailContent:
@@ -119,8 +145,8 @@ def build_approval_needed(req: Request, *, base_url: str = "") -> EmailContent:
         rows.append(("Vendor", req.vendor.name))
     if req.catalog_number:
         rows.append(("Catalog", req.catalog_number))
-    return _request_email(
-        subject=f"[LabButler] Approval needed: “{req.item_name}”",
+    return _email(
+        f"[LabButler] Approval needed: “{req.item_name}”",
         intro=intro,
         rows=rows,
         closing="See the full details and approve or decline it here:",
@@ -128,6 +154,7 @@ def build_approval_needed(req: Request, *, base_url: str = "") -> EmailContent:
         action_label="See request details",
         urgent=req.is_urgent,
         urgent_note="URGENT — the requester needs a decision as soon as possible.",
+        footer=_PROCUREMENT_FOOTER,
     )
 
 
@@ -135,22 +162,32 @@ def build_daily_digest(
     lab, pending_approvals: list, recent_updates: list, today: date, *, base_url: str = ""
 ) -> EmailContent:
     """A once-a-day per-member digest: requests awaiting their approval + their updates."""
-    subject = f"[LabButler] {lab.name}: daily procurement summary"
-    sections = [f"Procurement summary for {lab.name}, {today:%Y-%m-%d}."]
+    sections = []
     if pending_approvals:
         sections.append(
-            "\nAwaiting your approval:\n"
-            + "\n".join(f"  {r.item_name}  ({r.total} {r.currency})" for r in pending_approvals)
+            {
+                "title": "Awaiting your approval",
+                "lines": [f"{r.item_name}  ({r.total} {r.currency})" for r in pending_approvals],
+            }
         )
     if recent_updates:
         sections.append(
-            "\nYour requests, recently updated:\n"
-            + "\n".join(
-                f"  {r.item_name}  →  {Request.Status(r.status).label}" for r in recent_updates
-            )
+            {
+                "title": "Your requests, recently updated",
+                "lines": [
+                    f"{r.item_name}  →  {Request.Status(r.status).label}" for r in recent_updates
+                ],
+            }
         )
-    body = "\n".join(sections) + _link(base_url, "/requests/")
-    return EmailContent(subject, body)
+    return _email(
+        f"[LabButler] {lab.name}: daily procurement summary",
+        intro=f"Procurement summary for {lab.name}, {today:%Y-%m-%d}.",
+        sections=sections,
+        closing="Act on them here:",
+        action_url=_url(base_url, "/requests/"),
+        action_label="Open the request list",
+        footer=_PROCUREMENT_FOOTER,
+    )
 
 
 def build_assignment(req: Request, *, forwarded_by=None, base_url: str = "") -> EmailContent:
@@ -169,8 +206,8 @@ def build_assignment(req: Request, *, forwarded_by=None, base_url: str = "") -> 
         rows.append(("Vendor", req.vendor.name))
     if req.catalog_number:
         rows.append(("Catalog", req.catalog_number))
-    return _request_email(
-        subject=f"[LabButler] Please order “{req.item_name}”",
+    return _email(
+        f"[LabButler] Please order “{req.item_name}”",
         intro=intro,
         rows=rows,
         closing="See the full details and mark it ordered here:",
@@ -178,6 +215,7 @@ def build_assignment(req: Request, *, forwarded_by=None, base_url: str = "") -> 
         action_label="See request details",
         urgent=req.is_urgent,
         urgent_note="URGENT — this needs to be ordered as soon as possible.",
+        footer=_PROCUREMENT_FOOTER,
     )
 
 
@@ -187,20 +225,17 @@ def build_welcome(user, lab, set_password_url: str) -> EmailContent:
     The link is passed in fully-formed — generating the reset token is an effect that
     lives in :mod:`apps.notifications.tasks`, keeping this builder pure.
     """
-    subject = f"[LabButler] Welcome to {lab.name}"
-    lines = [
-        f"Hello {user.display_name},",
-        "",
-        f"You've been added to {lab.name} on LabButler.",
-        "",
-        "To get started, set a password for your account using the link below:",
-        "",
-        set_password_url,
-        "",
-        "For security, this link expires after a while — if it stops working, use the "
-        "“Forgot your password?” link on the sign-in page to request a fresh one.",
-    ]
-    return EmailContent(subject, "\n".join(lines))
+    return _email(
+        f"[LabButler] Welcome to {lab.name}",
+        greeting=f"Hello {user.display_name},",
+        intro=f"You've been added to {lab.name} on LabButler — the lab's shared "
+        "inventory and ordering tool.",
+        closing="To get started, set a password for your account:",
+        action_url=set_password_url,
+        action_label="Set your password",
+        postscript="For security, this link expires after a while — if it stops working, "
+        "use the “Forgot your password?” link on the sign-in page to request a fresh one.",
+    )
 
 
 def build_expiry_digest(
@@ -220,14 +255,23 @@ def build_expiry_digest(
 
     def _row(item) -> str:
         location = item.location.name if item.location_id else "—"
-        return f"  {item.expiration_date:%Y-%m-%d}  {item.human_id}  {item.name}  ({location})"
+        return f"{item.expiration_date:%Y-%m-%d}  {item.human_id}  {item.name}  ({location})"
 
-    sections = [f"Expiry report for {lab.name}, generated {today:%Y-%m-%d}."]
+    sections = []
     if expired:
-        sections.append("\nAlready expired:\n" + "\n".join(_row(i) for i in expired))
+        sections.append({"title": "Already expired", "lines": [_row(i) for i in expired]})
     if expiring:
         sections.append(
-            f"\nExpiring within {days_ahead} days:\n" + "\n".join(_row(i) for i in expiring)
+            {
+                "title": f"Expiring within {days_ahead} days",
+                "lines": [_row(i) for i in expiring],
+            }
         )
-    body = "\n".join(sections) + _link(base_url, "/inventory/")
-    return EmailContent(subject, body)
+    return _email(
+        subject,
+        intro=f"Expiry report for {lab.name}, generated {today:%Y-%m-%d}.",
+        sections=sections,
+        closing="Review them in the inventory:",
+        action_url=_url(base_url, "/inventory/"),
+        action_label="Open the inventory",
+    )

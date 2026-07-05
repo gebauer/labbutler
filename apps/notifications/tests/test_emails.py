@@ -7,6 +7,7 @@ from apps.inventory.models import Item
 from apps.notifications.emails import (
     build_approval_needed,
     build_assignment,
+    build_daily_digest,
     build_expiry_digest,
     build_status_change,
     build_welcome,
@@ -64,6 +65,59 @@ def test_welcome_greets_member_and_carries_set_password_link():
     assert "Ada Lovelace" in content.body
     assert "AG Baumann" in content.body
     assert url in content.body
+
+
+def test_every_builder_produces_an_html_alternative_with_action_button():
+    class FakeLab:
+        name = "AG Baumann"
+
+    today = date(2026, 7, 1)
+    base = "https://lab.example.org"
+    expiring = [Item(human_id="LB-2", name="Agar", expiration_date=today)]
+    status = build_status_change(_request(), Status.REQUESTED, Status.APPROVED, base_url=base)
+    welcome = build_welcome(User(pk=1, email="new@x.de"), FakeLab(), f"{base}/accounts/reset/MQ/t/")
+    cases = [
+        (status, "/requests/6/"),
+        (build_approval_needed(_request(), base_url=base), "/requests/6/"),
+        (build_assignment(_request(), base_url=base), "/requests/6/"),
+        (build_daily_digest(FakeLab(), [_request()], [], today, base_url=base), "/requests/"),
+        (
+            build_expiry_digest(FakeLab(), [], expiring, today, days_ahead=30, base_url=base),
+            "/inventory/",
+        ),
+        (welcome, "/accounts/reset/MQ/t/"),
+    ]
+    for content, path in cases:
+        assert content.html, content.subject
+        assert f'href="{base}{path}"' in content.html, content.subject
+
+
+def test_welcome_html_and_text_share_the_set_password_call_to_action():
+    class FakeLab:
+        name = "AG Baumann"
+
+    user = User(pk=1, email="new@x.de", friendly_name="Ada Lovelace")
+    url = "https://lab.example.org/accounts/reset/MQ/set-token/"
+    content = build_welcome(user, FakeLab(), url)
+    assert "Hello Ada Lovelace," in content.body
+    assert "set a password for your account" in content.body
+    assert url in content.body
+    assert "Set your password" in content.html
+    assert "Hello Ada Lovelace," in content.html
+
+
+def test_daily_digest_sections_render_in_text_and_html():
+    class FakeLab:
+        name = "AG Baumann"
+
+    pending = [_request()]
+    updates = [_request(pk=7, item_name="Agar", status=Status.ORDERED)]
+    content = build_daily_digest(FakeLab(), pending, updates, date(2026, 7, 1))
+    assert "Awaiting your approval:" in content.body
+    assert "  Whole-plasmid sequencing  (89.25 EUR)" in content.body
+    assert "Agar  →  Ordered" in content.body
+    assert "Awaiting your approval" in content.html
+    assert "Whole-plasmid sequencing" in content.html
 
 
 def test_status_change_reports_auto_forward_only_on_approval():

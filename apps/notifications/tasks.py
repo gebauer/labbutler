@@ -11,7 +11,7 @@ from datetime import timedelta
 from celery import shared_task
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import EmailMultiAlternatives, send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_bytes
@@ -121,7 +121,7 @@ def notify_request_transition(req_pk: int, previous: str, new: str) -> int:
     if not recipients:
         return 0
     content = emails.build_status_change(req, previous, new, base_url=_base_url())
-    send_mail(content.subject, content.body, settings.DEFAULT_FROM_EMAIL, recipients)
+    _send(content, recipients)
     return len(recipients)
 
 
@@ -181,7 +181,7 @@ def send_welcome_email(user_pk: int, lab_pk: int) -> int:
     url = f"{base.rstrip('/')}{path}" if base else path
 
     content = emails.build_welcome(user, lab, url)
-    send_mail(content.subject, content.body, settings.DEFAULT_FROM_EMAIL, [user.email])
+    _send(content, [user.email])
     return 1
 
 
@@ -212,7 +212,7 @@ def send_expiry_digests(days_ahead: int | None = None) -> int:
         content = emails.build_expiry_digest(
             lab, expired, expiring, today, days_ahead=days_ahead, base_url=_base_url()
         )
-        send_mail(content.subject, content.body, settings.DEFAULT_FROM_EMAIL, recipients)
+        _send(content, recipients)
         labs_notified += 1
     return labs_notified
 
@@ -260,6 +260,6 @@ def send_notification_digests(since=None) -> int:
             content = emails.build_daily_digest(
                 lab, approvals, updates, today, base_url=_base_url()
             )
-            send_mail(content.subject, content.body, settings.DEFAULT_FROM_EMAIL, [user.email])
+            _send(content, [user.email])
             emails_sent += 1
     return emails_sent
