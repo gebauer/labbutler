@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django.db import transaction
+from django.urls import reverse
 
 from apps.attachments.models import Attachment
 from apps.audit.models import AuditEntry
@@ -257,6 +258,19 @@ def receive(
         if carry_attachments:
             for attachment in Attachment.for_object(req):
                 attachment.copy_to(req.created_item)
+
+        # Cross-link the item back to its request in the item's comment thread
+        # (the request already links forward via ``created_item``).
+        from apps.comments.models import Comment
+
+        url = reverse("procurement:request_detail", args=[req.pk])
+        Comment.objects.create(
+            lab=req.lab,
+            author=actor,
+            target=req.created_item,
+            body=f"Checked in from [Request #{req.pk}]({url}).",
+        )
+
         req.status = Status.CHECKED_IN
         action = "checked_in"
         changes = {"from": previous, "to": req.status, "item": req.created_item.human_id}

@@ -1,4 +1,5 @@
 {% comment %}Comment thread + post box. Params: comments, target, comment_model.{% endcomment %}
+{% load comment_links %}
 <h2 id="comments" class="text-sm font-semibold uppercase tracking-wide text-gray-500">Comments</h2>
 <div class="mt-2 space-y-2">
   {% for comment in comments %}
@@ -7,7 +8,7 @@
         <span class="font-medium text-gray-700">{{ comment.author.display_name|default:"—" }}</span>
         <span>{{ comment.created_at|date:"Y-m-d H:i" }}</span>
       </div>
-      <p class="mt-1 whitespace-pre-line text-sm text-gray-800">{{ comment.body }}</p>
+      <p class="mt-1 whitespace-pre-line text-sm text-gray-800">{{ comment.body|linkify_comment }}</p>
     </div>
   {% empty %}
     <p class="text-sm text-gray-400">No comments yet.</p>
