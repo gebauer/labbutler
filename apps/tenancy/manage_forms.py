@@ -50,6 +50,15 @@ class _LabForm(forms.ModelForm):
     def _scope(self, lab: Lab) -> None:  # overridden where FK choices need scoping
         pass
 
+    def _get_validation_exclusions(self) -> set[str]:
+        # ``lab`` isn't a form field, so ModelForm excludes it and silently skips every
+        # per-lab unique constraint — duplicates then crash on the DB constraint at
+        # save(). ``lab`` is bound in __init__, so keep it in the validation and the
+        # constraints surface as form errors instead.
+        exclude = super()._get_validation_exclusions()
+        exclude.discard("lab")
+        return exclude
+
 
 class VendorForm(_LabForm):
     class Meta:

@@ -47,6 +47,18 @@ def test_create_supplier(client, lab):
 
 
 @pytest.mark.django_db
+def test_duplicate_supplier_is_a_form_error_not_a_crash(client, lab):
+    client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
+    Vendor.objects.create(lab=lab, name="Carl Roth")
+    # Exact and whitespace-variant duplicates both re-render with a validation error.
+    for name in ["Carl Roth", "  Carl   Roth "]:
+        resp = client.post(reverse("manage:add", args=["suppliers"]), {"name": name})
+        assert resp.status_code == 200
+        assert b"already exists" in resp.content
+    assert Vendor.objects.filter(lab=lab).count() == 1
+
+
+@pytest.mark.django_db
 def test_edit_then_delete_budget(client, lab):
     client.force_login(_user(lab, "boss@x.de", ["Lab manager"]))
     budget = Budget.objects.create(lab=lab, number="KST1", name="Grant")
