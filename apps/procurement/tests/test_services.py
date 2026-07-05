@@ -124,6 +124,48 @@ def test_receive_carries_hazard_data_onto_the_item(lab):
 
 
 @pytest.mark.django_db
+def test_receive_comments_the_request_link_onto_the_item(lab):
+    from django.urls import reverse
+
+    from apps.comments.models import Comment
+
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member, status=Status.ORDERED)
+    services.receive(req, actor=member, create_item=True)
+
+    comment = Comment.for_object(req.created_item).get()
+    assert comment.author == member and comment.lab == lab
+    url = reverse("procurement:request_detail", args=[req.pk])
+    assert f"[Request #{req.pk}]({url})" in comment.body
+
+
+@pytest.mark.django_db
+def test_receive_without_item_leaves_no_comment(lab):
+    from apps.comments.models import Comment
+
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member, status=Status.ORDERED)
+    services.receive(req, actor=manager, create_item=False)
+    assert Comment.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_item_detail_renders_check_in_comment_as_link(client, lab):
+    """End to end: the check-in comment shows on the item page as a clickable anchor."""
+    from django.urls import reverse
+
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member, status=Status.ORDERED)
+    services.receive(req, actor=member, create_item=True)
+
+    client.force_login(member)
+    resp = client.get(reverse("inventory:item_detail", args=[req.created_item.pk]))
+    url = reverse("procurement:request_detail", args=[req.pk])
+    assert f'<a href="{url}"'.encode() in resp.content
+
+
+@pytest.mark.django_db
 def test_receive_without_item_marks_received(lab):
     manager = _user(lab, "m@x.de", ["Lab manager"])
     member = _user(lab, "u@x.de", ["Member"])
