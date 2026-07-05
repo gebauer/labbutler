@@ -14,6 +14,10 @@
            class="border-l border-gray-300 px-3 py-1.5 {% if view_mode == 'cards' %}bg-teal-600 text-white{% else %}bg-white text-gray-600 hover:bg-gray-50{% endif %}">Cards</a>
       </div>
       {% if can_manage %}
+        <a href="{% url 'inventory:label_sheet' %}"
+           class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+          Label sheet
+        </a>
         <a href="{% url 'inventory:item_create' %}"
            class="rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-teal-700">
           + New item

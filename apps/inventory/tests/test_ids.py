@@ -41,3 +41,21 @@ def test_item_id_taken(lab):
     Item.objects.create(lab=lab, human_id="AGB-00001", name="a")
     assert ids.item_id_taken(lab, "AGB-00001") is True
     assert ids.item_id_taken(lab, "AGB-00002") is False
+
+
+@pytest.mark.django_db
+def test_id_sequence_is_consecutive_and_normalised(lab):
+    assert ids.id_sequence(lab, "agb-305", 3) == ["AGB-00305", "AGB-00306", "AGB-00307"]
+
+
+@pytest.mark.django_db
+def test_id_sequence_does_not_skip_used_numbers(lab):
+    # Labels are preprinted: a taken number still gets its label (reprint case).
+    Item.objects.create(lab=lab, human_id="AGB-00306", name="taken")
+    assert ids.id_sequence(lab, "AGB-305", 3) == ["AGB-00305", "AGB-00306", "AGB-00307"]
+
+
+@pytest.mark.django_db
+def test_id_sequence_rejects_malformed_start(lab):
+    with pytest.raises(ValueError):
+        ids.id_sequence(lab, "XYZ-1", 3)

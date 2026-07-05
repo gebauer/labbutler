@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Label · {{ item.human_id }} · LabButler{% endblock %}
 
@@ -12,22 +13,94 @@
     </div>
   </div>
 
-  {# The label itself — kept small and self-contained so it prints cleanly. #}
-  <div class="mt-5 inline-block rounded-lg border-2 border-gray-900 px-6 py-4 text-center">
-    <div class="text-xs uppercase tracking-widest text-gray-500">{{ current_lab.name }}</div>
-    <div class="mt-1 font-mono text-3xl font-bold tracking-tight">{{ item.human_id }}</div>
-    <div class="mt-1 max-w-[16rem] truncate text-sm text-gray-600">{{ item.name }}</div>
-    <div class="mt-2 grid h-24 w-24 mx-auto place-items-center rounded border border-dashed border-gray-300 text-[10px] text-gray-400">
-      Data&nbsp;Matrix
+  {# On-screen preview of the printed GHS container label (60 x 30 mm, scaled up 2x). #}
+  <div class="mt-5 flex h-[240px] w-[480px] flex-col overflow-hidden rounded border-2 border-gray-900 bg-white p-3">
+    <div class="text-lg font-bold leading-tight text-gray-900">{{ item.name }}</div>
+    {% if item.signal_word %}
+      <div class="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-gray-900">{{ item.get_signal_word_display }}</div>
+    {% endif %}
+    {% if ghs_label.statements %}
+      <div class="mt-1 flex-1 overflow-hidden text-[9px] leading-snug text-gray-800">
+        {% for statement in ghs_label.statements %}{{ statement }} {% endfor %}
+      </div>
+    {% else %}
+      <div class="flex-1"></div>
+    {% endif %}
+    <div class="mt-1 flex items-end justify-between gap-2">
+      <div class="flex gap-1">
+        {% for code in pictogram_codes %}
+          <img src="{% static 'img/ghs/' %}{{ code }}.svg" alt="{{ code }}" class="h-[76px] w-[76px]">
+        {% endfor %}
+      </div>
+      <div class="flex shrink-0 flex-col items-center">
+        {# Rendered server-side from the frozen human ID — safe to inline, it's only path data. #}
+        <div class="h-[60px] w-[60px]">{{ datamatrix_svg|safe }}</div>
+        <div class="mt-0.5 font-mono text-[10px] font-semibold text-gray-900">{{ item.human_id }}</div>
+      </div>
     </div>
   </div>
+
+  {# One GHS container label on the Avery 60x30-R sheet, at a picked position. #}
+  <form method="get" action="{% url 'inventory:item_ghs_label_pdf' item.pk %}"
+        class="mt-6 max-w-xl rounded-xl border border-gray-200 bg-white p-4 print:hidden">
+    <h2 class="text-sm font-semibold text-gray-800">Print GHS label (Avery 60 × 30 mm sheet)</h2>
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+      <label class="block text-sm text-gray-700">
+        Row <span class="text-xs text-gray-400">(1–{{ ghs_spec.rows }})</span>
+        <input type="number" name="row" value="1" min="1" max="{{ ghs_spec.rows }}" required
+               class="mt-1 w-24 rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500">
+      </label>
+      <label class="block text-sm text-gray-700">
+        Column <span class="text-xs text-gray-400">(1–{{ ghs_spec.columns }})</span>
+        <input type="number" name="column" value="1" min="1" max="{{ ghs_spec.columns }}" required
+               class="mt-1 w-24 rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500">
+      </label>
+      <button type="submit"
+              class="rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-700">
+        Download GHS label PDF
+      </button>
+    </div>
+    <p class="mt-2 text-xs text-gray-500">
+      The label above, printed onto that position of a {{ ghs_spec.per_page }}-label sheet
+      ({{ ghs_spec.columns }} × {{ ghs_spec.rows }}) — print at 100&nbsp;% scale.
+    </p>
+  </form>
+
+  {# One small ID-only label on the Avery 25x10-R sheet, at a picked position. #}
+  <form method="get" action="{% url 'inventory:item_label_pdf' item.pk %}"
+        class="mt-6 max-w-xl rounded-xl border border-gray-200 bg-white p-4 print:hidden">
+    <h2 class="text-sm font-semibold text-gray-800">Print ID label (Avery 25.4 × 10 mm sheet)</h2>
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+      <label class="block text-sm text-gray-700">
+        Row <span class="text-xs text-gray-400">(1–{{ spec.rows }})</span>
+        <input type="number" name="row" value="1" min="1" max="{{ spec.rows }}" required
+               class="mt-1 w-24 rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500">
+      </label>
+      <label class="block text-sm text-gray-700">
+        Column <span class="text-xs text-gray-400">(1–{{ spec.columns }})</span>
+        <input type="number" name="column" value="1" min="1" max="{{ spec.columns }}" required
+               class="mt-1 w-24 rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500">
+      </label>
+      <button type="submit"
+              class="rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-700">
+        Download ID label PDF
+      </button>
+    </div>
+    <p class="mt-2 text-xs text-gray-500">
+      Just the Data&nbsp;Matrix and {{ item.human_id }}, onto a
+      {{ spec.per_page }}-label sheet — print at 100&nbsp;% scale.{% if can_manage %}
+      For a whole batch, use the
+      <a href="{% url 'inventory:label_sheet' %}" class="text-teal-700 hover:underline">label sheet</a> page.{% endif %}
+    </p>
+  </form>
 
   <div class="mt-6 max-w-xl rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 print:hidden">
     <h2 class="text-sm font-semibold text-gray-800">How to label</h2>
     <ol class="mt-2 list-decimal space-y-1 pl-5">
       <li>Write or stick the ID <span class="font-mono font-medium text-gray-900">{{ item.human_id }}</span> on the container.</li>
       <li>This ID is permanent — it never changes, even if the item is reclassified or moved.</li>
-      <li>Preprinted Data&nbsp;Matrix labels (encoding just this ID) can be applied instead; scanning support is coming.</li>
+      <li>Preprinted Data&nbsp;Matrix labels (encoding just this ID) can be applied instead{% if can_manage %} —
+        <a href="{% url 'inventory:label_sheet' %}" class="text-teal-700 hover:underline">print a label sheet</a>{% endif %}; scanning support is coming.</li>
     </ol>
   </div>
 {% endblock %}

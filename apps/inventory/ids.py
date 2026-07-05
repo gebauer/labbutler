@@ -57,3 +57,16 @@ def normalize_item_id(lab: Lab, raw: str) -> str:
 
 def item_id_taken(lab: Lab, human_id: str) -> bool:
     return lab.items.filter(human_id=human_id).exists()
+
+
+def id_sequence(lab: Lab, start_id: str, count: int) -> list[str]:
+    """``count`` consecutive IDs starting at ``start_id`` (which may be unnormalised).
+
+    Labels are preprinted, so the sequence is strictly consecutive — numbers already
+    in use are *not* skipped (reprinting an existing label is legitimate).
+    """
+    match = _pattern(lab.item_id_prefix).match((start_id or "").strip())
+    if not match:
+        raise ValueError(f"ID must look like {_format(lab.item_id_prefix, 1)}.")
+    start = int(match.group(1))
+    return [_format(lab.item_id_prefix, number) for number in range(start, start + count)]

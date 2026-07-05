@@ -7,11 +7,14 @@ HTMX-friendly: an HTMX request gets just the results partial back for live filte
 
 from __future__ import annotations
 
+import re
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.staticfiles import finders
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
 from django.urls import reverse
@@ -25,9 +28,9 @@ from apps.procurement.models import Vendor
 from apps.tenancy.models import User
 from apps.tenancy.scoping import require_permission, set_current_lab, user_labs
 
-from . import ghs
+from . import ghs, ids, labels
 from . import ghs_lookup as ghs_lookup_client
-from .forms import ItemForm
+from .forms import ItemForm, LabelSheetForm
 from .models import HazardStatement, Item, Location, Tag
 
 PAGE_SIZE = 25
@@ -173,11 +176,129 @@ def _custom_field_rows(lab, item: Item) -> list[tuple[str, object]]:
     return [(labels.get(key, key), value) for key, value in sorted(item.custom_fields.items())]
 
 
+# Hazard kinds in on-label order: hazards first, EU extras, then precautions.
+_STATEMENT_KIND_ORDER = {"H": 0, "EUH": 1, "P": 2}
+
+
+def _ghs_label_data(item: Item) -> labels.GhsLabel:
+    """Collect everything the item's GHS container label shows (statements ordered
+    H → EUH → P, pictograms resolved to their static SVG files)."""
+    hazards = sorted(
+        item.hazards.all(), key=lambda h: (_STATEMENT_KIND_ORDER.get(h.kind, 9), h.code)
+    )
+    pictogram_codes = sorted({p for h in hazards for p in ghs.pictograms_for(h.code)})
+    pictogram_paths = [
+        path for code in pictogram_codes if (path := finders.find(f"img/ghs/{code}.svg"))
+    ]
+    return labels.GhsLabel(
+        code=item.human_id,
+        name=item.name,
+        signal_word=item.get_signal_word_display() if item.signal_word else "",
+        statements=[f"{h.code}: {h.text_en}" if h.text_en else h.code for h in hazards],
+        pictogram_paths=pictogram_paths,
+    )
+
+
 @require_permission("view_inventory")
 def item_label(request: HttpRequest, pk: int) -> HttpResponse:
-    """Print-friendly label page for an item: its frozen ID plus labelling instructions."""
+    """Print-friendly label page for an item: a GHS container-label preview plus
+    per-position printing onto Avery label sheets."""
     item = get_object_or_404(Item, pk=pk, lab=request.lab)
-    return render(request, "inventory/item_label.html", {"item": item})
+    ghs_label = _ghs_label_data(item)
+    return render(
+        request,
+        "inventory/item_label.html",
+        {
+            "item": item,
+            "datamatrix_svg": labels.datamatrix_svg(item.human_id),
+            "ghs_label": ghs_label,
+            "pictogram_codes": sorted(
+                {p for h in item.hazards.all() for p in ghs.pictograms_for(h.code)}
+            ),
+            "spec": labels.AVERY_25X10_R,
+            "ghs_spec": labels.AVERY_60X30_R,
+            "can_manage": request.user.can(request.lab, "manage_inventory"),
+        },
+    )
+
+
+def _sheet_position(request: HttpRequest, spec: labels.SheetSpec) -> tuple[int, int] | None:
+    """Parse and bound-check ?row=&column= against the sheet grid; None if invalid."""
+    try:
+        row = int(request.GET.get("row", 1))
+        column = int(request.GET.get("column", 1))
+    except ValueError:
+        return None
+    if not (1 <= row <= spec.rows and 1 <= column <= spec.columns):
+        return None
+    return row, column
+
+
+def _label_pdf_response(
+    pdf: bytes, human_id: str, kind: str, row: int, column: int
+) -> HttpResponse:
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "_", human_id)
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{kind}_{safe_id}_r{row}c{column}.pdf"'
+    return response
+
+
+@require_permission("view_inventory")
+def item_label_pdf(request: HttpRequest, pk: int) -> HttpResponse:
+    """One preprinted ID label for this item, placed at a chosen position on the sheet.
+
+    Uses the item's frozen ID verbatim (works for legacy serials too), so this stays
+    separate from the bulk :func:`label_sheet` form and its prefix normalisation.
+    """
+    item = get_object_or_404(Item, pk=pk, lab=request.lab)
+    spec = labels.AVERY_25X10_R
+    position = _sheet_position(request, spec)
+    if position is None:
+        return HttpResponseBadRequest(f"Row must be 1–{spec.rows} and column 1–{spec.columns}.")
+    row, column = position
+    pdf = labels.render_label_sheet([item.human_id], start_row=row, start_column=column)
+    return _label_pdf_response(pdf, item.human_id, "label", row, column)
+
+
+@require_permission("view_inventory")
+def item_ghs_label_pdf(request: HttpRequest, pk: int) -> HttpResponse:
+    """One GHS container label (name, signal word, H/P statements, pictograms, Data
+    Matrix + ID) at a chosen position on an Avery 60 x 30 mm sheet."""
+    item = get_object_or_404(Item, pk=pk, lab=request.lab)
+    spec = labels.AVERY_60X30_R
+    position = _sheet_position(request, spec)
+    if position is None:
+        return HttpResponseBadRequest(f"Row must be 1–{spec.rows} and column 1–{spec.columns}.")
+    row, column = position
+    pdf = labels.render_ghs_label_sheet([_ghs_label_data(item)], start_row=row, start_column=column)
+    return _label_pdf_response(pdf, item.human_id, "ghs-label", row, column)
+
+
+@require_permission("manage_inventory")
+def label_sheet(request: HttpRequest) -> HttpResponse:
+    """Generate a PDF sheet of preprinted Data Matrix ID labels (Avery 25.4 x 10 mm).
+
+    The user picks the first ID, how many labels, and where on a partially used
+    sheet to start; the response is the ready-to-print PDF (print at 100 % scale).
+    """
+    if request.method == "POST":
+        form = LabelSheetForm(request.POST, lab=request.lab)
+        if form.is_valid():
+            data = form.cleaned_data
+            codes = ids.id_sequence(request.lab, data["start_id"], data["count"])
+            pdf = labels.render_label_sheet(
+                codes, start_row=data["start_row"], start_column=data["start_column"]
+            )
+            response = HttpResponse(pdf, content_type="application/pdf")
+            response["Content-Disposition"] = (
+                f'attachment; filename="labels_{codes[0]}_to_{codes[-1]}.pdf"'
+            )
+            return response
+    else:
+        form = LabelSheetForm(lab=request.lab)
+    return render(
+        request, "inventory/label_sheet.html", {"form": form, "spec": labels.AVERY_25X10_R}
+    )
 
 
 @require_permission("manage_inventory")

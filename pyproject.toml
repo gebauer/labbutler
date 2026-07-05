@@ -1,6 +1,6 @@
 [project]
 name = "labbutler"
-version = "1.0.0rc6"
+version = "1.0.0rc7"
 description = "Self-hosted lab inventory and procurement (a free LabSuit alternative)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -15,6 +15,9 @@ dependencies = [
     "gunicorn>=23.0",
     "whitenoise>=6.7",
     "django-axes>=8.3.1",
+    "reportlab>=5.0.0",
+    "ppf-datamatrix>=0.2",
+    "svglib>=2.0.2",
 ]
 
 [dependency-groups]

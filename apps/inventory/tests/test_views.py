@@ -443,3 +443,109 @@ def test_switch_lab_ignores_offsite_next(client, lab):
     )
     assert resp.status_code == 302
     assert "evil.example.com" not in resp["Location"]  # open-redirect guard
+
+
+# ---- label sheet (preprinted Data Matrix labels) ----
+
+
+@pytest.mark.django_db
+def test_label_sheet_requires_manage_inventory(client, lab, viewer):
+    client.force_login(viewer)
+    assert client.get(reverse("inventory:label_sheet")).status_code == 403
+
+
+@pytest.mark.django_db
+def test_label_sheet_form_suggests_next_free_id(client, lab, manager):
+    Item.objects.create(lab=lab, human_id="AGB-00304", name="a")
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:label_sheet"))
+    assert resp.status_code == 200
+    assert b'value="AGB-00305"' in resp.content
+
+
+@pytest.mark.django_db
+def test_label_sheet_post_returns_pdf(client, lab, manager):
+    client.force_login(manager)
+    resp = client.post(
+        reverse("inventory:label_sheet"),
+        {"start_id": "AGB-305", "count": 100, "start_row": 2, "start_column": 3},
+    )
+    assert resp.status_code == 200
+    assert resp["Content-Type"] == "application/pdf"
+    assert 'filename="labels_AGB-00305_to_AGB-00404.pdf"' in resp["Content-Disposition"]
+    assert resp.content.startswith(b"%PDF")
+
+
+@pytest.mark.django_db
+def test_label_sheet_rejects_bad_input(client, lab, manager):
+    client.force_login(manager)
+    resp = client.post(
+        reverse("inventory:label_sheet"),
+        {"start_id": "XYZ-1", "count": 100, "start_row": 99, "start_column": 0},
+    )
+    assert resp.status_code == 200
+    assert resp["Content-Type"].startswith("text/html")
+    assert b"ID must look like" in resp.content
+
+
+@pytest.mark.django_db
+def test_item_label_page_shows_datamatrix(client, lab, manager):
+    item = _make_item(lab)
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_label", args=[item.pk]))
+    assert resp.status_code == 200
+    assert b"<svg" in resp.content
+
+
+@pytest.mark.django_db
+def test_item_label_pdf_places_one_label(client, lab, viewer):
+    item = _make_item(lab)
+    client.force_login(viewer)  # view_inventory suffices for a single existing label
+    resp = client.get(reverse("inventory:item_label_pdf", args=[item.pk]), {"row": 5, "column": 3})
+    assert resp.status_code == 200
+    assert resp["Content-Type"] == "application/pdf"
+    assert f'filename="label_{item.human_id}_r5c3.pdf"' in resp["Content-Disposition"]
+    assert resp.content.startswith(b"%PDF")
+
+
+@pytest.mark.django_db
+def test_item_label_pdf_works_for_legacy_serials(client, lab, viewer):
+    item = Item.objects.create(lab=lab, human_id="ch-0005", name="legacy")
+    client.force_login(viewer)
+    resp = client.get(reverse("inventory:item_label_pdf", args=[item.pk]))
+    assert resp.status_code == 200
+    assert resp["Content-Type"] == "application/pdf"
+
+
+@pytest.mark.django_db
+def test_item_label_pdf_rejects_out_of_range_position(client, lab, viewer):
+    item = _make_item(lab)
+    client.force_login(viewer)
+    for params in ({"row": 28}, {"column": 8}, {"row": 0}, {"row": "abc"}):
+        resp = client.get(reverse("inventory:item_label_pdf", args=[item.pk]), params)
+        assert resp.status_code == 400
+
+
+@pytest.mark.django_db
+def test_item_ghs_label_pdf(client, lab, viewer):
+    item = _make_item(lab, name="Acetone", signal_word="danger")
+    item.hazards.set(
+        HazardStatement.objects.filter(code__in=["H225", "H319", "P210"])
+        | HazardStatement.objects.none()
+    )
+    client.force_login(viewer)
+    resp = client.get(
+        reverse("inventory:item_ghs_label_pdf", args=[item.pk]), {"row": 4, "column": 2}
+    )
+    assert resp.status_code == 200
+    assert resp["Content-Type"] == "application/pdf"
+    assert f'filename="ghs-label_{item.human_id}_r4c2.pdf"' in resp["Content-Disposition"]
+    assert resp.content.startswith(b"%PDF")
+
+
+@pytest.mark.django_db
+def test_item_ghs_label_pdf_rejects_out_of_range_position(client, lab, viewer):
+    item = _make_item(lab)
+    client.force_login(viewer)
+    resp = client.get(reverse("inventory:item_ghs_label_pdf", args=[item.pk]), {"row": 9})
+    assert resp.status_code == 400

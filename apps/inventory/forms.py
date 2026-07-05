@@ -21,7 +21,7 @@ from apps.attachments.models import Attachment
 from apps.procurement.models import Vendor
 from apps.tenancy.models import Lab, User
 
-from . import ghs, ids
+from . import ghs, ids, labels
 from .models import FieldDefinition, FieldPreset, HazardStatement, Item, Location, Tag
 
 _INPUT_CLASS = (
@@ -319,3 +319,49 @@ class ItemForm(forms.ModelForm):
             )
             entries.append({"field": bound, "filled": filled})
         return entries
+
+
+class LabelSheetForm(forms.Form):
+    """Parameters for a preprinted Data Matrix label sheet (Avery 25.4 x 10 mm).
+
+    The start row/column let a partially used sheet be fed again, continuing at
+    the first free label. Bounds come from the sheet geometry in ``labels.py``.
+    """
+
+    start_id = forms.CharField(
+        label="First ID",
+        help_text="Labels count up from here, e.g. AGB-305.",
+        widget=forms.TextInput(attrs={"class": _INPUT_CLASS}),
+    )
+    count = forms.IntegerField(
+        label="Number of labels",
+        min_value=1,
+        max_value=10 * labels.AVERY_25X10_R.per_page,
+        initial=labels.AVERY_25X10_R.per_page,
+        widget=forms.NumberInput(attrs={"class": _INPUT_CLASS}),
+    )
+    start_row = forms.IntegerField(
+        label="Start at row",
+        min_value=1,
+        max_value=labels.AVERY_25X10_R.rows,
+        initial=1,
+        widget=forms.NumberInput(attrs={"class": _INPUT_CLASS}),
+    )
+    start_column = forms.IntegerField(
+        label="Start at column",
+        min_value=1,
+        max_value=labels.AVERY_25X10_R.columns,
+        initial=1,
+        widget=forms.NumberInput(attrs={"class": _INPUT_CLASS}),
+    )
+
+    def __init__(self, *args, lab: Lab, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.lab = lab
+        self.fields["start_id"].initial = ids.suggest_ids(lab, 1)[0]
+
+    def clean_start_id(self) -> str:
+        try:
+            return ids.normalize_item_id(self.lab, self.cleaned_data["start_id"])
+        except ValueError as error:
+            raise forms.ValidationError(str(error)) from error
