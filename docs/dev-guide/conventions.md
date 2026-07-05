@@ -48,6 +48,18 @@ Prefer the standard library and what's already in the project. A new dependency
 needs a justification (maintenance, size, security, license) and gets pinned via
 `uv.lock`.
 
+### Vendored frontend assets
+
+The CSP is `script-src 'self'` — no CDNs. Third-party JS is committed to
+`labbutler/static/vendor/` as-is (package.json is for the Tailwind build only).
+To update one, fetch the release artifact and replace the file:
+
+| File | Package | Version | License | Source |
+| --- | --- | --- | --- | --- |
+| `htmx.min.js` | htmx.org | — | BSD-2-Clause | <https://htmx.org> |
+| `sortable.min.js` | sortablejs | — | MIT | <https://github.com/SortableJS/Sortable> |
+| `zxing.min.js` | @zxing/library (`umd/index.min.js`) | 0.23.0 | Apache-2.0 | `npm pack @zxing/library` |
+
 ## Documentation
 
 This site lives in `docs/` and is built with MkDocs Material
