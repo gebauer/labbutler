@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 from django.urls import reverse
 
-from apps.inventory.models import Item
+from apps.inventory.models import HazardStatement, Item, Tag
 from apps.procurement.models import Budget, Request, Vendor
 from apps.tenancy.models import User
 from apps.tenancy.services import add_member, create_lab
@@ -47,6 +47,157 @@ def test_create_request_computes_totals(client, lab):
     req = Request.objects.get(item_name="Tips")
     assert req.requested_by == member
     assert req.total == Decimal("249.90")  # (100*2 + 10) * 1.19
+
+
+@pytest.mark.django_db
+def test_reorder_prefills_item_data_but_not_workflow_state(client, lab):
+    """Issue #8: ?from_request= copies the what/where-from, resets the order-specifics."""
+    member = _user(lab, "u@x.de", ["Member"])
+    vendor = Vendor.objects.create(lab=lab, name="Sigma")
+    default_budget = Budget.objects.create(lab=lab, number="KST-1", name="Core", is_default=True)
+    other_budget = Budget.objects.create(lab=lab, number="KST-2", name="Grant")
+    tag = Tag.objects.create(lab=lab, name="solvent")
+    hazard = HazardStatement.objects.get(code="H225")  # seeded by the catalog migration
+    source = Request.objects.create(
+        lab=lab,
+        item_name="Acetone",
+        requested_by=member,
+        vendor=vendor,
+        budget=other_budget,
+        catalog_number="A-123",
+        cas_number="67-64-1",
+        product_url="https://vendor.example/acetone",
+        unit_price=Decimal("12.50"),
+        currency="USD",
+        pack_count=3,
+        quote_id="Q-9",
+        po_number="PO-1",
+        signal_word="danger",
+        storage_class="3",
+        status=Status.CHECKED_IN,
+    )
+    source.tags.add(tag)
+    source.hazards.add(hazard)
+
+    client.force_login(member)
+    resp = client.get(reverse("procurement:request_create"), {"from_request": source.pk})
+    assert resp.status_code == 200
+    initial = resp.context["form"].initial
+    assert initial["item_name"] == "Acetone"
+    assert initial["catalog_number"] == "A-123"
+    assert initial["cas_number"] == "67-64-1"
+    assert initial["product_url"] == "https://vendor.example/acetone"
+    assert initial["vendor"] == vendor.pk
+    assert initial["unit_price"] == Decimal("12.50")
+    assert initial["pack_count"] == 3
+    assert initial["currency"] == "USD"  # copied — not clobbered by the lab default
+    assert initial["signal_word"] == "danger"
+    assert initial["storage_class"] == "3"
+    assert initial["tags"] == [tag.pk]
+    assert initial["hazards"] == [hazard.pk]
+    # Order-specifics start fresh: today's defaults, not the source's values.
+    assert initial["budget"] == default_budget
+    assert not initial.get("quote_id")
+    assert initial["expected_delivery"]  # fresh lead-time default, not the old date
+
+    # The source's detail page offers the shortcut.
+    detail = client.get(reverse("procurement:request_detail", args=[source.pk]))
+    assert f"?from_request={source.pk}".encode() in detail.content
+
+
+@pytest.mark.django_db
+def test_reorder_source_is_lab_scoped(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    other = create_lab(name="Other", item_id_prefix="OT")
+    foreign_req = Request.objects.create(lab=other, item_name="NotMine")
+    foreign_item = Item.objects.create(lab=other, human_id="OT-00001", name="NotMine")
+    client.force_login(member)
+    url = reverse("procurement:request_create")
+    assert client.get(url, {"from_request": foreign_req.pk}).status_code == 404
+    assert client.get(url, {"from_item": foreign_item.pk}).status_code == 404
+    assert client.get(url, {"from_item": "abc"}).status_code == 404
+
+
+@pytest.mark.django_db
+def test_order_again_prefills_from_item_fields(client, lab):
+    """An imported item without a source request prefills from its own fields."""
+    member = _user(lab, "u@x.de", ["Member"])
+    vendor = Vendor.objects.create(lab=lab, name="Roth")
+    item = Item.objects.create(
+        lab=lab,
+        human_id="LB-00001",
+        name="Ethanol",
+        vendor=vendor,
+        catalog_number="E-7",
+        cas_number="64-17-5",
+        price_amount=Decimal("9.90"),
+        price_currency="EUR",
+        signal_word="danger",
+    )
+    client.force_login(member)
+    resp = client.get(reverse("procurement:request_create"), {"from_item": item.pk})
+    initial = resp.context["form"].initial
+    assert initial["item_name"] == "Ethanol"
+    assert initial["vendor"] == vendor.pk
+    assert initial["catalog_number"] == "E-7"
+    assert initial["unit_price"] == Decimal("9.90")
+    assert initial["signal_word"] == "danger"
+
+
+@pytest.mark.django_db
+def test_order_again_prefers_the_items_source_request(client, lab):
+    """A checked-in item reorders from its source request (URL, pack count, price)."""
+    member = _user(lab, "u@x.de", ["Member"])
+    item = Item.objects.create(lab=lab, human_id="LB-00002", name="Tips")
+    Request.objects.create(
+        lab=lab,
+        item_name="Tips 200 µl",
+        requested_by=member,
+        created_item=item,
+        product_url="https://vendor.example/tips",
+        unit_price=Decimal("55.00"),
+        pack_count=10,
+        status=Status.CHECKED_IN,
+    )
+    client.force_login(member)
+    resp = client.get(reverse("procurement:request_create"), {"from_item": item.pk})
+    initial = resp.context["form"].initial
+    assert initial["item_name"] == "Tips 200 µl"
+    assert initial["product_url"] == "https://vendor.example/tips"
+    assert initial["pack_count"] == 10
+
+
+@pytest.mark.django_db
+def test_order_again_links_new_request_to_source_item(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    vendor = Vendor.objects.create(lab=lab, name="Sigma")
+    budget = Budget.objects.create(lab=lab, number="KST-1", name="Core")
+    item = Item.objects.create(lab=lab, human_id="LB-00003", name="Acetone")
+    client.force_login(member)
+
+    # The item detail page offers the shortcut …
+    detail = client.get(reverse("inventory:item_detail", args=[item.pk]))
+    assert b"Order again" in detail.content
+
+    # … and posting the prefilled form records the reorder provenance.
+    resp = client.post(
+        reverse("procurement:request_create") + f"?from_item={item.pk}",
+        {
+            "item_name": "Acetone",
+            "vendor": vendor.pk,
+            "budget": budget.pk,
+            "currency": "EUR",
+            "unit_price": "12.50",
+            "pack_count": "1",
+            "shipping_cost": "0",
+            "tags": [],
+        },
+    )
+    assert resp.status_code == 302
+    req = Request.objects.get(item_name="Acetone")
+    assert req.source_item == item
+    assert req.status == Status.REQUESTED
+    assert item.reorder_requests.get() == req
 
 
 @pytest.mark.django_db

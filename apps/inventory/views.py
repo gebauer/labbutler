@@ -157,6 +157,7 @@ def item_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "item": item,
             "custom_fields": _custom_field_rows(request.lab, item),
             "can_manage": request.user.can(request.lab, "manage_inventory"),
+            "can_order": request.user.can(request.lab, "create_request"),
             "entries": entries,
             "comments": Comment.for_object(item),
             "attachments": Attachment.for_object(item),

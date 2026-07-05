@@ -13,7 +13,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -23,7 +23,7 @@ from apps.attachments.models import Attachment
 from apps.audit.models import AuditEntry
 from apps.comments.models import Comment
 from apps.inventory import ids
-from apps.inventory.models import Location
+from apps.inventory.models import Item, Location
 from apps.tenancy.models import User
 from apps.tenancy.scoping import require_permission
 
@@ -169,7 +169,13 @@ def request_list(request: HttpRequest) -> HttpResponse:
 def request_detail(request: HttpRequest, pk: int) -> HttpResponse:
     req = get_object_or_404(
         Request.objects.select_related(
-            "vendor", "budget", "shipping_address", "requested_by", "approver", "created_item"
+            "vendor",
+            "budget",
+            "shipping_address",
+            "requested_by",
+            "approver",
+            "created_item",
+            "source_item",
         ).prefetch_related("tags"),
         pk=pk,
         lab=request.lab,
@@ -196,28 +202,93 @@ def request_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "comments": Comment.for_object(req),
             "attachments": Attachment.for_object(req),
             "can_attach": request.user.can(request.lab, "create_request"),
+            "can_create": request.user.can(request.lab, "create_request"),
         },
     )
 
 
+# Fields copied verbatim when a request is duplicated for a reorder. Workflow state,
+# budget, shipping address, delivery date, PO/quote and attachments start fresh.
+_REORDER_FIELDS = (
+    "item_name",
+    "catalog_number",
+    "cas_number",
+    "product_url",
+    "unit_price",
+    "currency",
+    "pack_count",
+    "signal_word",
+    "storage_class",
+)
+
+
+def _reorder_source(request: HttpRequest) -> tuple[Request | None, Item | None]:
+    """Resolve the ``from_request`` / ``from_item`` reorder parameter, lab-scoped."""
+    for param, model in (("from_request", Request), ("from_item", Item)):
+        raw_pk = request.GET.get(param)
+        if raw_pk:
+            if not raw_pk.isdigit():
+                raise Http404
+            source = get_object_or_404(model, pk=raw_pk, lab=request.lab)
+            return (source, None) if model is Request else (None, source)
+    return None, None
+
+
+def _initial_from_request(source: Request) -> dict:
+    initial: dict = {name: getattr(source, name) for name in _REORDER_FIELDS}
+    initial["vendor"] = source.vendor_id
+    initial["tags"] = list(source.tags.values_list("pk", flat=True))
+    initial["hazards"] = list(source.hazards.values_list("pk", flat=True))
+    return {name: value for name, value in initial.items() if value not in (None, "", [])}
+
+
+def _initial_from_item(item: Item) -> dict:
+    # The request the item was checked in from has the richer data (URL, pack count,
+    # price at order time); fall back to the item's own fields for imported stock.
+    source = Request.objects.filter(created_item=item).first()
+    if source is not None:
+        return _initial_from_request(source)
+    initial: dict = {
+        "item_name": item.name,
+        "catalog_number": item.catalog_number,
+        "cas_number": item.cas_number,
+        "vendor": item.vendor_id,
+        "unit_price": item.price_amount,
+        "currency": item.price_currency,
+        "signal_word": item.signal_word,
+        "storage_class": item.storage_class,
+        "tags": list(item.tags.values_list("pk", flat=True)),
+        "hazards": list(item.hazards.values_list("pk", flat=True)),
+    }
+    return {name: value for name, value in initial.items() if value not in (None, "", [])}
+
+
 @require_permission("create_request")
 def request_create(request: HttpRequest) -> HttpResponse:
+    # The form posts back to the same URL, so the reorder params survive into the POST.
+    source_request, source_item = _reorder_source(request)
     if request.method == "POST":
         form = RequestForm(request.POST, request.FILES, lab=request.lab)
         if form.is_valid():
             req = form.save(commit=False)
             req.lab = request.lab
             req.requested_by = request.user
+            req.source_item = source_item
             req.recalculate_totals()
             req.save()
             form.save_m2m()
             form.save_attachments(user=request.user)
+            changes = {"item_name": req.item_name, "total": str(req.total)}
+            if source_item is not None:
+                changes["reordered_from_item"] = source_item.human_id
+            elif source_request is not None:
+                changes["duplicated_from_request"] = source_request.pk
             AuditEntry.record(
                 lab=request.lab,
                 actor=request.user,
                 action="procurement.request_created",
                 target=req,
-                changes={"item_name": req.item_name, "total": str(req.total)},
+                changes=changes,
             )
             # Notify the lab's approvers (once the row is committed) that it needs approval.
             from apps.notifications.tasks import notify_request_created
@@ -226,7 +297,12 @@ def request_create(request: HttpRequest) -> HttpResponse:
             messages.success(request, "Request raised.")
             return redirect("procurement:request_detail", pk=req.pk)
     else:
-        form = RequestForm(lab=request.lab)
+        initial = None
+        if source_request is not None:
+            initial = _initial_from_request(source_request)
+        elif source_item is not None:
+            initial = _initial_from_item(source_item)
+        form = RequestForm(lab=request.lab, initial=initial)
     return render(
         request,
         "procurement/request_form.html",

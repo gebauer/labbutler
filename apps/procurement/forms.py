@@ -73,6 +73,9 @@ class RequestForm(forms.ModelForm):
         labels = {"product_url": "Product URL", "cas_number": "CAS number"}
 
     def __init__(self, *args, lab: Lab, **kwargs) -> None:
+        # Remembered before super() merges it into self.initial: caller-passed initial
+        # (e.g. a reorder prefill) must win over the lab-level defaults applied below.
+        provided_initial = kwargs.get("initial") or {}
         super().__init__(*args, **kwargs)
         self.lab = lab
         # Bind the lab up front so save(commit=True) and per-lab lookups both see it.
@@ -85,9 +88,14 @@ class RequestForm(forms.ModelForm):
         self.fields["tags"].queryset = Tag.objects.filter(lab=lab).order_by("name")
         self.fields["hazards"] = hazard_statement_field()
 
-        # Currency is a fixed dropdown; keep an off-list code (imported data) selectable.
+        # Currency is a fixed dropdown; keep an off-list code (imported data, or a
+        # reorder prefill of such a request) selectable.
         codes = list(CURRENCIES)
-        for extra in (self.instance.currency if self.instance.pk else "", lab.default_currency):
+        for extra in (
+            self.instance.currency if self.instance.pk else "",
+            self.initial.get("currency") or "",
+            lab.default_currency,
+        ):
             if extra and extra not in codes:
                 codes.append(extra)
         self.fields["currency"] = forms.ChoiceField(
@@ -95,15 +103,21 @@ class RequestForm(forms.ModelForm):
         )
 
         # self.initial (built from the model instance) beats field.initial, so lab-level
-        # defaults for a new request must be written there.
+        # defaults for a new request must be written there — but only for fields the
+        # caller didn't prefill (self.initial alone can't tell the two apart).
         if not self.instance.pk:
-            self.initial["currency"] = lab.default_currency or "EUR"
-            # Standard lead time; the template offers +3d/+2wks/… shortcuts to adjust.
-            self.initial["expected_delivery"] = date.today() + timedelta(weeks=1)
+            lab_defaults: dict[str, object] = {
+                "currency": lab.default_currency or "EUR",
+                # Standard lead time; the template offers +3d/+2wks/… shortcuts to adjust.
+                "expected_delivery": date.today() + timedelta(weeks=1),
+            }
             for field_name, model in (("shipping_address", ShippingAddress), ("budget", Budget)):
                 default = model.default_for(lab)
                 if default is not None:
-                    self.initial[field_name] = default
+                    lab_defaults[field_name] = default
+            for field_name, value in lab_defaults.items():
+                if field_name not in provided_initial:
+                    self.initial[field_name] = value
 
         self.fields["budget"].required = True
         self.fields["budget"].error_messages["required"] = (
