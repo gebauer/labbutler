@@ -269,3 +269,39 @@ class Item(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.human_id} · {self.name}"
+
+
+class ScanEvent(models.Model):
+    """Append-only record of a physical label scan ("last seen by").
+
+    Deliberately not an :class:`~apps.audit.models.AuditEntry`: audit records state
+    mutations, a scan is an observation that the container was physically in hand.
+    ``source`` distinguishes ad-hoc lookups from a future stocktaking ("Inventur")
+    mode, which will add a session FK later without touching existing rows.
+    """
+
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name="scan_events")
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="scan_events")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="scan_events",
+    )
+    scanned_at = models.DateTimeField(auto_now_add=True)
+    source = models.CharField(max_length=20, default="search")
+    # Snapshot of the item's recorded location at scan time; in Inventur mode this
+    # becomes the location being stocktaken.
+    location = models.ForeignKey(
+        Location, on_delete=models.SET_NULL, null=True, blank=True, related_name="scan_events"
+    )
+
+    class Meta:
+        ordering = ["-scanned_at"]
+        indexes = [
+            models.Index(fields=["item", "-scanned_at"]),
+            models.Index(fields=["lab", "-scanned_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.item.human_id} seen by {self.user} at {self.scanned_at:%Y-%m-%d %H:%M}"

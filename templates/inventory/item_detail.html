@@ -89,5 +89,30 @@
     <div>{% include "attachments/_list.html" with attachments=attachments target=item attach_model="item" can_attach=can_manage %}</div>
   </div>
 
+  {# Scan sightings ("was this container physically in hand recently?") — separate from
+     the audit trail below, which records state changes only. #}
+  <details class="mt-8 rounded-lg border border-gray-200 bg-white shadow-sm">
+    <summary class="cursor-pointer select-none px-5 py-4 text-sm font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700 [&::-webkit-details-marker]:hidden">
+      Last seen by
+      {% with scans|first as last_scan %}
+        {% if last_scan %}
+          <span class="ml-1 font-normal normal-case tracking-normal text-gray-400">— {{ last_scan.user.display_name|default:"former member" }}, {{ last_scan.scanned_at|timesince }} ago</span>
+        {% else %}
+          <span class="ml-1 font-normal normal-case tracking-normal text-gray-400">— never scanned</span>
+        {% endif %}
+      {% endwith %}
+    </summary>
+    <ul class="divide-y divide-gray-100 border-t border-gray-100 px-5">
+      {% for scan in scans %}
+        <li class="flex items-baseline justify-between gap-3 py-2.5 text-sm">
+          <span class="text-gray-900">{{ scan.user.display_name|default:"former member" }}</span>
+          <span class="text-gray-400">{{ scan.scanned_at|date:"DATETIME_FORMAT" }} · {{ scan.scanned_at|timesince }} ago</span>
+        </li>
+      {% empty %}
+        <li class="py-2.5 text-sm text-gray-400">No scans yet — open this item via the label scanner to record a sighting.</li>
+      {% endfor %}
+    </ul>
+  </details>
+
   {% include "_audit_trail.html" %}
 {% endblock %}

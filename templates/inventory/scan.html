@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Scan label · LabButler{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'vendor/zxing.min.js' %}" defer></script>
+  <script src="{% static 'js/scanner.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+  <div class="mx-auto max-w-md" data-scanner>
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-semibold tracking-tight">Scan label</h1>
+      <a href="{% url 'inventory:item_list' %}" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+    </div>
+
+    <video data-scanner-video playsinline muted
+           class="mt-4 aspect-[3/4] w-full rounded-lg bg-black object-cover"></video>
+    <p data-scanner-status class="mt-2 text-sm text-gray-500">Starting camera…</p>
+
+    <form method="post" action="{% url 'inventory:scan_resolve' %}" class="mt-6">
+      {% csrf_token %}
+      <label for="scan-code" class="block text-xs font-semibold uppercase tracking-wide text-gray-500">
+        Or type the ID instead
+      </label>
+      <div class="mt-1 flex gap-2">
+        <input id="scan-code" type="text" name="code" data-scanner-code
+               placeholder="e.g. {{ request.lab.item_id_prefix }}-00001"
+               autocomplete="off" autocapitalize="characters"
+               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500">
+        <button type="submit"
+                class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-700">
+          Look up
+        </button>
+      </div>
+    </form>
+  </div>
+{% endblock %}

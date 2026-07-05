@@ -18,7 +18,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, JsonR
 from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
 from django.urls import reverse
-from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.views.decorators.http import require_GET, require_POST
 
 from apps.attachments.models import Attachment
@@ -31,7 +31,7 @@ from apps.tenancy.scoping import require_permission, set_current_lab, user_labs
 from . import ghs, ids, labels
 from . import ghs_lookup as ghs_lookup_client
 from .forms import ItemForm, LabelSheetForm
-from .models import HazardStatement, Item, Location, Tag
+from .models import HazardStatement, Item, Location, ScanEvent, Tag
 
 PAGE_SIZE = 25
 
@@ -162,10 +162,42 @@ def item_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "can_manage": request.user.can(request.lab, "manage_inventory"),
             "can_order": request.user.can(request.lab, "create_request"),
             "entries": entries,
+            "scans": item.scan_events.select_related("user")[:10],
             "comments": Comment.for_object(item),
             "attachments": Attachment.for_object(item),
         },
     )
+
+
+@require_permission("view_inventory")
+def scan_page(request: HttpRequest) -> HttpResponse:
+    """Camera scanner for the Data Matrix ID labels (with a manual-entry fallback)."""
+    return render(request, "inventory/scan.html")
+
+
+@require_permission("view_inventory")
+@require_POST
+def scan_resolve(request: HttpRequest) -> HttpResponse:
+    """Resolve a scanned/typed code to an item, record the sighting, show the item.
+
+    Unknown or malformed codes fall back to the item list with the code as the search
+    query — it may still match a legacy serial or barcode there.
+    """
+    raw = (request.POST.get("code") or "").strip()
+    try:
+        human_id = ids.normalize_item_id(request.lab, raw)
+        item = Item.objects.get(lab=request.lab, human_id=human_id)
+    except (ValueError, Item.DoesNotExist):
+        messages.warning(request, f'No item found for "{raw}" — showing search results instead.')
+        return redirect(f"{reverse('inventory:item_list')}?{urlencode({'q': raw})}")
+    ScanEvent.objects.create(
+        lab=request.lab,
+        item=item,
+        user=request.user,
+        source="search",
+        location=item.location,
+    )
+    return redirect("inventory:item_detail", pk=item.pk)
 
 
 def _custom_field_rows(lab, item: Item) -> list[tuple[str, object]]:

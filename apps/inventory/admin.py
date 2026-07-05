@@ -6,6 +6,7 @@ from .models import (
     HazardStatement,
     Item,
     Location,
+    ScanEvent,
     Tag,
 )
 
@@ -46,6 +47,14 @@ class FieldPresetAdmin(admin.ModelAdmin):
     # fields__* so a preset can be found by any field it bundles.
     search_fields = ("name", "fields__label", "fields__key")
     filter_horizontal = ("fields",)
+
+
+@admin.register(ScanEvent)
+class ScanEventAdmin(admin.ModelAdmin):
+    list_display = ("item", "user", "scanned_at", "source", "lab")
+    list_filter = ("lab", "source")
+    date_hierarchy = "scanned_at"
+    readonly_fields = ("scanned_at",)
 
 
 admin.site.register(Tag)
