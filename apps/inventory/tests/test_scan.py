@@ -83,6 +83,29 @@ def test_resolve_unknown_code_falls_back_to_search(client, lab, viewer):
 
 
 @pytest.mark.django_db
+def test_resolve_matches_legacy_human_id_verbatim(client, lab, viewer):
+    # Imported items keep their legacy ID as human_id; it doesn't match the lab
+    # prefix, but a label encoding it must still resolve directly (case-insensitively).
+    item = Item.objects.create(lab=lab, human_id="pr-0213", name="Imported acetone")
+    client.force_login(viewer)
+    resp = client.post(reverse("inventory:scan_resolve"), {"code": "PR-0213"})
+    assert resp.status_code == 302
+    assert resp["Location"] == reverse("inventory:item_detail", kwargs={"pk": item.pk})
+    assert ScanEvent.objects.get().item == item
+
+
+@pytest.mark.django_db
+def test_resolve_ambiguous_case_variants_fall_back_to_search(client, lab, viewer):
+    Item.objects.create(lab=lab, human_id="pr-0213", name="Lower")
+    Item.objects.create(lab=lab, human_id="PR-0213", name="Upper")
+    client.force_login(viewer)
+    resp = client.post(reverse("inventory:scan_resolve"), {"code": "Pr-0213"})
+    assert resp.status_code == 302
+    assert reverse("inventory:item_list") in resp["Location"]
+    assert ScanEvent.objects.count() == 0
+
+
+@pytest.mark.django_db
 def test_resolve_malformed_code_falls_back_without_error(client, lab, viewer):
     client.force_login(viewer)
     resp = client.post(reverse("inventory:scan_resolve"), {"code": "garbage!!"})
@@ -124,6 +147,8 @@ def test_detail_shows_last_seen_by(client, lab, viewer):
     assert resp.status_code == 200
     assert b"Last seen by" in resp.content
     assert viewer.display_name.encode() in resp.content
+    # {# ... #} template comments are single-line only; a multi-line one leaks as text.
+    assert b"{#" not in resp.content
 
 
 @pytest.mark.django_db

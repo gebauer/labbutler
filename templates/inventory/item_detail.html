@@ -89,8 +89,7 @@
     <div>{% include "attachments/_list.html" with attachments=attachments target=item attach_model="item" can_attach=can_manage %}</div>
   </div>
 
-  {# Scan sightings ("was this container physically in hand recently?") — separate from
-     the audit trail below, which records state changes only. #}
+  {# Scan sightings — separate from the audit trail below, which records state changes only. #}
   <details class="mt-8 rounded-lg border border-gray-200 bg-white shadow-sm">
     <summary class="cursor-pointer select-none px-5 py-4 text-sm font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700 [&::-webkit-details-marker]:hidden">
       Last seen by

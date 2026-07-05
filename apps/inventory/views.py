@@ -175,19 +175,37 @@ def scan_page(request: HttpRequest) -> HttpResponse:
     return render(request, "inventory/scan.html")
 
 
+def _item_for_scanned_code(lab, raw: str) -> Item | None:
+    """Match a scanned code to exactly one item, or None.
+
+    Imported items keep their legacy ID as ``human_id`` (e.g. ``pr-0213``), so the code
+    is tried verbatim before prefix normalisation; ambiguity (iexact matching several
+    case-variants) counts as no match rather than guessing.
+    """
+    candidates = [raw]
+    try:
+        candidates.append(ids.normalize_item_id(lab, raw))
+    except ValueError:
+        pass
+    for code in candidates:
+        try:
+            return Item.objects.get(lab=lab, human_id__iexact=code)
+        except (Item.DoesNotExist, Item.MultipleObjectsReturned):
+            continue
+    return None
+
+
 @require_permission("view_inventory")
 @require_POST
 def scan_resolve(request: HttpRequest) -> HttpResponse:
     """Resolve a scanned/typed code to an item, record the sighting, show the item.
 
-    Unknown or malformed codes fall back to the item list with the code as the search
-    query — it may still match a legacy serial or barcode there.
+    Unknown codes fall back to the item list with the code as the search query — it
+    may still match a legacy serial or barcode there.
     """
     raw = (request.POST.get("code") or "").strip()
-    try:
-        human_id = ids.normalize_item_id(request.lab, raw)
-        item = Item.objects.get(lab=request.lab, human_id=human_id)
-    except (ValueError, Item.DoesNotExist):
+    item = _item_for_scanned_code(request.lab, raw)
+    if item is None:
         messages.warning(request, f'No item found for "{raw}" — showing search results instead.')
         return redirect(f"{reverse('inventory:item_list')}?{urlencode({'q': raw})}")
     ScanEvent.objects.create(
