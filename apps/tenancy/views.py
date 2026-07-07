@@ -77,11 +77,12 @@ def onboarding(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def account_settings(request: HttpRequest) -> HttpResponse:
-    """Personal settings for the active lab: the account's friendly name plus (when the
-    member can act on them) per-lab email preferences.
+    """Personal settings for the active lab: the account's friendly name plus per-lab
+    email preferences.
 
-    The notification section only shows the categories the member can act on: approval
-    settings for approvers, request-update settings for people who can raise requests.
+    The notification section shows the procurement categories the member can act on
+    (approval settings for approvers, request-update settings for people who can raise
+    requests) and the weekly expiry report, which every member can tune.
     """
     lab = get_current_lab(request)
     if lab is None:
@@ -90,7 +91,7 @@ def account_settings(request: HttpRequest) -> HttpResponse:
     membership = Membership.objects.filter(user=request.user, lab=lab).first()
     can_approve = request.user.can(lab, "approve_request")
     can_request = request.user.can(lab, "create_request")
-    show_notifications = membership is not None and (can_approve or can_request)
+    can_view_inventory = request.user.can(lab, "view_inventory")
 
     profile_form = ProfileForm(request.POST or None, instance=request.user)
     notif_form = (
@@ -99,8 +100,9 @@ def account_settings(request: HttpRequest) -> HttpResponse:
             instance=membership,
             can_approve=can_approve,
             can_request=can_request,
+            can_view_inventory=can_view_inventory,
         )
-        if show_notifications
+        if membership is not None
         else None
     )
 

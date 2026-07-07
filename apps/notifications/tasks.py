@@ -19,7 +19,14 @@ from django.utils.http import urlsafe_base64_encode
 
 from apps.inventory.models import Item
 from apps.procurement.models import Request
-from apps.tenancy.models import Lab, Membership, NotificationFrequency, User
+from apps.tenancy.models import (
+    ExpiryAdvanceDays,
+    ExpiryReportMode,
+    Lab,
+    Membership,
+    NotificationFrequency,
+    User,
+)
 
 from . import emails
 
@@ -87,19 +94,6 @@ def approval_recipients(
     )
     if exclude is not None:
         users = users.exclude(pk=exclude.pk)
-    return sorted({user.email for user in users})
-
-
-def digest_recipients(lab: Lab) -> list[str]:
-    """Emails of lab members who can manage inventory — the people who act on expiry."""
-    users = (
-        User.objects.filter(
-            memberships__lab=lab,
-            memberships__roles__permissions__code="manage_inventory",
-        )
-        .exclude(email="")
-        .distinct()
-    )
     return sorted({user.email for user in users})
 
 
@@ -185,36 +179,73 @@ def send_welcome_email(user_pk: int, lab_pk: int) -> int:
     return 1
 
 
+# The expiry report runs weekly, so "new" covers what changed since the previous run.
+EXPIRY_REPORT_INTERVAL_DAYS = 7
+
+
 @shared_task
 def send_expiry_digests(days_ahead: int | None = None) -> int:
-    """Send a per-lab digest of expired / soon-to-expire items. Returns labs notified."""
-    if days_ahead is None:
-        days_ahead = getattr(settings, "EXPIRY_DIGEST_DAYS", 30)
-    today = timezone.localdate()
-    horizon = today + timedelta(days=days_ahead)
+    """Send each member their weekly expiry report. Returns the number of emails sent.
 
-    labs_notified = 0
+    Honours each membership's expiry preferences: report mode (all items, only what
+    changed since last week's run, or off), the advance-warning window (7/14/30 days),
+    and the owned-items-only flag. ``days_ahead`` overrides every member's window (the
+    management command's ``--days``). Members without ``view_inventory`` only ever get
+    items they own — fail closed on lab-wide data.
+    """
+    today = timezone.localdate()
+    max_window = max([days_ahead or 0, *ExpiryAdvanceDays.values])
+
+    emails_sent = 0
     for lab in Lab.objects.all():
         items = list(
             Item.objects.filter(
-                lab=lab, expiration_date__isnull=False, expiration_date__lte=horizon
+                lab=lab,
+                expiration_date__isnull=False,
+                expiration_date__lte=today + timedelta(days=max_window),
             )
             .select_related("location")
             .order_by("expiration_date")
         )
         if not items:
             continue
-        recipients = digest_recipients(lab)
-        if not recipients:
-            continue
-        expired = [i for i in items if i.expiration_date < today]
-        expiring = [i for i in items if i.expiration_date >= today]
-        content = emails.build_expiry_digest(
-            lab, expired, expiring, today, days_ahead=days_ahead, base_url=_base_url()
+        memberships = (
+            Membership.objects.filter(lab=lab)
+            .exclude(expiry_notifications=ExpiryReportMode.OFF)
+            .select_related("user")
         )
-        _send(content, recipients)
-        labs_notified += 1
-    return labs_notified
+        for membership in memberships:
+            user = membership.user
+            if not user.email:
+                continue
+            window = days_ahead if days_ahead is not None else membership.expiry_days_ahead
+            horizon = today + timedelta(days=window)
+            owned_only = membership.expiry_owned_only or not user.can(lab, "view_inventory")
+            visible = [i for i in items if i.owner_id == user.pk] if owned_only else items
+            expired = [i for i in visible if i.expiration_date < today]
+            expiring = [i for i in visible if today <= i.expiration_date <= horizon]
+            new_only = membership.expiry_notifications == ExpiryReportMode.WEEKLY_NEW
+            if new_only:
+                interval = timedelta(days=EXPIRY_REPORT_INTERVAL_DAYS)
+                expired = [i for i in expired if i.expiration_date >= today - interval]
+                # An item is newly "expiring soon" once it first enters the member's
+                # advance window, i.e. since the previous weekly run.
+                expiring = [i for i in expiring if i.expiration_date > horizon - interval]
+            if not expired and not expiring:
+                continue
+            content = emails.build_expiry_digest(
+                lab,
+                expired,
+                expiring,
+                today,
+                days_ahead=window,
+                new_only=new_only,
+                owned_only=owned_only,
+                base_url=_base_url(),
+            )
+            _send(content, [user.email])
+            emails_sent += 1
+    return emails_sent
 
 
 @shared_task

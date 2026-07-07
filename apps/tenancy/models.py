@@ -161,6 +161,22 @@ class NotificationFrequency(models.TextChoices):
     OFF = "off", "No email"
 
 
+class ExpiryReportMode(models.TextChoices):
+    """What the weekly expiry report contains for a member — or nothing at all."""
+
+    WEEKLY_ALL = "weekly_all", "Once a week — all items"
+    WEEKLY_NEW = "weekly_new", "Once a week — only newly expired items"
+    OFF = "off", "Never"
+
+
+class ExpiryAdvanceDays(models.IntegerChoices):
+    """How far ahead a member is warned about items expiring soon."""
+
+    ONE_WEEK = 7, "7 days ahead"
+    TWO_WEEKS = 14, "14 days ahead"
+    ONE_MONTH = 30, "30 days ahead"
+
+
 class Membership(TimeStampedModel):
     """A user's participation in one lab, carrying that lab's roles."""
 
@@ -181,6 +197,20 @@ class Membership(TimeStampedModel):
         max_length=16,
         choices=NotificationFrequency.choices,
         default=NotificationFrequency.IMMEDIATE,
+    )
+
+    # Weekly expiry report. "Only newly expired" limits the report to changes since the
+    # previous weekly run; the owned-only flag narrows it to the member's own items (and
+    # is forced on for members without view_inventory — fail closed on lab-wide data).
+    expiry_notifications = models.CharField(
+        max_length=16,
+        choices=ExpiryReportMode.choices,
+        default=ExpiryReportMode.WEEKLY_NEW,
+    )
+    expiry_owned_only = models.BooleanField(default=False)
+    expiry_days_ahead = models.PositiveSmallIntegerField(
+        choices=ExpiryAdvanceDays.choices,
+        default=ExpiryAdvanceDays.ONE_MONTH,
     )
 
     class Meta:

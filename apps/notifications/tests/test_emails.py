@@ -196,3 +196,22 @@ def test_expiry_digest_lists_items_and_counts():
     assert "1 expiring within 30 days" in content.subject
     assert "LB-1" in content.body and "Old Tris" in content.body
     assert "LB-2" in content.body and "Soon Agar" in content.body
+    assert "Already expired" in content.body
+    assert "Expiring within 30 days" in content.body
+
+
+def test_expiry_digest_new_and_owned_wording():
+    today = date(2026, 7, 1)
+    expired = [Item(human_id="LB-1", name="Old Tris", expiration_date=date(2026, 6, 28))]
+    expiring = [Item(human_id="LB-2", name="Soon Agar", expiration_date=date(2026, 7, 13))]
+
+    class FakeLab:
+        name = "AG Baumann"
+
+    content = build_expiry_digest(
+        FakeLab(), expired, expiring, today, days_ahead=14, new_only=True, owned_only=True
+    )
+    assert "Newly expired since the last report" in content.body
+    assert "Newly expiring within 14 days" in content.body
+    assert "It covers only items you own." in content.body
+    assert "only changes since last week" in content.body

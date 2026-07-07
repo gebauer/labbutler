@@ -176,11 +176,16 @@ CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/1")
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 
-# Daily digests (run by `celery -A labbutler beat`). Hours are local time.
+# Digests (run by `celery -A labbutler beat`). Hours are local time; the expiry report
+# is weekly (per-member preferences decide its content), the procurement digest daily.
 CELERY_BEAT_SCHEDULE = {
-    "expiry-digest-daily": {
+    "expiry-digest-weekly": {
         "task": "apps.notifications.tasks.send_expiry_digests",
-        "schedule": crontab(hour=env.int("EXPIRY_DIGEST_HOUR", default=7), minute=0),
+        "schedule": crontab(
+            day_of_week=env("EXPIRY_DIGEST_WEEKDAY", default="mon"),
+            hour=env.int("EXPIRY_DIGEST_HOUR", default=7),
+            minute=0,
+        ),
     },
     "procurement-digest-daily": {
         "task": "apps.notifications.tasks.send_notification_digests",
@@ -203,8 +208,6 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="labbutler@localhost")
 # --- Notifications --------------------------------------------------------------------
 # Absolute base URL used to build links in emails (blank omits links, e.g. in dev).
 LABBUTLER_BASE_URL = env("LABBUTLER_BASE_URL", default="")
-# How many days ahead the expiry digest looks.
-EXPIRY_DIGEST_DAYS = env.int("EXPIRY_DIGEST_DAYS", default=30)
 
 # --- Login brute-force protection (django-axes) ----------------------------------------
 AXES_ENABLED = env.bool("AXES_ENABLED", default=True)

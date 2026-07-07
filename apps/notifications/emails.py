@@ -245,9 +245,16 @@ def build_expiry_digest(
     today: date,
     *,
     days_ahead: int,
+    new_only: bool = False,
+    owned_only: bool = False,
     base_url: str = "",
 ) -> EmailContent:
-    """Digest of items already expired and expiring within ``days_ahead`` days."""
+    """Digest of items already expired and expiring within ``days_ahead`` days.
+
+    ``new_only`` marks a report limited to changes since the previous weekly run;
+    ``owned_only`` marks one limited to items the recipient owns. Both only adjust the
+    wording — the item lists arrive pre-filtered.
+    """
     subject = (
         f"[LabButler] {lab.name}: {len(expired)} expired, "
         f"{len(expiring)} expiring within {days_ahead} days"
@@ -259,17 +266,31 @@ def build_expiry_digest(
 
     sections = []
     if expired:
-        sections.append({"title": "Already expired", "lines": [_row(i) for i in expired]})
+        sections.append(
+            {
+                "title": "Newly expired since the last report" if new_only else "Already expired",
+                "lines": [_row(i) for i in expired],
+            }
+        )
     if expiring:
         sections.append(
             {
-                "title": f"Expiring within {days_ahead} days",
+                "title": (
+                    f"Newly expiring within {days_ahead} days"
+                    if new_only
+                    else f"Expiring within {days_ahead} days"
+                ),
                 "lines": [_row(i) for i in expiring],
             }
         )
+    intro = f"Expiry report for {lab.name}, generated {today:%Y-%m-%d}."
+    if owned_only:
+        intro += " It covers only items you own."
+    if new_only:
+        intro += " It lists only changes since last week's report."
     return _email(
         subject,
-        intro=f"Expiry report for {lab.name}, generated {today:%Y-%m-%d}.",
+        intro=intro,
         sections=sections,
         closing="Review them in the inventory:",
         action_url=_url(base_url, "/inventory/"),

@@ -9,7 +9,6 @@ from apps.inventory.models import Item
 from apps.notifications import tasks
 from apps.notifications.tasks import (
     approval_recipients,
-    digest_recipients,
     notify_request_created,
     notify_request_transition,
     request_update_recipients,
@@ -19,7 +18,7 @@ from apps.notifications.tasks import (
 )
 from apps.procurement.models import Request
 from apps.procurement.services import perform_transition
-from apps.tenancy.models import Membership, NotificationFrequency, User
+from apps.tenancy.models import ExpiryReportMode, Membership, NotificationFrequency, User
 from apps.tenancy.services import add_member, create_lab
 
 Status = Request.Status
@@ -118,23 +117,14 @@ def test_notify_task_is_noop_for_missing_request(mailoutbox):
 
 
 @pytest.mark.django_db
-def test_digest_recipients_are_inventory_managers_only(lab):
-    _user(lab, "mgr@x.de", ["Lab manager"])  # manage_inventory via "*"
-    _user(lab, "member@x.de", ["Member"])  # Member carries manage_inventory
-    _user(lab, "viewer@x.de", ["Viewer"])  # view-only -> excluded
-    assert digest_recipients(lab) == ["member@x.de", "mgr@x.de"]
-
-
-@pytest.mark.django_db
-def test_send_expiry_digests_reports_expired_and_soon(lab, mailoutbox, settings):
-    settings.EXPIRY_DIGEST_DAYS = 30
-    _user(lab, "mgr@x.de", ["Lab manager"])
+def test_send_expiry_digests_all_mode_reports_expired_and_soon(lab, mailoutbox):
+    _user(lab, "mgr@x.de", ["Lab manager"], expiry_notifications=ExpiryReportMode.WEEKLY_ALL)
     today = timezone.localdate()
     Item.objects.create(
-        lab=lab, human_id="LB-1", name="Expired", expiration_date=today - timedelta(days=5)
+        lab=lab, human_id="LB-1", name="OldStock", expiration_date=today - timedelta(days=90)
     )
     Item.objects.create(
-        lab=lab, human_id="LB-2", name="Soon", expiration_date=today + timedelta(days=10)
+        lab=lab, human_id="LB-2", name="Soonish", expiration_date=today + timedelta(days=10)
     )
     Item.objects.create(
         lab=lab, human_id="LB-3", name="Later", expiration_date=today + timedelta(days=90)
@@ -144,20 +134,127 @@ def test_send_expiry_digests_reports_expired_and_soon(lab, mailoutbox, settings)
     assert send_expiry_digests() == 1
     assert len(mailoutbox) == 1
     body = mailoutbox[0].body
-    assert "Expired" in body and "Soon" in body
-    assert "Later" not in body  # beyond the horizon
+    # "All items" mode reports everything expired, however long ago.
+    assert "OldStock" in body and "Soonish" in body
+    assert "Later" not in body  # beyond the 30-day default window
     assert "NoDate" not in body  # no expiration date
 
 
 @pytest.mark.django_db
-def test_send_expiry_digests_skips_labs_without_recipients(lab, mailoutbox):
+def test_send_expiry_digests_new_mode_lists_only_changes_since_last_week(lab, mailoutbox):
+    # WEEKLY_NEW is the default mode: only items that expired, or entered the member's
+    # advance window, during the past week appear in the report.
+    _user(lab, "mgr@x.de", ["Lab manager"])
+    today = timezone.localdate()
+    Item.objects.create(
+        lab=lab, human_id="LB-1", name="FreshLapse", expiration_date=today - timedelta(days=2)
+    )
+    Item.objects.create(
+        lab=lab, human_id="LB-2", name="LongGone", expiration_date=today - timedelta(days=30)
+    )
+    Item.objects.create(
+        lab=lab, human_id="LB-3", name="JustEntered", expiration_date=today + timedelta(days=27)
+    )
+    Item.objects.create(
+        lab=lab, human_id="LB-4", name="KnownAlready", expiration_date=today + timedelta(days=10)
+    )
+
+    assert send_expiry_digests() == 1
+    body = mailoutbox[0].body
+    assert "FreshLapse" in body and "JustEntered" in body
+    assert "LongGone" not in body  # expired long before the last report
+    assert "KnownAlready" not in body  # entered the 30-day window weeks ago
+    assert "only changes since last week" in body
+
+
+@pytest.mark.django_db
+def test_send_expiry_digests_respects_off(lab, mailoutbox):
+    _user(lab, "off@x.de", ["Lab manager"], expiry_notifications=ExpiryReportMode.OFF)
     today = timezone.localdate()
     Item.objects.create(
         lab=lab, human_id="LB-1", name="Expired", expiration_date=today - timedelta(days=1)
     )
-    # No member can manage inventory, so there's no one to notify.
     assert send_expiry_digests() == 0
     assert mailoutbox == []
+
+
+@pytest.mark.django_db
+def test_send_expiry_digests_owned_only_limits_to_own_items(lab, mailoutbox):
+    owner = _user(
+        lab,
+        "own@x.de",
+        ["Lab manager"],
+        expiry_notifications=ExpiryReportMode.WEEKLY_ALL,
+        expiry_owned_only=True,
+    )
+    today = timezone.localdate()
+    Item.objects.create(
+        lab=lab,
+        human_id="LB-1",
+        name="Mine",
+        expiration_date=today - timedelta(days=1),
+        owner=owner,
+    )
+    Item.objects.create(
+        lab=lab, human_id="LB-2", name="Theirs", expiration_date=today - timedelta(days=1)
+    )
+
+    assert send_expiry_digests() == 1
+    body = mailoutbox[0].body
+    assert "Mine" in body
+    assert "Theirs" not in body
+    assert "items you own" in body
+
+
+@pytest.mark.django_db
+def test_send_expiry_digests_forces_owned_only_without_view_inventory(lab, mailoutbox):
+    # A member without view_inventory never receives lab-wide data, even with the
+    # owned-only flag off — the report falls back to their own items.
+    owner = _user(lab, "norole@x.de", [], expiry_notifications=ExpiryReportMode.WEEKLY_ALL)
+    today = timezone.localdate()
+    Item.objects.create(
+        lab=lab,
+        human_id="LB-1",
+        name="Mine",
+        expiration_date=today - timedelta(days=1),
+        owner=owner,
+    )
+    Item.objects.create(
+        lab=lab, human_id="LB-2", name="Theirs", expiration_date=today - timedelta(days=1)
+    )
+
+    assert send_expiry_digests() == 1
+    assert mailoutbox[0].to == ["norole@x.de"]
+    body = mailoutbox[0].body
+    assert "Mine" in body
+    assert "Theirs" not in body
+
+
+@pytest.mark.django_db
+def test_send_expiry_digests_uses_each_members_advance_window(lab, mailoutbox):
+    _user(
+        lab,
+        "short@x.de",
+        ["Lab manager"],
+        expiry_notifications=ExpiryReportMode.WEEKLY_ALL,
+        expiry_days_ahead=7,
+    )
+    _user(
+        lab,
+        "long@x.de",
+        ["Lab manager"],
+        expiry_notifications=ExpiryReportMode.WEEKLY_ALL,
+        expiry_days_ahead=30,
+    )
+    today = timezone.localdate()
+    Item.objects.create(
+        lab=lab, human_id="LB-1", name="Soonish", expiration_date=today + timedelta(days=10)
+    )
+
+    # Only the member looking 30 days ahead is warned about an item expiring in 10 days.
+    assert send_expiry_digests() == 1
+    assert mailoutbox[0].to == ["long@x.de"]
+    assert "within 30 days" in mailoutbox[0].subject
 
 
 @pytest.mark.django_db

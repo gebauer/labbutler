@@ -3,10 +3,23 @@
 import pytest
 from django.urls import reverse
 
-from apps.tenancy.models import Membership, NotificationFrequency, User
+from apps.tenancy.models import (
+    ExpiryAdvanceDays,
+    ExpiryReportMode,
+    Membership,
+    NotificationFrequency,
+    User,
+)
 from apps.tenancy.services import add_member, create_lab
 
 URL = reverse("tenancy:settings")
+
+# Every POST includes the always-present expiry fields (at their defaults), matching
+# what the rendered form submits.
+EXPIRY_DEFAULTS = {
+    "expiry_notifications": ExpiryReportMode.WEEKLY_NEW,
+    "expiry_days_ahead": ExpiryAdvanceDays.ONE_MONTH,
+}
 
 
 @pytest.fixture
@@ -41,12 +54,15 @@ def test_member_sees_only_request_updates(client, lab):
 
 
 @pytest.mark.django_db
-def test_viewer_sees_account_but_no_notifications(client, lab):
+def test_viewer_sees_expiry_but_no_procurement_notifications(client, lab):
     client.force_login(_user(lab, "viewer@x.de", ["Viewer"]))
     resp = client.get(URL)
     assert resp.status_code == 200
-    # The account section is always available; notification categories are not.
+    # The account section and the expiry report (available to every member) show;
+    # the procurement categories the viewer cannot act on do not.
     assert b"Friendly name" in resp.content
+    assert b"expiry report" in resp.content
+    assert b"items I own" in resp.content
     assert b"changes status" not in resp.content
     assert b"needs approval" not in resp.content
 
@@ -56,12 +72,12 @@ def test_can_set_and_clear_friendly_name(client, lab):
     user = _user(lab, "viewer@x.de", ["Viewer"])
     client.force_login(user)
 
-    resp = client.post(URL, {"friendly_name": "Vera Viewer"})
+    resp = client.post(URL, {"friendly_name": "Vera Viewer", **EXPIRY_DEFAULTS})
     assert resp.status_code == 302
     user.refresh_from_db()
     assert user.friendly_name == "Vera Viewer"
 
-    client.post(URL, {"friendly_name": ""})
+    client.post(URL, {"friendly_name": "", **EXPIRY_DEFAULTS})
     user.refresh_from_db()
     assert user.friendly_name == ""
 
@@ -70,10 +86,32 @@ def test_can_set_and_clear_friendly_name(client, lab):
 def test_member_can_save_preference(client, lab):
     user = _user(lab, "member@x.de", ["Member"])
     client.force_login(user)
-    resp = client.post(URL, {"request_update_notifications": NotificationFrequency.OFF})
+    resp = client.post(
+        URL, {"request_update_notifications": NotificationFrequency.OFF, **EXPIRY_DEFAULTS}
+    )
     assert resp.status_code == 302
     membership = Membership.objects.get(user=user, lab=lab)
     assert membership.request_update_notifications == NotificationFrequency.OFF
+
+
+@pytest.mark.django_db
+def test_member_can_save_expiry_preferences(client, lab):
+    user = _user(lab, "member@x.de", ["Member"])
+    client.force_login(user)
+    resp = client.post(
+        URL,
+        {
+            "request_update_notifications": NotificationFrequency.IMMEDIATE,
+            "expiry_notifications": ExpiryReportMode.WEEKLY_ALL,
+            "expiry_owned_only": "on",
+            "expiry_days_ahead": ExpiryAdvanceDays.ONE_WEEK,
+        },
+    )
+    assert resp.status_code == 302
+    membership = Membership.objects.get(user=user, lab=lab)
+    assert membership.expiry_notifications == ExpiryReportMode.WEEKLY_ALL
+    assert membership.expiry_owned_only is True
+    assert membership.expiry_days_ahead == ExpiryAdvanceDays.ONE_WEEK
 
 
 @pytest.mark.django_db
@@ -118,6 +156,7 @@ def test_member_cannot_set_a_field_they_lack_rights_for(client, lab):
         {
             "request_update_notifications": NotificationFrequency.DAILY,
             "approval_notifications": NotificationFrequency.OFF,  # should be ignored
+            **EXPIRY_DEFAULTS,
         },
     )
     membership = Membership.objects.get(user=user, lab=lab)

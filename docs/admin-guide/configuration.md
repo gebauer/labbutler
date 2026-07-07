@@ -46,8 +46,8 @@ the image. There are no secrets in the repository.
 | Variable | Default | Purpose |
 |---|---|---|
 | `LABBUTLER_BASE_URL` | (empty) | Absolute public URL used for links in emails. Leave blank to omit links — but then set-password links in welcome emails won't work. |
-| `EXPIRY_DIGEST_DAYS` | `30` | Look-ahead window for the expiry digest. |
-| `EXPIRY_DIGEST_HOUR` | `7` | Local hour the daily expiry digest is sent. |
+| `EXPIRY_DIGEST_WEEKDAY` | `mon` | Day the weekly expiry report is sent (celery crontab `day_of_week` syntax). Content — look-ahead window, only-new filter, owned-only — is a per-member setting. |
+| `EXPIRY_DIGEST_HOUR` | `7` | Local hour the weekly expiry report is sent. |
 | `NOTIFY_DIGEST_HOUR` | `7` | Local hour the daily procurement digest is sent (at :30). |
 
 ## Login brute-force protection (django-axes)
