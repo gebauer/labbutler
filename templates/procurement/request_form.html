@@ -116,6 +116,7 @@
         <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {% include "procurement/_form_field.html" with field=form.budget tooltip="The budget (Kostenstelle) this purchase is booked against." help_url=docs_url|add:"user-guide/lab-administration/#budgets-kostenstellen" %}
           {% include "procurement/_form_field.html" with field=form.shipping_address tooltip="Where the vendor should deliver — lab admins manage the address list." %}
+          {% include "procurement/_form_field.html" with field=form.procurement_route tooltip="Direct = you (or the coordinator) order at the vendor. Central purchasing = the order goes through Zentraleinkauf via a signed Beschaffungsantrag. LabButler suggests a route but never changes it by itself." %}
           <div>
             {% include "procurement/_form_field.html" with field=form.expected_delivery tooltip="When the order is expected to arrive — used on the dashboard and for check-in." %}
             <div class="mt-1.5 flex gap-1.5">

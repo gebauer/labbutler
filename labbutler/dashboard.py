@@ -78,6 +78,20 @@ def build(user, lab) -> list[Widget]:
             "Nothing waiting to be ordered.",
         )
 
+    if user.can(lab, "sign_po"):
+        # Central-purchasing order forms waiting for a signature. Shown lab-wide: signing
+        # authority is per-lab, and the email notification may drown in an inbox.
+        qs = requests.filter(status=Status.PO_CREATED).order_by("-created_at")
+        if qs.exists():
+            add(
+                "to_sign",
+                "Purchase orders to sign",
+                "to_sign",
+                qs,
+                f"{list_url}?status=po_created",
+                "Nothing waiting for your signature.",
+            )
+
     if user.can(lab, "check_in"):
         # Only deliveries the viewer is involved in: raised by them or forwarded to them
         # to order — not every open delivery in the lab.

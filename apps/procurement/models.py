@@ -1,4 +1,6 @@
+import uuid
 from decimal import Decimal
+from pathlib import Path
 
 from django.conf import settings
 from django.db import IntegrityError, models, transaction
@@ -41,6 +43,9 @@ class Vendor(TimeStampedModel):
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name="vendors")
     name = models.CharField(max_length=200)
+    # ISO 3166 alpha-2, maintained in the lab admin. Blank means unknown origin, which
+    # deliberately contributes no signal to the route suggestion (never nudge on unknown).
+    country = models.CharField(max_length=2, blank=True, default="")
 
     objects = VendorManager()
 
@@ -151,11 +156,20 @@ class Request(TimeStampedModel):
         REQUESTED = "requested", "Requested"
         APPROVED = "approved", "Approved"
         REJECTED = "rejected", "Rejected"
+        # Central-purchasing detour between Approved and Ordered (route == CENTRAL only).
+        PO_CREATED = "po_created", "PO created"
+        PO_SIGNED = "po_signed", "PO signed"
+        PO_SENT = "po_sent", "PO sent"
         ORDERED = "ordered", "Ordered"
         DELIVERED = "delivered", "Delivered"
         RECEIVED = "received", "Received"
         CHECKED_IN = "checked_in", "Checked in"
         CANCELLED = "cancelled", "Cancelled"
+
+    class Route(models.TextChoices):
+        # An enum rather than a bool: leaves room for a third route later.
+        DIRECT = "direct", "Direct order"
+        CENTRAL = "central", "Central purchasing (Zentraleinkauf)"
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name="requests")
 
@@ -236,6 +250,13 @@ class Request(TimeStampedModel):
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.REQUESTED)
+    # How the purchase reaches the vendor. Only ever changed by an explicit human action;
+    # money (net total, price drift) produces suggestions, never a route change.
+    procurement_route = models.CharField(
+        "procurement route", max_length=16, choices=Route.choices, default=Route.DIRECT
+    )
+    # Central purchasing's own order number, captured manually when ZK confirms.
+    zk_order_number = models.CharField("ZK order #", max_length=64, blank=True)
     is_urgent = models.BooleanField(default=False)
     po_number = models.CharField("PO #", max_length=64, blank=True)
     quote_id = models.CharField(max_length=64, blank=True)
@@ -265,6 +286,25 @@ class Request(TimeStampedModel):
     def __str__(self) -> str:
         return f"{self.item_name} [{self.get_status_display()}]"
 
+    @property
+    def net_total(self) -> Decimal:
+        """The request's total without VAT — the basis for every route/PO comparison.
+
+        Always derived (never stored) so the gross/net entry mode can't skew the
+        central-purchasing suggestion. Quantized to cents: in-memory values carry the
+        full precision of the VAT multiplication (or plain-int field defaults) until
+        the next DB round-trip.
+        """
+        return (Decimal(self.total) - Decimal(self.tax)).quantize(Decimal("0.01"))
+
+    def active_purchase_order(self) -> "PurchaseOrder | None":
+        """The one non-superseded PO, or None outside the central-purchasing flow."""
+        return (
+            self.purchase_orders.filter(status=PurchaseOrder.Status.ACTIVE)
+            .order_by("-created_at")
+            .first()
+        )
+
     def recalculate_totals(self, vat_rate: Decimal | None = None) -> None:
         """Recompute ``tax`` and ``total`` from the price fields.
 
@@ -282,3 +322,49 @@ class Request(TimeStampedModel):
         else:
             self.tax = subtotal * vat_rate
             self.total = subtotal + self.tax
+
+
+def purchase_order_upload_path(instance: "PurchaseOrder", filename: str) -> str:
+    """Random storage name inside the owning lab's folder (mirrors attachments):
+    uploads never influence the path on disk."""
+    suffix = Path(filename).suffix.lower()
+    return f"purchase_orders/lab_{instance.request.lab_id}/{uuid.uuid4().hex}{suffix}"
+
+
+class PurchaseOrder(TimeStampedModel):
+    """The official central-purchasing order form (Beschaffungsantrag) for one request.
+
+    Always the institution's own form, uploaded filled — LabButler never renders a PO.
+    The net snapshot is frozen from the request's fields at creation (never parsed out
+    of the PDF) and is the baseline for the price-drift suggestion. Files are not
+    web-served directly; downloads go through a permission-checked view.
+    """
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        SUPERSEDED = "superseded", "Superseded"
+
+    request = models.ForeignKey(Request, on_delete=models.CASCADE, related_name="purchase_orders")
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    po_snapshot_net = models.DecimalField(max_digits=12, decimal_places=2)
+    unsigned_pdf = models.FileField(upload_to=purchase_order_upload_path)
+    signed_pdf = models.FileField(upload_to=purchase_order_upload_path, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="purchase_orders_created",
+    )
+    signed_uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="purchase_orders_signed",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"PO for request #{self.request_id} ({self.get_status_display()})"

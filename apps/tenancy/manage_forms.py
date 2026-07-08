@@ -63,11 +63,21 @@ class _LabForm(forms.ModelForm):
 class VendorForm(_LabForm):
     class Meta:
         model = Vendor
-        fields = ["name"]
+        fields = ["name", "country"]
+        help_texts = {
+            "country": "ISO code, e.g. DE, FR, US. Determines the EU/non-EU signal for "
+            "the central-purchasing suggestion; leave blank if unknown (no signal)."
+        }
 
     def clean_name(self) -> str:
         # Whitespace variants of one supplier shouldn't become separate rows.
         return normalize_vendor_name(self.cleaned_data["name"])
+
+    def clean_country(self) -> str:
+        country = (self.cleaned_data.get("country") or "").strip().upper()
+        if country and (len(country) != 2 or not country.isalpha()):
+            raise forms.ValidationError("Use a two-letter ISO country code, e.g. DE or US.")
+        return country
 
 
 class ShippingAddressForm(_LabForm):
@@ -167,13 +177,27 @@ class FieldPresetForm(_LabForm):
 class LabSettingsForm(forms.ModelForm):
     class Meta:
         model = Lab
-        fields = ["name", "default_vat_rate", "default_currency"]
+        fields = [
+            "name",
+            "default_vat_rate",
+            "default_currency",
+            "central_purchasing_threshold_net",
+            "po_deviation_threshold_pct",
+        ]
         widgets = {"default_currency": forms.Select(choices=[(c, c) for c in CURRENCIES])}
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.fields["default_vat_rate"].help_text = "Fraction, e.g. 0.19 for 19% VAT."
         self.fields["default_currency"].help_text = "Preselected on new requests."
+        self.fields["central_purchasing_threshold_net"].help_text = (
+            "Net total above which central purchasing is suggested. "
+            "Leave blank to use the instance default."
+        )
+        self.fields["po_deviation_threshold_pct"].help_text = (
+            "Price drift (%) above which recreating the order form is suggested. "
+            "Leave blank to use the instance default."
+        )
         _style(self)
 
     def clean_default_vat_rate(self) -> Decimal:

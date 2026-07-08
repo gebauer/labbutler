@@ -55,6 +55,7 @@ class RequestForm(forms.ModelForm):
             "vendor",
             "budget",
             "shipping_address",
+            "procurement_route",
             "unit_price",
             "currency",
             "pack_count",
@@ -94,6 +95,10 @@ class RequestForm(forms.ModelForm):
         self.fields["forward_to"].queryset = forward_recipients(lab)
         self.fields["forward_to"].label = "Hand over to (after approval)"
         self.fields["forward_to"].empty_label = "— I will handle the order myself —"
+        self.fields["procurement_route"].label = "Procurement route"
+        # Absent in a POST (older clients, tests) falls back to the model default rather
+        # than failing validation; see clean().
+        self.fields["procurement_route"].required = False
 
         # Currency is a fixed dropdown; keep an off-list code (imported data, or a
         # reorder prefill of such a request) selectable.
@@ -175,6 +180,8 @@ class RequestForm(forms.ModelForm):
         cleaned["new_tags"] = new_tags
         if not cleaned.get("vendor") and not (cleaned.get("new_vendor") or "").strip():
             self.add_error("vendor", "Pick a vendor or type a new name to create one.")
+        if not cleaned.get("procurement_route"):
+            cleaned["procurement_route"] = Request.Route.DIRECT
         return cleaned
 
     def save_attachments(self, *, user) -> None:

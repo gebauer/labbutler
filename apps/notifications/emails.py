@@ -219,6 +219,50 @@ def build_assignment(req: Request, *, forwarded_by=None, base_url: str = "") -> 
     )
 
 
+def build_po_signature_needed(req: Request, *, base_url: str = "") -> EmailContent:
+    """Email telling the signers a purchase order form awaits their signature."""
+    po = req.active_purchase_order()
+    rows = [
+        ("Request", req.item_name),
+        ("Net total", f"{req.net_total} {req.currency}"),
+    ]
+    if req.vendor_id:
+        rows.append(("Vendor", req.vendor.name))
+    if po is not None:
+        rows.append(("PO net snapshot", f"{po.po_snapshot_net} {req.currency}"))
+    return _email(
+        f"[LabButler] Signature needed: purchase order for “{req.item_name}”",
+        intro="A central-purchasing order form is waiting for your signature. "
+        "Download it from the request page, sign it, and upload the signed version there:",
+        rows=rows,
+        closing="Open the request to download and sign:",
+        action_url=_url(base_url, f"/requests/{req.pk}/"),
+        action_label="See request details",
+        urgent=req.is_urgent,
+        urgent_note="URGENT — the requester needs this signed as soon as possible.",
+        footer=_PROCUREMENT_FOOTER,
+    )
+
+
+def build_zk_forward(req: Request, recipient) -> EmailContent:
+    """The forward-ready email to central purchasing, sent to the request's manager.
+
+    The body is pure ZK-facing German text — it gets forwarded verbatim, so it must
+    carry no internal instructions and no LabButler footer, and it signs with the
+    *recipient's* name (they are the sender ZK sees). The signed PDF is attached by
+    the sending task; guidance for the recipient lives on the request page instead.
+    """
+    body = (
+        "Lieber Zentraleinkauf,\n"
+        "\n"
+        "anbei finden Sie einen Beschaffungsantrag mit der Bitte um Bearbeitung.\n"
+        "\n"
+        "Mit freundlichen Grüßen\n"
+        f"{recipient.display_name}"
+    )
+    return EmailContent(f"Beschaffungsantrag {req.item_name}", body)
+
+
 def build_welcome(user, lab, set_password_url: str) -> EmailContent:
     """Welcome a newly-added member and hand them a link to set their password.
 

@@ -209,6 +209,47 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="labbutler@localhost")
 # Absolute base URL used to build links in emails (blank omits links, e.g. in dev).
 LABBUTLER_BASE_URL = env("LABBUTLER_BASE_URL", default="")
 
+# --- Central purchasing (Zentraleinkauf) ------------------------------------------------
+# Instance-wide defaults for the route/PO suggestion engine; labs can override the two
+# thresholds in their lab settings. Resolution lives in apps.procurement.suggestions.
+LABBUTLER_CENTRAL_PURCHASING_THRESHOLD_NET = env(
+    "LABBUTLER_CENTRAL_PURCHASING_THRESHOLD_NET", default="1000"
+)
+LABBUTLER_PO_DEVIATION_THRESHOLD_PCT = env("LABBUTLER_PO_DEVIATION_THRESHOLD_PCT", default="15")
+# ISO 3166 alpha-2 codes counted as EU for the non-EU vendor signal (default: EU-27).
+LABBUTLER_EU_COUNTRIES = env.list(
+    "LABBUTLER_EU_COUNTRIES",
+    default=[
+        "AT",
+        "BE",
+        "BG",
+        "HR",
+        "CY",
+        "CZ",
+        "DK",
+        "EE",
+        "FI",
+        "FR",
+        "DE",
+        "GR",
+        "HU",
+        "IE",
+        "IT",
+        "LV",
+        "LT",
+        "LU",
+        "MT",
+        "NL",
+        "PL",
+        "PT",
+        "RO",
+        "SK",
+        "SI",
+        "ES",
+        "SE",
+    ],
+)
+
 # --- Login brute-force protection (django-axes) ----------------------------------------
 AXES_ENABLED = env.bool("AXES_ENABLED", default=True)
 # Lock the specific (client IP, username) pair — stops targeted guessing without letting a

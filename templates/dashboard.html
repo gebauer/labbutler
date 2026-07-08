@@ -52,6 +52,14 @@
                       {% include "dashboard/_action.html" with pk=item.pk action="order" label="Mark ordered" style="primary" %}
                     </div>
                   </div>
+                {% elif w.kind == 'to_sign' %}
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                      <a href="{% url 'procurement:request_detail' item.pk %}" class="block truncate font-medium text-gray-900 hover:text-teal-700">{{ item.item_name }}</a>
+                      <div class="text-xs text-gray-500">{{ item.vendor.name|default:"—" }} · net {{ item.net_total }} {{ item.currency }}</div>
+                    </div>
+                    <a href="{% url 'procurement:request_detail' item.pk %}" class="shrink-0 rounded bg-teal-600 px-2 py-1 text-xs font-medium text-white hover:bg-teal-700">Sign…</a>
+                  </div>
                 {% elif w.kind == 'deliveries' %}
                   <div class="flex items-center justify-between gap-2">
                     <div class="min-w-0">

@@ -99,6 +99,19 @@ class Lab(TimeStampedModel):
     default_vat_rate = models.DecimalField(max_digits=5, decimal_places=4, default=Decimal("0.19"))
     # ISO 4217 code preselected on new procurement requests.
     default_currency = models.CharField(max_length=3, default="EUR")
+    # Central-purchasing thresholds. Null means "use the instance default from settings"
+    # (LABBUTLER_CENTRAL_PURCHASING_THRESHOLD_NET / LABBUTLER_PO_DEVIATION_THRESHOLD_PCT);
+    # resolution lives in apps.procurement.suggestions, never read these directly.
+    central_purchasing_threshold_net = models.DecimalField(
+        "central purchasing threshold (net)",
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    po_deviation_threshold_pct = models.DecimalField(
+        "PO price deviation threshold (%)", max_digits=5, decimal_places=2, null=True, blank=True
+    )
 
     def __str__(self) -> str:
         return self.name

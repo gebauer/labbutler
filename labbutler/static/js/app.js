@@ -7,6 +7,7 @@
    - [data-print]             open the browser print dialog on click
    - [data-stop-propagation]  keep clicks from bubbling (e.g. actions inside a <summary>)
    - form[data-confirm]       ask for confirmation before submitting (destructive actions)
+   - [data-copy]              copy the attribute's text to the clipboard, with ✓ feedback
 */
 document.addEventListener('submit', function (event) {
   var form = event.target.closest('form[data-confirm]');
@@ -28,5 +29,15 @@ document.addEventListener('click', function (event) {
 document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('[data-stop-propagation]').forEach(function (el) {
     el.addEventListener('click', function (event) { event.stopPropagation(); });
+  });
+});
+
+document.addEventListener('click', function (event) {
+  var button = event.target.closest('[data-copy]');
+  if (!button) return;
+  navigator.clipboard.writeText(button.getAttribute('data-copy')).then(function () {
+    var original = button.textContent;
+    button.textContent = '✓ copied';
+    setTimeout(function () { button.textContent = original; }, 1200);
   });
 });

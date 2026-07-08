@@ -37,8 +37,20 @@
         <form method="post" action="{% url 'procurement:request_action' req.pk t.action %}" class="flex items-center gap-2">
           {% csrf_token %}
           {% if t.action == 'order' %}
-            <input type="text" name="po_number" placeholder="PO # (optional)"
-                   class="rounded border border-gray-300 px-2 py-1.5 text-sm">
+            {% if req.status == 'po_sent' %}
+              <input type="text" name="zk_order_number" placeholder="ZK order # (optional)"
+                     class="rounded border border-gray-300 px-2 py-1.5 text-sm">
+            {% else %}
+              <input type="text" name="po_number" placeholder="PO # (optional)"
+                     class="rounded border border-gray-300 px-2 py-1.5 text-sm">
+              {% if route_suggestion and req.status == 'approved' %}
+                {# Ordering direct against the CENTRAL suggestion: reason optional, never blocking. #}
+                <select name="override_reason_code" class="rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-600">
+                  <option value="">Override reason (optional)</option>
+                  {% for code, label in override_reasons.items %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+                </select>
+              {% endif %}
+            {% endif %}
           {% endif %}
           <button type="submit"
                   class="rounded px-3 py-2 text-sm font-medium
@@ -50,7 +62,49 @@
     </div>
   {% endif %}
 
+  {% if route_suggestion %}
+    <div class="mt-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm">
+      <p class="font-medium text-amber-900">
+        Suggestion: {% if route_suggestion.route == 'central' %}route this through central purchasing{% else %}a direct order would do{% endif %}
+      </p>
+      {% if route_suggestion.reasons %}
+        <ul class="mt-1 list-disc pl-5 text-amber-800">
+          {% for reason in route_suggestion.reasons %}<li>{{ reason }}</li>{% endfor %}
+        </ul>
+      {% else %}
+        <p class="mt-1 text-amber-800">Neither the net total nor the vendor's origin calls for the central-purchasing round.</p>
+      {% endif %}
+      {% if can_reroute %}
+        <form method="post" action="{% url 'procurement:request_reroute' req.pk %}" class="mt-2 flex flex-wrap items-center gap-2">
+          {% csrf_token %}
+          <input type="hidden" name="to_route" value="{{ route_suggestion.route }}">
+          <button type="submit" class="rounded border border-amber-400 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100">
+            Switch to {% if route_suggestion.route == 'central' %}central purchasing{% else %}direct order{% endif %}
+          </button>
+          <span class="text-xs text-amber-700">Routes never change automatically — this is only a suggestion.</span>
+        </form>
+      {% elif editable %}
+        <p class="mt-1 text-xs text-amber-700">You can change the route by editing the request.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if po_refresh %}
+    <div class="mt-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm">
+      <p class="font-medium text-amber-900">The order form may be outdated</p>
+      <p class="mt-1 text-amber-800">
+        The request's net total deviates {{ po_refresh.deviation_pct }} % from the
+        {{ active_po.po_snapshot_net }} {{ req.currency }} frozen when the form was created.
+        Consider uploading a corrected form — it will need to be signed again.
+      </p>
+    </div>
+  {% endif %}
+
   <dl class="mt-6 grid grid-cols-1 gap-x-8 gap-y-4 rounded border bg-white p-4 sm:grid-cols-2">
+    {% include "inventory/_detail_row.html" with label="Route" value=req.get_procurement_route_display %}
+    {% if req.zk_order_number %}
+      {% include "inventory/_detail_row.html" with label="ZK order #" value=req.zk_order_number %}
+    {% endif %}
     {% include "inventory/_detail_row.html" with label="Vendor" value=req.vendor.name %}
     {% include "inventory/_detail_row.html" with label="Budget" value=req.budget %}
     {% include "inventory/_detail_row.html" with label="Ships to" value=req.shipping_address.label %}
@@ -96,6 +150,111 @@
     <div><dt class="text-xs uppercase tracking-wide text-gray-500">VAT {% if req.includes_taxes %}(incl.){% endif %}</dt><dd class="mt-1 text-sm">{{ req.tax }} {{ req.currency }}</dd></div>
     <div class="sm:col-span-4"><dt class="text-xs uppercase tracking-wide text-gray-500">Total</dt><dd class="mt-1 text-base font-semibold">{{ req.total }} {{ req.currency }}</dd></div>
   </dl>
+
+  {% if req.procurement_route == 'central' and req.status != 'requested' and req.status != 'rejected' and req.status != 'cancelled' %}
+    <h2 class="mt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">Central purchasing (Zentraleinkauf)</h2>
+    <div class="mt-2 space-y-4 rounded border bg-white p-4">
+
+      {% if active_po %}
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+          <span class="text-gray-600">Order form · net snapshot <strong>{{ active_po.po_snapshot_net }} {{ req.currency }}</strong></span>
+          <a href="{% url 'procurement:request_po_download' req.pk active_po.pk 'unsigned' %}" class="font-medium text-blue-700 hover:underline">Download form ↓</a>
+          {% if active_po.signed_pdf %}
+            <a href="{% url 'procurement:request_po_download' req.pk active_po.pk 'signed' %}" class="font-medium text-blue-700 hover:underline">Download signed form ↓</a>
+            <span class="text-xs text-gray-500">signed version uploaded by {{ active_po.signed_uploaded_by.display_name|default:"—" }}</span>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {% if req.status == 'po_created' %}
+        <p class="text-sm text-gray-700">
+          Waiting for signature{% if manager %} — the signers have been notified by email{% endif %}.
+          Download the form, sign it digitally (Antragsteller and Budgetverantwortliche/r), and upload the signed version here.
+        </p>
+      {% elif req.status == 'po_signed' %}
+        <p class="text-sm text-gray-700">
+          Signed. {% if manager %}<strong>{{ manager.display_name }}</strong> received a ready-to-forward email with the signed PDF attached — forward it to Zentraleinkauf from your own mailbox, then record it here with “Sent to central purchasing”.{% endif %}
+        </p>
+      {% elif req.status == 'po_sent' %}
+        <p class="text-sm text-gray-700">
+          Sent to Zentraleinkauf. Once their confirmation arrives{% if manager %} (in {{ manager.display_name }}'s inbox){% endif %}, mark the request ordered and capture the ZK order number.
+        </p>
+      {% endif %}
+
+      {% if can_resend_zk_email %}
+        <form method="post" action="{% url 'procurement:request_resend_zk_email' req.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="rounded border px-3 py-1.5 text-sm hover:bg-gray-50">Re-send the forward email{% if manager %} to {{ manager.display_name }}{% endif %}</button>
+        </form>
+      {% endif %}
+
+      {% if can_create_po %}
+        <form method="post" action="{% url 'procurement:request_po_upload' req.pk %}" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
+          {% csrf_token %}
+          <label class="text-sm text-gray-700">{% if active_po %}Replace the order form (supersedes the current one):{% else %}Upload the filled Beschaffungsantrag (PDF):{% endif %}</label>
+          <input type="file" name="po_pdf" accept="application/pdf" required
+                 class="text-sm text-gray-600 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200">
+          <button type="submit" class="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700">Upload</button>
+        </form>
+      {% endif %}
+
+      {% if can_upload_signed_po %}
+        <form method="post" action="{% url 'procurement:request_po_upload_signed' req.pk %}" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
+          {% csrf_token %}
+          <label class="text-sm text-gray-700">Upload the signed form (PDF):</label>
+          <input type="file" name="po_pdf" accept="application/pdf" required
+                 class="text-sm text-gray-600 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200">
+          <button type="submit" class="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700">Upload signed</button>
+        </form>
+      {% endif %}
+
+      {% if fill_summary %}
+        <div class="border-t border-gray-100 pt-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Form-fill summary</h3>
+            <button type="button" class="rounded border px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                    data-copy="{% for row in fill_summary %}{{ row.label }}: {{ row.value }}&#10;{% endfor %}">Copy all</button>
+          </div>
+          <p class="mt-1 text-xs text-gray-500">The request's values, in the order the Beschaffungsantrag asks for them — copy each into the official form.</p>
+          <dl class="mt-2 divide-y divide-gray-100">
+            {% for row in fill_summary %}
+              <div class="flex items-center justify-between gap-3 py-1.5">
+                <dt class="w-40 shrink-0 text-xs text-gray-500">{{ row.label }}</dt>
+                <dd class="min-w-0 flex-1 truncate text-sm" title="{{ row.value }}">{{ row.value }}</dd>
+                <button type="button" data-copy="{{ row.value }}" class="shrink-0 rounded border px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50">Copy</button>
+              </div>
+            {% endfor %}
+          </dl>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if can_reroute %}
+    <div class="mt-4 rounded border bg-white p-4">
+      <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Procurement route</h3>
+      <form method="post" action="{% url 'procurement:request_reroute' req.pk %}" class="mt-2 flex flex-wrap items-end gap-2">
+        {% csrf_token %}
+        <label class="block text-xs text-gray-500">Change to
+          <select name="to_route" class="mt-1 block rounded border border-gray-300 px-2 py-1.5 text-sm">
+            {% for value, label in routes %}{% if value != req.procurement_route %}<option value="{{ value }}">{{ label }}</option>{% endif %}{% endfor %}
+          </select>
+        </label>
+        <label class="block text-xs text-gray-500">Reason (optional)
+          <select name="reason_code" class="mt-1 block rounded border border-gray-300 px-2 py-1.5 text-sm">
+            <option value="">—</option>
+            {% for code, label in override_reasons.items %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+          </select>
+        </label>
+        <input type="text" name="reason_text" placeholder="Note (optional)" class="rounded border border-gray-300 px-2 py-1.5 text-sm">
+        <button type="submit" class="rounded border px-3 py-1.5 text-sm hover:bg-gray-50">Change route</button>
+      </form>
+      <p class="mt-2 text-xs text-gray-400">
+        Resets the request to “Approved”; an existing order form is archived as superseded.
+        The route locks once the order left the organization (sent to ZK or ordered).
+      </p>
+    </div>
+  {% endif %}
 
   {% if req.tags.all %}
     <div class="mt-4 flex flex-wrap items-center gap-1">

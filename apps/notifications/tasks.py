@@ -37,10 +37,15 @@ def _base_url() -> str:
     return getattr(settings, "LABBUTLER_BASE_URL", "")
 
 
-def _send(content: emails.EmailContent, recipients: list[str]) -> None:
+def _send(
+    content: emails.EmailContent,
+    recipients: list[str],
+    attachments: list[tuple[str, bytes, str]] | None = None,
+) -> None:
     """Send builder output: multipart when an HTML alternative exists, high-priority
     headers when the underlying request is marked urgent (all three header spellings,
-    since clients disagree on which one they honour)."""
+    since clients disagree on which one they honour). ``attachments`` are
+    (filename, bytes, mimetype) triples — used only by the forward-ready ZK email."""
     headers = (
         {"X-Priority": "1", "Priority": "urgent", "Importance": "high"} if content.urgent else None
     )
@@ -49,6 +54,8 @@ def _send(content: emails.EmailContent, recipients: list[str]) -> None:
     )
     if content.html:
         message.attach_alternative(content.html, "text/html")
+    for filename, data, mimetype in attachments or []:
+        message.attach(filename, data, mimetype)
     message.send()
 
 
@@ -151,6 +158,61 @@ def notify_request_assigned(req_pk: int, forwarded_by_pk: int | None = None) -> 
     forwarder = User.objects.filter(pk=forwarded_by_pk).first() if forwarded_by_pk else None
     content = emails.build_assignment(req, forwarded_by=forwarder, base_url=_base_url())
     _send(content, [req.assigned_to.email])
+    return 1
+
+
+@shared_task
+def notify_po_signature_needed(req_pk: int) -> int:
+    """Email the lab's ``sign_po`` holders that a purchase order awaits their signature.
+
+    Returns the number of signers emailed. The dashboard shows the same work item, so a
+    signer without email still finds it.
+    """
+    from apps.procurement.services import signer_recipients
+
+    req = Request.objects.select_related("vendor").filter(pk=req_pk).first()
+    if req is None or req.status != Request.Status.PO_CREATED:
+        return 0
+    recipients = sorted({user.email for user in signer_recipients(req.lab)})
+    if not recipients:
+        return 0
+    content = emails.build_po_signature_needed(req, base_url=_base_url())
+    _send(content, recipients)
+    return len(recipients)
+
+
+@shared_task
+def send_zk_forward_email(req_pk: int) -> int:
+    """Send the forward-ready ZK email (signed PDF attached) to the request's manager.
+
+    The one mail in the system that carries the PDF — its whole point is to be
+    forwarded to central purchasing verbatim from the recipient's own mailbox;
+    LabButler itself never emails ZK. Returns 0/1; every send is audited.
+    """
+    from apps.audit.models import AuditEntry
+    from apps.procurement.services import request_manager
+
+    req = Request.objects.select_related("requested_by", "assigned_to").filter(pk=req_pk).first()
+    if req is None or req.status not in (Request.Status.PO_SIGNED, Request.Status.PO_SENT):
+        return 0
+    po = req.active_purchase_order()
+    if po is None or not po.signed_pdf:
+        return 0
+    recipient = request_manager(req)
+    if recipient is None or not recipient.email:
+        return 0
+
+    content = emails.build_zk_forward(req, recipient)
+    with po.signed_pdf.open("rb") as fh:
+        data = fh.read()
+    filename = f"Beschaffungsantrag_Request_{req.pk}_signiert.pdf"
+    _send(content, [recipient.email], attachments=[(filename, data, "application/pdf")])
+    AuditEntry.record(
+        lab=req.lab,
+        action="procurement.po_forward_email_sent",
+        target=req,
+        changes={"recipient": recipient.email, "po": po.pk},
+    )
     return 1
 
 
