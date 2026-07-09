@@ -22,6 +22,18 @@ Status = Request.Status
 _LIMIT = 6  # items shown per widget before "View all"
 
 
+def _responsible_for(user) -> Q:
+    """Requests ``user`` personally owns the next move on, at any status.
+
+    Ownership follows the forward: a request belongs to whoever it was forwarded to, and
+    otherwise to whoever raised it. A request forwarded away is no longer the requester's
+    to act on — they follow it in "My requests in progress" instead. Deliberately *not*
+    "everything unassigned in the lab": a shared queue on every dashboard is noise, and
+    nobody treats it as theirs.
+    """
+    return Q(requested_by=user, assigned_to__isnull=True) | Q(assigned_to=user)
+
+
 @dataclass
 class Widget:
     key: str
@@ -60,13 +72,12 @@ def build(user, lab) -> list[Widget]:
         )
 
     if user.can(lab, "place_order"):
-        # Approved requests this user could place: unassigned ones plus those forwarded
-        # to them — but not work already forwarded to somebody else. Gated on the
-        # permission (not the Purchase coordinator role name) so anyone who may order
-        # can actually do so from here (#10).
+        # Approved requests this user is on the hook to place — their own, or forwarded to
+        # them. Gated on the permission (not the Purchase coordinator role name) so anyone
+        # who may order can actually do so from here (#10).
         qs = (
             requests.filter(status=Status.APPROVED)
-            .filter(Q(assigned_to__isnull=True) | Q(assigned_to=user))
+            .filter(_responsible_for(user))
             .order_by("-created_at")
         )
         add(
@@ -74,7 +85,7 @@ def build(user, lab) -> list[Widget]:
             "Requests to order",
             "to_order",
             qs,
-            f"{list_url}?status=approved",
+            f"{list_url}?mine=1&status=approved",
             "Nothing waiting to be ordered.",
         )
 
@@ -93,11 +104,11 @@ def build(user, lab) -> list[Widget]:
             )
 
     if user.can(lab, "check_in"):
-        # Only deliveries the viewer is involved in: raised by them or forwarded to them
-        # to order — not every open delivery in the lab.
+        # Only deliveries the viewer is on the hook to receive — same ownership rule as
+        # ordering, not every open delivery in the lab.
         qs = (
             requests.filter(status__in=[Status.ORDERED, Status.DELIVERED])
-            .filter(Q(requested_by=user) | Q(assigned_to=user))
+            .filter(_responsible_for(user))
             .order_by("expected_delivery", "created_at")
         )
         add(
@@ -155,7 +166,9 @@ def build(user, lab) -> list[Widget]:
                 lab=lab, expiration_date__isnull=False, expiration_date__lte=horizon
             )
             .select_related("location")
-            .order_by("expiration_date")
+            # Latest expiry first: the filter has no lower bound, so ascending order pins
+            # long-expired items at the top forever and the widget never turns over (#7).
+            .order_by("-expiration_date")
         )
         if items.exists():
             add(

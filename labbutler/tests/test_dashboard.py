@@ -44,17 +44,21 @@ def test_dashboard_is_empty_for_viewer(client, lab):
 
 
 @pytest.mark.django_db
-def test_order_widget_lists_unassigned_and_my_forwarded_requests(client, lab):
+def test_order_widget_lists_only_requests_i_am_responsible_for(client, lab):
     coord = _user(lab, "c@x.de", ["Purchase coordinator"])
     other_coord = _user(lab, "c2@x.de", ["Purchase coordinator"])
     member = _user(lab, "u@x.de", ["Member"])
     Request.objects.create(
         lab=lab,
-        item_name="Assigned to me",
+        item_name="Forwarded to me",
         requested_by=member,
         assigned_to=coord,
         status=Status.APPROVED,
     )
+    Request.objects.create(
+        lab=lab, item_name="Raised by me", requested_by=coord, status=Status.APPROVED
+    )
+    # Unforwarded work of somebody else's is theirs, not a shared queue on every dashboard.
     Request.objects.create(
         lab=lab, item_name="Nobody ordered yet", requested_by=member, status=Status.APPROVED
     )
@@ -68,8 +72,9 @@ def test_order_widget_lists_unassigned_and_my_forwarded_requests(client, lab):
     client.force_login(coord)
     resp = client.get(reverse("home"))
     assert b"Requests to order" in resp.content
-    assert b"Assigned to me" in resp.content
-    assert b"Nobody ordered yet" in resp.content
+    assert b"Forwarded to me" in resp.content
+    assert b"Raised by me" in resp.content
+    assert b"Nobody ordered yet" not in resp.content
     assert b"Someone else handles" not in resp.content
     assert b"Mark ordered" in resp.content
 
@@ -80,6 +85,7 @@ def test_deliveries_widget_scoped_to_my_involvement(lab):
 
     manager = _user(lab, "m@x.de", ["Lab manager"])  # has check_in via "*"
     other = _user(lab, "o@x.de", ["Member"])
+    coord = _user(lab, "c@x.de", ["Purchase coordinator"])
     Request.objects.create(
         lab=lab, item_name="I requested", requested_by=manager, status=Status.ORDERED
     )
@@ -92,6 +98,13 @@ def test_deliveries_widget_scoped_to_my_involvement(lab):
     )
     Request.objects.create(
         lab=lab, item_name="Someone else", requested_by=other, status=Status.ORDERED
+    )
+    Request.objects.create(  # mine, but forwarded away: the coordinator receives it
+        lab=lab,
+        item_name="I forwarded away",
+        requested_by=manager,
+        assigned_to=coord,
+        status=Status.ORDERED,
     )
     Request.objects.create(  # right person, wrong status
         lab=lab, item_name="Not yet ordered", requested_by=manager, status=Status.APPROVED
@@ -130,8 +143,12 @@ def test_request_widgets_list_newest_first(lab):
         Request.objects.create(
             lab=lab, item_name=f"Approval {i}", requested_by=member, status=Status.REQUESTED
         )
-        Request.objects.create(
-            lab=lab, item_name=f"Order {i}", requested_by=member, status=Status.APPROVED
+        Request.objects.create(  # forwarded to the manager, so they own the order step
+            lab=lab,
+            item_name=f"Order {i}",
+            requested_by=member,
+            assigned_to=manager,
+            status=Status.APPROVED,
         )
 
     widgets = {w.key: w for w in dashboard.build(manager, lab)}
@@ -142,6 +159,33 @@ def test_request_widgets_list_newest_first(lab):
     assert [r.item_name for r in widgets["to_order"].items] == [
         f"Order {i}" for i in range(7, 1, -1)
     ]
+
+
+@pytest.mark.django_db
+def test_expiring_widget_lists_latest_expiry_first(lab):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.inventory.models import Item
+    from labbutler import dashboard
+
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    today = timezone.localdate()
+    for label, offset in [("soon", 29), ("sooner", 3), ("long expired", -400)]:
+        Item.objects.create(
+            lab=lab,
+            human_id=f"LB-{label}",
+            name=label,
+            expiration_date=today + timedelta(days=offset),
+        )
+    Item.objects.create(  # beyond the 30-day horizon
+        lab=lab, human_id="LB-far", name="far off", expiration_date=today + timedelta(days=60)
+    )
+
+    expiring = {w.key: w for w in dashboard.build(manager, lab)}["expiring"]
+    # Latest expiry first, so long-expired rows don't pin the top of the widget (#7).
+    assert [i.name for i in expiring.items] == ["soon", "sooner", "long expired"]
 
 
 @pytest.mark.django_db
@@ -179,14 +223,20 @@ def test_offsite_next_is_ignored(client, lab):
 @pytest.mark.django_db
 def test_order_widget_gated_on_place_order_permission(client, lab):
     member = _user(lab, "u@x.de", ["Member"])
+    manager = _user(lab, "m@x.de", ["Lab manager"])
     Request.objects.create(
-        lab=lab, item_name="Waiting", requested_by=member, status=Status.APPROVED
+        lab=lab,
+        item_name="Waiting",
+        requested_by=member,
+        assigned_to=manager,
+        status=Status.APPROVED,
     )
     # Anyone holding place_order can order — the widget must not require the literal
     # "Purchase coordinator" role (#10): a manager has place_order via "*".
-    client.force_login(_user(lab, "m@x.de", ["Lab manager"]))
+    client.force_login(manager)
     resp = client.get(reverse("home"))
     assert b"Requests to order" in resp.content
+    assert b"Waiting" in resp.content
 
     client.force_login(member)  # no place_order -> no widget
     resp = client.get(reverse("home"))

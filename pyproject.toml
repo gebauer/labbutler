@@ -1,6 +1,6 @@
 [project]
 name = "labbutler"
-version = "1.1.0rc1"
+version = "1.1.0rc2"
 description = "Self-hosted lab inventory and procurement (a free LabSuit alternative)."
 readme = "README.md"
 requires-python = ">=3.11"
