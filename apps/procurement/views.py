@@ -249,6 +249,14 @@ def request_detail(request: HttpRequest, pk: int) -> HttpResponse:
             po_refresh = candidate
     is_central = req.procurement_route == Request.Route.CENTRAL
 
+    # Both PO uploads sit behind a collapsible arrow; each defaults open only for its
+    # usual actor, so signers land on "upload signed" and the request's manager (the
+    # requester, or the coordinator it was forwarded to) on "replace the form".
+    manager = services.request_manager(req)
+    is_request_manager = manager is not None and manager.pk == request.user.pk
+    po_upload_open = is_request_manager or not request.user.can(request.lab, "sign_po")
+    signed_upload_open = not is_request_manager
+
     return render(
         request,
         "procurement/request_detail.html",
@@ -274,7 +282,9 @@ def request_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "fill_summary": _form_fill_summary(req) if is_central else [],
             "routes": Request.Route.choices,
             "override_reasons": services.OVERRIDE_REASONS,
-            "manager": services.request_manager(req),
+            "manager": manager,
+            "po_upload_open": po_upload_open,
+            "signed_upload_open": signed_upload_open,
         },
     )
 

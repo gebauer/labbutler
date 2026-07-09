@@ -188,24 +188,46 @@
         </form>
       {% endif %}
 
+      {# Each upload defaults open only for its usual actor (see the view): replacing the
+         form is the request manager's move, signing is the sign_po holders' — the arrow
+         keeps both reachable for everyone permitted. #}
       {% if can_create_po %}
-        <form method="post" action="{% url 'procurement:request_po_upload' req.pk %}" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
-          {% csrf_token %}
-          <label class="text-sm text-gray-700">{% if active_po %}Replace the order form (supersedes the current one):{% else %}Upload the filled Beschaffungsantrag (PDF):{% endif %}</label>
-          <input type="file" name="po_pdf" accept="application/pdf" required
-                 class="text-sm text-gray-600 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200">
-          <button type="submit" class="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700">Upload</button>
-        </form>
+        {% if active_po %}
+          <details class="border-t border-gray-100 pt-3" {% if po_upload_open %}open{% endif %}>
+            <summary class="cursor-pointer select-none text-sm text-gray-700 hover:text-gray-900">
+              Replace the order form <span class="text-gray-400">(supersedes the current one — signatures start over)</span>
+            </summary>
+            <form method="post" action="{% url 'procurement:request_po_upload' req.pk %}" enctype="multipart/form-data" class="mt-2 flex flex-wrap items-center gap-2">
+              {% csrf_token %}
+              <input type="file" name="po_pdf" accept="application/pdf" required
+                     class="text-sm text-gray-600 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200">
+              <button type="submit" class="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700">Upload</button>
+            </form>
+          </details>
+        {% else %}
+          {# No form yet: uploading it is the one pending action, so it stays in plain sight. #}
+          <form method="post" action="{% url 'procurement:request_po_upload' req.pk %}" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
+            {% csrf_token %}
+            <label class="text-sm text-gray-700">Upload the filled Beschaffungsantrag (PDF):</label>
+            <input type="file" name="po_pdf" accept="application/pdf" required
+                   class="text-sm text-gray-600 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200">
+            <button type="submit" class="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700">Upload</button>
+          </form>
+        {% endif %}
       {% endif %}
 
       {% if can_upload_signed_po %}
-        <form method="post" action="{% url 'procurement:request_po_upload_signed' req.pk %}" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
-          {% csrf_token %}
-          <label class="text-sm text-gray-700">Upload the signed form (PDF):</label>
-          <input type="file" name="po_pdf" accept="application/pdf" required
-                 class="text-sm text-gray-600 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200">
-          <button type="submit" class="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700">Upload signed</button>
-        </form>
+        <details class="border-t border-gray-100 pt-3" {% if signed_upload_open %}open{% endif %}>
+          <summary class="cursor-pointer select-none text-sm text-gray-700 hover:text-gray-900">
+            Upload the signed form <span class="text-gray-400">(PDF)</span>
+          </summary>
+          <form method="post" action="{% url 'procurement:request_po_upload_signed' req.pk %}" enctype="multipart/form-data" class="mt-2 flex flex-wrap items-center gap-2">
+            {% csrf_token %}
+            <input type="file" name="po_pdf" accept="application/pdf" required
+                   class="text-sm text-gray-600 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200">
+            <button type="submit" class="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700">Upload signed</button>
+          </form>
+        </details>
       {% endif %}
 
       {% if fill_summary %}

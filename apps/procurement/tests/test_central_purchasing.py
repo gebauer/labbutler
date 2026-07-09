@@ -434,6 +434,57 @@ def test_detail_page_shows_route_nudge_with_reasons(client, lab):
 
 
 @pytest.mark.django_db
+def test_po_uploads_default_open_per_persona(client, lab):
+    """Each PO upload sits behind <details>, open only for its usual actor."""
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member)
+    services.create_po(req, actor=member, upload=_pdf())  # PO created, awaiting signature
+
+    # Signer, not the request's manager: signed upload open, replace collapsed.
+    _login(client, lab, manager)
+    response = client.get(f"/requests/{req.pk}/")
+    assert response.context["po_upload_open"] is False
+    assert response.context["signed_upload_open"] is True
+    content = response.content.decode()
+    assert "Replace the order form" in content
+    assert "Upload the signed form" in content
+
+    # The request's manager (requester or forwarded-to coordinator): replace open,
+    # the signed upload is permission-hidden for them entirely.
+    _login(client, lab, member)
+    response = client.get(f"/requests/{req.pk}/")
+    assert response.context["po_upload_open"] is True
+    assert "Upload the signed form" not in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_po_uploads_open_for_a_signing_requester(client, lab):
+    # A lab manager raising their own request wears both hats: preparing the form is
+    # theirs (open); the signed upload defaults collapsed like for any request manager.
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    req = _request(lab, manager)
+    services.create_po(req, actor=manager, upload=_pdf())
+
+    _login(client, lab, manager)
+    response = client.get(f"/requests/{req.pk}/")
+    assert response.context["po_upload_open"] is True
+    assert response.context["signed_upload_open"] is False
+    assert "Upload the signed form" in response.content.decode()  # reachable via the arrow
+
+
+@pytest.mark.django_db
+def test_first_po_upload_stays_in_plain_sight(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    req = _request(lab, member)  # Approved, CENTRAL, no PO yet
+    _login(client, lab, member)
+
+    content = client.get(f"/requests/{req.pk}/").content.decode()
+    assert "Upload the filled Beschaffungsantrag" in content
+    assert "Replace the order form" not in content
+
+
+@pytest.mark.django_db
 def test_dashboard_shows_pos_to_sign_for_signers(client, lab):
     manager = _user(lab, "m@x.de", ["Lab manager"])
     member = _user(lab, "u@x.de", ["Member"])
