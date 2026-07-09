@@ -103,6 +103,26 @@ def build(user, lab) -> list[Widget]:
                 "Nothing waiting for your signature.",
             )
 
+    if user.can(lab, "view_requests"):
+        # The follow side of "to sign": order forms of mine that are out for signature.
+        # Wider than _responsible_for — the requester keeps following after forwarding
+        # (the move is the signers', so watching twice costs nothing). Only shown when
+        # non-empty: central purchasing is the rare route.
+        qs = (
+            requests.filter(status=Status.PO_CREATED)
+            .filter(Q(requested_by=user) | Q(assigned_to=user))
+            .order_by("-created_at")
+        )
+        if qs.exists():
+            add(
+                "awaiting_signature",
+                "Purchase orders awaiting signature",
+                "awaiting_signature",
+                qs,
+                f"{list_url}?mine=1&status=po_created",
+                "None of your order forms is waiting for a signature.",
+            )
+
     if user.can(lab, "check_in"):
         # Only deliveries the viewer is on the hook to receive — same ownership rule as
         # ordering, not every open delivery in the lab.
