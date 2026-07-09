@@ -1,19 +1,134 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block content %}
-  <h1 class="text-2xl font-semibold tracking-tight">LabButler</h1>
-  <p class="mt-2 text-gray-600">
-    Self-hosted lab inventory and procurement.
-  </p>
-  {% if user.is_authenticated %}
-    <a href="{% url 'inventory:item_list' %}"
-       class="mt-4 inline-block rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">
-      Go to inventory
-    </a>
-  {% else %}
-    <a href="{% url 'login' %}"
-       class="mt-4 inline-block rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">
-      Sign in
-    </a>
-  {% endif %}
+  <div class="mx-auto max-w-5xl">
+
+    {# Hero #}
+    <section class="px-2 pb-14 pt-10 text-center sm:pt-16">
+      <img src="{% static 'icons/favicon.svg' %}" alt="" class="mx-auto h-14 w-14">
+
+      <h1 class="mt-6 text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
+        Lab<span class="text-teal-600">Butler</span>
+      </h1>
+      <p class="mx-auto mt-4 max-w-2xl text-lg text-gray-600">
+        Self-hosted inventory and procurement for research labs.
+        Know what you have, where it is, and what's on order &mdash; without spreadsheets.
+      </p>
+      {% if user.is_authenticated %}
+        {# Signed in but without a lab: the dashboard redirects here until a membership exists. #}
+        <div class="mx-auto mt-8 max-w-xl rounded-xl border border-teal-200 bg-teal-50 px-5 py-4 text-sm text-teal-900">
+          You're signed in, but not a member of a lab yet.
+          Ask your lab manager to add you &mdash; your labs will appear here automatically.
+        </div>
+      {% else %}
+        <div class="mt-8 flex items-center justify-center gap-4">
+          <a href="{% url 'login' %}"
+             class="rounded-lg bg-teal-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-teal-700">
+            Sign in
+          </a>
+          <a href="{% url 'privacy' %}" class="text-sm font-medium text-gray-600 hover:text-gray-900">
+            Privacy notice
+          </a>
+        </div>
+      {% endif %}
+    </section>
+
+    {# Feature grid #}
+    <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="rounded-xl border border-gray-200 bg-white p-5">
+        <div class="grid h-9 w-9 place-items-center rounded-lg bg-teal-50 text-teal-700">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23-.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+          </svg>
+        </div>
+        <h2 class="mt-3 font-semibold text-gray-900">Inventory that fits your lab</h2>
+        <p class="mt-1 text-sm leading-relaxed text-gray-600">
+          Track chemicals, consumables, and equipment with locations, tags,
+          custom fields, and GHS hazard statements.
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-gray-200 bg-white p-5">
+        <div class="grid h-9 w-9 place-items-center rounded-lg bg-teal-50 text-teal-700">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+          </svg>
+        </div>
+        <h2 class="mt-3 font-semibold text-gray-900">Procurement without the paper trail</h2>
+        <p class="mt-1 text-sm leading-relaxed text-gray-600">
+          Request, approve, and order in one workflow &mdash; with budgets,
+          vendors, and email notifications at every step.
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-gray-200 bg-white p-5">
+        <div class="grid h-9 w-9 place-items-center rounded-lg bg-teal-50 text-teal-700">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+          </svg>
+        </div>
+        <h2 class="mt-3 font-semibold text-gray-900">Painless migration</h2>
+        <p class="mt-1 text-sm leading-relaxed text-gray-600">
+          Import existing data from LabSuit or any spreadsheet with a guided
+          column mapper and a dry-run preview before anything is saved.
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-gray-200 bg-white p-5">
+        <div class="grid h-9 w-9 place-items-center rounded-lg bg-teal-50 text-teal-700">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+          </svg>
+        </div>
+        <h2 class="mt-3 font-semibold text-gray-900">Built for shared labs</h2>
+        <p class="mt-1 text-sm leading-relaxed text-gray-600">
+          Multiple labs on one instance, each with its own members, roles,
+          and fine-grained permissions.
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-gray-200 bg-white p-5">
+        <div class="grid h-9 w-9 place-items-center rounded-lg bg-teal-50 text-teal-700">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+          </svg>
+        </div>
+        <h2 class="mt-3 font-semibold text-gray-900">A complete audit trail</h2>
+        <p class="mt-1 text-sm leading-relaxed text-gray-600">
+          Every change is recorded in an append-only log, so you can always
+          answer who changed what, and when.
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-gray-200 bg-white p-5">
+        <div class="grid h-9 w-9 place-items-center rounded-lg bg-teal-50 text-teal-700">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 17.25v-.228a4.5 4.5 0 0 0-.12-1.03l-2.268-9.64a3.375 3.375 0 0 0-3.285-2.602H7.923a3.375 3.375 0 0 0-3.285 2.602l-2.268 9.64a4.5 4.5 0 0 0-.12 1.03v.228m19.5 0a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3m19.5 0a3 3 0 0 0-3-3H5.25a3 3 0 0 0-3 3m16.5 0h.008v.008h-.008v-.008Zm-3 0h.008v.008h-.008v-.008Z" />
+          </svg>
+        </div>
+        <h2 class="mt-3 font-semibold text-gray-900">Your server, your data</h2>
+        <p class="mt-1 text-sm leading-relaxed text-gray-600">
+          Runs entirely on your own infrastructure. No third-party cloud,
+          no per-seat fees, no data leaving the building.
+        </p>
+      </div>
+    </section>
+
+    {# Closing call to action #}
+    {% if not user.is_authenticated %}
+      <section class="my-14 rounded-2xl bg-teal-600 px-6 py-10 text-center sm:px-10">
+        <h2 class="text-2xl font-semibold tracking-tight text-white">Your lab already uses LabButler?</h2>
+        <p class="mx-auto mt-2 max-w-xl text-teal-50">
+          Sign in with the account your lab manager set up for you.
+          Forgot your password? You can reset it from the sign-in page.
+        </p>
+        <a href="{% url 'login' %}"
+           class="mt-6 inline-block rounded-lg bg-white px-6 py-3 text-sm font-semibold text-teal-700 shadow-sm hover:bg-teal-50">
+          Sign in to your lab
+        </a>
+      </section>
+    {% endif %}
+
+  </div>
 {% endblock %}
