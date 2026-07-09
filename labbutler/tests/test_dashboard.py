@@ -119,6 +119,35 @@ def test_deliveries_widget_scoped_to_my_involvement(lab):
 
 
 @pytest.mark.django_db
+def test_awaiting_signature_widget_follows_requester_and_coordinator(client, lab):
+    from labbutler import dashboard
+
+    member = _user(lab, "u@x.de", ["Member"])
+    coord = _user(lab, "c@x.de", ["Purchase coordinator"])
+    stranger = _user(lab, "s@x.de", ["Member"])
+    bystander = _user(lab, "b@x.de", ["Member"])
+    central = {"procurement_route": Request.Route.CENTRAL, "status": Status.PO_CREATED}
+    Request.objects.create(lab=lab, item_name="Mine unforwarded", requested_by=member, **central)
+    Request.objects.create(
+        lab=lab, item_name="Forwarded to coord", requested_by=member, assigned_to=coord, **central
+    )
+    Request.objects.create(lab=lab, item_name="Somebody else's", requested_by=stranger, **central)
+
+    # The requester keeps following even after forwarding; the coordinator sees only theirs.
+    mine = {w.key: w for w in dashboard.build(member, lab)}["awaiting_signature"]
+    assert {r.item_name for r in mine.items} == {"Mine unforwarded", "Forwarded to coord"}
+    coords = {w.key: w for w in dashboard.build(coord, lab)}["awaiting_signature"]
+    assert {r.item_name for r in coords.items} == {"Forwarded to coord"}
+    # Uninvolved users don't get an (empty) box — central purchasing is the rare route.
+    assert "awaiting_signature" not in {w.key for w in dashboard.build(bystander, lab)}
+
+    client.force_login(member)
+    content = client.get(reverse("home")).content.decode()
+    assert "Purchase orders awaiting signature" in content
+    assert "awaiting signature" in content  # the per-row badge
+
+
+@pytest.mark.django_db
 def test_deliveries_widget_caps_items_at_ten(lab):
     from labbutler import dashboard
 

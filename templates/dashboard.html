@@ -60,6 +60,14 @@
                     </div>
                     <a href="{% url 'procurement:request_detail' item.pk %}" class="shrink-0 rounded bg-teal-600 px-2 py-1 text-xs font-medium text-white hover:bg-teal-700">Sign…</a>
                   </div>
+                {% elif w.kind == 'awaiting_signature' %}
+                  <a href="{% url 'procurement:request_detail' item.pk %}" class="flex items-center justify-between gap-2">
+                    <span class="min-w-0">
+                      <span class="block truncate font-medium text-gray-900 hover:text-teal-700">{{ item.item_name }}</span>
+                      <span class="text-xs text-gray-500">{{ item.vendor.name|default:"—" }} · net {{ item.net_total }} {{ item.currency }}{% if item.assigned_to %} · with {{ item.assigned_to.display_name }}{% endif %}</span>
+                    </span>
+                    <span class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">awaiting signature</span>
+                  </a>
                 {% elif w.kind == 'deliveries' %}
                   <div class="flex items-center justify-between gap-2">
                     <div class="min-w-0">
