@@ -8,7 +8,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 from apps.audit.models import AuditEntry
 from apps.procurement import services
-from apps.procurement.models import PurchaseOrder, Request
+from apps.procurement.models import Budget, PurchaseOrder, Request, Vendor
 from apps.procurement.services import TRANSITIONS, TransitionError, may_perform, perform_transition
 from apps.tenancy.models import User
 from apps.tenancy.services import add_member, create_lab
@@ -445,3 +445,125 @@ def test_dashboard_shows_pos_to_sign_for_signers(client, lab):
 
     _login(client, lab, member)
     assert "Purchase orders to sign" not in client.get("/").content.decode()
+
+
+# --- Bypass confirmation at form save -----------------------------------------------
+
+
+def _form_payload(vendor, budget, **overrides) -> dict:
+    payload = {
+        "item_name": "Ultracentrifuge rotor",
+        "vendor": vendor.pk,
+        "budget": budget.pk,
+        "currency": "EUR",
+        "unit_price": "1500.00",  # net (taxes not included) — above the 1000 € default
+        "pack_count": "1",
+        "shipping_cost": "0",
+        "procurement_route": Route.DIRECT,
+        "tags": [],
+    }
+    payload.update(overrides)
+    return payload
+
+
+@pytest.mark.django_db
+def test_create_keeping_direct_against_suggestion_records_override(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    vendor = Vendor.objects.create(lab=lab, name="ACME", country="DE")
+    budget = Budget.objects.create(lab=lab, number="KST-1", name="Core")
+    _login(client, lab, member)
+
+    response = client.post(
+        "/requests/new/",
+        _form_payload(
+            vendor,
+            budget,
+            override_reason_code="emergency",
+            override_reason_text="Freezer died",
+        ),
+    )
+
+    assert response.status_code == 302
+    req = Request.objects.get(item_name="Ultracentrifuge rotor")
+    event = _audit(req, "procurement.route_suggestion_overridden").get()
+    assert event.changes["suggested_route"] == Route.CENTRAL
+    assert event.changes["chosen_route"] == Route.DIRECT
+    assert event.changes["reason_code"] == "emergency"
+    assert event.changes["reason_text"] == "Freezer died"
+
+
+@pytest.mark.django_db
+def test_create_below_threshold_direct_records_no_override(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    vendor = Vendor.objects.create(lab=lab, name="ACME", country="DE")
+    budget = Budget.objects.create(lab=lab, number="KST-1", name="Core")
+    _login(client, lab, member)
+
+    response = client.post("/requests/new/", _form_payload(vendor, budget, unit_price="100.00"))
+
+    assert response.status_code == 302
+    req = Request.objects.get(item_name="Ultracentrifuge rotor")
+    assert not _audit(req, "procurement.route_suggestion_overridden").exists()
+
+
+@pytest.mark.django_db
+def test_create_following_the_suggestion_records_no_override(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    vendor = Vendor.objects.create(lab=lab, name="ACME", country="DE")
+    budget = Budget.objects.create(lab=lab, number="KST-1", name="Core")
+    _login(client, lab, member)
+
+    response = client.post(
+        "/requests/new/", _form_payload(vendor, budget, procurement_route=Route.CENTRAL)
+    )
+
+    assert response.status_code == 302
+    req = Request.objects.get(item_name="Ultracentrifuge rotor")
+    assert req.procurement_route == Route.CENTRAL
+    assert not _audit(req, "procurement.route_suggestion_overridden").exists()
+
+
+@pytest.mark.django_db
+def test_edit_keeping_direct_against_suggestion_records_override(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    vendor = Vendor.objects.create(lab=lab, name="ACME", country="DE")
+    budget = Budget.objects.create(lab=lab, number="KST-1", name="Core")
+    req = _request(
+        lab,
+        member,
+        net="100.00",
+        route=Route.DIRECT,
+        status=Status.REQUESTED,
+        vendor=vendor,
+        budget=budget,
+    )
+    _login(client, lab, member)
+
+    # Raising the price across the threshold while keeping DIRECT is the same
+    # friction point as at creation — the event is recorded on save.
+    response = client.post(
+        f"/requests/{req.pk}/edit/",
+        _form_payload(vendor, budget, item_name=req.item_name, unit_price="1500.00"),
+    )
+
+    assert response.status_code == 302
+    event = _audit(req, "procurement.route_suggestion_overridden").get()
+    assert event.changes["suggested_route"] == Route.CENTRAL
+    assert event.changes["net_total"] == "1500.00"
+
+
+@pytest.mark.django_db
+def test_form_page_serves_suggestion_config_and_bypass_modal(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    Vendor.objects.create(lab=lab, name="US Vendor", country="US")
+    Budget.objects.create(lab=lab, number="KST-1", name="Core")
+    _login(client, lab, member)
+
+    content = client.get("/requests/new/").content.decode()
+    assert "route-suggestion-config" in content
+    assert '"threshold": "1000' in content
+    assert '"US"' in content  # vendor country map for the client-side non-EU signal
+    assert "data-route-override-modal" in content
+    assert "data-route-nudge" in content
+    for code in services.OVERRIDE_REASONS:
+        assert code in content

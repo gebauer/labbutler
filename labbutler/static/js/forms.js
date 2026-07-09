@@ -14,7 +14,11 @@
                                       from data-ghs-url and merges them into the pickers
    - form[data-request-form]          live total/VAT preview from the price fields, with
                                       the chosen currency echoed into [data-currency-echo];
-                                      a unit price of 0 asks for confirmation on submit
+                                      a unit price of 0 asks for confirmation on submit;
+                                      mirrors the server's route suggestion (config in
+                                      #route-suggestion-config) to highlight the route
+                                      field live and, on submit, confirm bypassing a
+                                      CENTRAL suggestion in dialog[data-route-override-modal]
    - button[data-delivery-days]       sets the expected-delivery date to today + N days
    - section[data-preset-fields]      collapses empty custom fields; preset buttons and
                                       "Show all fields" reveal them, echoed back to the
@@ -566,6 +570,108 @@
     });
   }
 
+  /* ——— Central-purchasing route nudge ———
+
+     Client-side mirror of apps/procurement/suggestions.suggest_route(): CENTRAL when
+     the net total exceeds the lab's threshold or the vendor is non-EU (an unknown
+     country — including a to-be-created vendor — contributes no signal). While the
+     conflict holds, the route field is highlighted; submitting with it open swaps the
+     save for a confirm dialog that collects an optional reason. The server recomputes
+     the suggestion and writes the override audit event either way — this is UX, not
+     enforcement. */
+
+  function bindRouteSuggestion(form) {
+    var configEl = document.getElementById('route-suggestion-config');
+    var routeSelect = form.querySelector('[name="procurement_route"]');
+    if (!configEl || !routeSelect) return;
+    var config = JSON.parse(configEl.textContent);
+    var threshold = parseFloat(config.threshold);
+    var rate = parseFloat(form.getAttribute('data-vat-rate')) || 0;
+    var nudge = form.querySelector('[data-route-nudge]');
+    var modal = document.querySelector('dialog[data-route-override-modal]');
+    var HIGHLIGHT = ['border-amber-400', 'ring-1', 'ring-amber-400'];
+
+    function field(name) { return form.querySelector('[name="' + name + '"]'); }
+    function num(name) { return parseFloat(field(name).value) || 0; }
+    function cents(value) { return Math.round(value * 100) / 100; }
+
+    function suggestionReasons() {
+      var subtotal = num('unit_price') * (parseInt(field('pack_count').value, 10) || 0)
+        + num('shipping_cost');
+      // Same cent rounding as the total preview, so both agree with the server.
+      var net = field('includes_taxes').checked
+        ? cents(subtotal) - cents(subtotal - subtotal / (1 + rate))
+        : cents(subtotal);
+      var reasons = [];
+      if (net > threshold) {
+        reasons.push('Net total ' + net.toFixed(2) + ' ' + (field('currency').value || 'EUR')
+          + ' is above the ' + config.threshold + ' € threshold');
+      }
+      var country = (config.vendorCountries[field('vendor').value] || '').toUpperCase();
+      if (country && config.euCountries.indexOf(country) === -1) {
+        reasons.push('Vendor is outside the EU (' + country + ')');
+      }
+      return reasons;
+    }
+
+    function bypassReasons() {
+      return routeSelect.value === 'direct' ? suggestionReasons() : [];
+    }
+
+    function renderReasons(listEl, reasons) {
+      listEl.textContent = '';
+      reasons.forEach(function (text) {
+        var item = document.createElement('li');
+        item.textContent = text;
+        listEl.appendChild(item);
+      });
+    }
+
+    function refresh() {
+      var reasons = bypassReasons();
+      var active = reasons.length > 0;
+      HIGHLIGHT.forEach(function (cls) { routeSelect.classList.toggle(cls, active); });
+      routeSelect.classList.toggle('border-gray-300', !active);
+      if (nudge) {
+        nudge.classList.toggle('hidden', !active);
+        if (active) renderReasons(nudge.querySelector('[data-route-nudge-reasons]'), reasons);
+      }
+    }
+
+    form.addEventListener('input', refresh);
+    form.addEventListener('change', refresh);
+    refresh();
+
+    if (!modal || typeof modal.showModal !== 'function') return;
+    var confirmed = false;
+    form.addEventListener('submit', function (event) {
+      if (event.defaultPrevented || confirmed) return;
+      var reasons = bypassReasons();
+      if (!reasons.length) return;
+      event.preventDefault();
+      renderReasons(modal.querySelector('[data-route-modal-reasons]'), reasons);
+      modal.showModal();
+    });
+    modal.querySelector('[data-route-modal-cancel]').addEventListener('click', function () {
+      modal.close();
+    });
+    modal.querySelector('[data-route-modal-central]').addEventListener('click', function () {
+      routeSelect.value = 'central';
+      routeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      modal.close();
+      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+    });
+    modal.querySelector('[data-route-modal-bypass]').addEventListener('click', function () {
+      field('override_reason_code').value =
+        modal.querySelector('[data-override-reason-code]').value;
+      field('override_reason_text').value =
+        modal.querySelector('[data-override-reason-text]').value.trim();
+      confirmed = true;
+      modal.close();
+      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+    });
+  }
+
   /* ——— Custom-field presets: collapse empty fields until a preset reveals them ——— */
 
   function bindPresetFields(section) {
@@ -665,6 +771,8 @@
       bindTotals(form);
       bindDeliveryShortcuts(form);
       bindZeroPriceConfirm(form);
+      // After the zero-price confirm: a cancelled submit must not open the modal.
+      bindRouteSuggestion(form);
     }
   });
 })();

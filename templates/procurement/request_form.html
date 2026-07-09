@@ -17,6 +17,9 @@
     <form method="post" enctype="multipart/form-data" class="mt-6 space-y-6" data-request-form data-vat-rate="{{ form.lab.default_vat_rate|stringformat:'f' }}">
       {% csrf_token %}
       {{ form.new_vendor }}
+      {# Filled by the bypass modal when saving DIRECT against a CENTRAL suggestion. #}
+      <input type="hidden" name="override_reason_code">
+      <input type="hidden" name="override_reason_text">
       {% for name in form.new_tag_names %}<input type="hidden" name="new_tags" value="{{ name }}">{% endfor %}
       {% if form.non_field_errors %}
         <div class="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>
@@ -116,7 +119,15 @@
         <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {% include "procurement/_form_field.html" with field=form.budget tooltip="The budget (Kostenstelle) this purchase is booked against." help_url=docs_url|add:"user-guide/lab-administration/#budgets-kostenstellen" %}
           {% include "procurement/_form_field.html" with field=form.shipping_address tooltip="Where the vendor should deliver — lab admins manage the address list." %}
-          {% include "procurement/_form_field.html" with field=form.procurement_route tooltip="Direct = you (or the coordinator) order at the vendor. Central purchasing = the order goes through Zentraleinkauf via a signed Beschaffungsantrag. LabButler suggests a route but never changes it by itself." %}
+          <div>
+            {% include "procurement/_form_field.html" with field=form.procurement_route tooltip="Direct = you (or the coordinator) order at the vendor. Central purchasing = the order goes through Zentraleinkauf via a signed Beschaffungsantrag. LabButler suggests a route but never changes it by itself." %}
+            {# Live nudge, filled by forms.js while the price/vendor fields change. #}
+            <div data-route-nudge class="mt-1.5 hidden rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
+              <p class="font-medium text-amber-900">Central purchasing suggested</p>
+              <ul data-route-nudge-reasons class="mt-1 list-disc pl-5 text-amber-800"></ul>
+              <p class="mt-1 text-xs text-amber-700">Keeping the direct order is fine — you'll be asked to confirm when saving.</p>
+            </div>
+          </div>
           <div>
             {% include "procurement/_form_field.html" with field=form.expected_delivery tooltip="When the order is expected to arrive — used on the dashboard and for check-in." %}
             <div class="mt-1.5 flex gap-1.5">
@@ -155,6 +166,36 @@
         <button type="submit" class="rounded bg-teal-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-teal-700">Save request</button>
       </div>
     </form>
+
+    {{ route_config|json_script:"route-suggestion-config" }}
+
+    {# Shown by forms.js when saving a direct order against a CENTRAL suggestion. Kept
+       outside the form so its inputs never leak into the POST — the chosen reason is
+       copied into the hidden override_reason_* fields instead. #}
+    <dialog data-route-override-modal class="w-full max-w-md rounded-lg p-0 shadow-xl backdrop:bg-gray-900/40">
+      <div class="p-5">
+        <h2 class="text-base font-semibold text-gray-900">Bypass central purchasing?</h2>
+        <p class="mt-2 text-sm text-gray-600">LabButler suggests routing this request through central purchasing (Zentraleinkauf):</p>
+        <ul data-route-modal-reasons class="mt-1 list-disc pl-5 text-sm text-amber-800"></ul>
+        <p class="mt-2 text-sm text-gray-600">
+          You picked a direct order. That's allowed — the decision and your reason are
+          recorded in the request's audit trail.
+        </p>
+        <label class="mt-3 block text-sm font-medium text-gray-700">Reason for ordering directly
+          <select data-override-reason-code class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm font-normal">
+            <option value="">— no reason given —</option>
+            {% for code, label in override_reasons.items %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+          </select>
+        </label>
+        <input type="text" data-override-reason-text placeholder="Note (optional)"
+               class="mt-2 w-full rounded border border-gray-300 px-3 py-2 text-sm">
+        <div class="mt-4 flex flex-wrap justify-end gap-2">
+          <button type="button" data-route-modal-cancel class="rounded border px-3 py-2 text-sm hover:bg-gray-50">Back to the form</button>
+          <button type="button" data-route-modal-bypass class="rounded border border-amber-400 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-50">Keep direct order</button>
+          <button type="button" data-route-modal-central class="rounded bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700">Use central purchasing</button>
+        </div>
+      </div>
+    </dialog>
   </div>
   <script src="{% static 'js/forms.js' %}" defer></script>
 {% endblock %}

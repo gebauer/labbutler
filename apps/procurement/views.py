@@ -336,6 +336,43 @@ def _initial_from_item(item: Item) -> dict:
     return {name: value for name, value in initial.items() if value not in (None, "", [])}
 
 
+def _route_suggestion_config(form: RequestForm) -> dict:
+    """Inputs for the client-side mirror of :func:`suggestions.suggest_route`.
+
+    Serialized into the form page (via ``json_script``) so the route nudge can react
+    live while typing; the server recomputes the suggestion on save regardless.
+    """
+    return {
+        "threshold": str(suggestions.central_purchasing_threshold(form.lab)),
+        "euCountries": sorted(suggestions.eu_countries()),
+        "vendorCountries": {
+            str(pk): country
+            for pk, country in form.fields["vendor"].queryset.values_list("pk", "country")
+            if country
+        },
+    }
+
+
+def _record_form_save_override(request: HttpRequest, req: Request) -> None:
+    """Audit keeping DIRECT against a CENTRAL suggestion when the form saves.
+
+    Same contract as at order time: the event is mandatory, the reason (collected by
+    the bypass modal, absent without JS) is optional.
+    """
+    if req.procurement_route != Request.Route.DIRECT:
+        return
+    suggestion = suggestions.suggest_route(req)
+    if suggestion.route != Request.Route.CENTRAL:
+        return
+    services.record_route_override(
+        req,
+        actor=request.user,
+        suggestion=suggestion,
+        reason_code=request.POST.get("override_reason_code", ""),
+        reason_text=(request.POST.get("override_reason_text") or "").strip(),
+    )
+
+
 @require_permission("create_request")
 def request_create(request: HttpRequest) -> HttpResponse:
     # The form posts back to the same URL, so the reorder params survive into the POST.
@@ -363,6 +400,7 @@ def request_create(request: HttpRequest) -> HttpResponse:
                 target=req,
                 changes=changes,
             )
+            _record_form_save_override(request, req)
             # Notify the lab's approvers (once the row is committed) that it needs approval.
             from apps.notifications.tasks import notify_request_created
 
@@ -379,7 +417,13 @@ def request_create(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "procurement/request_form.html",
-        {"form": form, "title": "New request", "req": None},
+        {
+            "form": form,
+            "title": "New request",
+            "req": None,
+            "route_config": _route_suggestion_config(form),
+            "override_reasons": services.OVERRIDE_REASONS,
+        },
     )
 
 
@@ -399,6 +443,7 @@ def request_edit(request: HttpRequest, pk: int) -> HttpResponse:
             req.save()
             form.save_m2m()
             form.save_attachments(user=request.user)
+            _record_form_save_override(request, req)
             messages.success(request, "Request updated.")
             return redirect("procurement:request_detail", pk=req.pk)
     else:
@@ -406,7 +451,13 @@ def request_edit(request: HttpRequest, pk: int) -> HttpResponse:
     return render(
         request,
         "procurement/request_form.html",
-        {"form": form, "title": f"Edit request #{req.pk}", "req": req},
+        {
+            "form": form,
+            "title": f"Edit request #{req.pk}",
+            "req": req,
+            "route_config": _route_suggestion_config(form),
+            "override_reasons": services.OVERRIDE_REASONS,
+        },
     )
 
 
