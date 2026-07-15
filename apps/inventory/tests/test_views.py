@@ -240,6 +240,33 @@ def test_detail_shows_hazard_statement_on_hover(client, lab, manager):
 
 
 @pytest.mark.django_db
+def test_detail_shows_ghs_pictograms(client, lab, manager):
+    item = _make_item(lab, name="Ethanol")
+    item.hazards.add(
+        HazardStatement.objects.get(code="H225"),  # -> GHS02 (Flammable)
+        HazardStatement.objects.get(code="H319"),  # -> GHS07 (Irritant)
+    )
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_detail", args=[item.pk]))
+    assert resp.status_code == 200
+    assert b"img/ghs/GHS02.svg" in resp.content
+    assert b"img/ghs/GHS07.svg" in resp.content
+    assert b"GHS07 \xe2\x80\x94 Irritant" in resp.content  # tooltip carries the name
+
+
+@pytest.mark.django_db
+def test_detail_hides_pictogram_row_without_pictogram_hazards(client, lab, manager):
+    item = _make_item(lab, name="Buffer")
+    # P-statements carry no pictogram, so the row should not render at all.
+    item.hazards.add(HazardStatement.objects.get(code="P280"))
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_detail", args=[item.pk]))
+    assert resp.status_code == 200
+    assert b"img/ghs/" not in resp.content
+    assert b"Pictograms" not in resp.content
+
+
+@pytest.mark.django_db
 def test_filter_by_location(client, lab, manager):
     from apps.inventory.models import Location
 

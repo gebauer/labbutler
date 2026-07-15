@@ -139,6 +139,16 @@ def item_list(request: HttpRequest) -> HttpResponse:
     return render(request, "inventory/item_list.html", context)
 
 
+# GHS pictogram code -> display name (inverse of the PubChem name -> code map).
+_PICTOGRAM_NAMES = {code: name for name, code in ghs_lookup_client.PICTOGRAM_CODES.items()}
+
+
+def _item_pictograms(item: Item) -> list[tuple[str, str]]:
+    """(code, display name) for every GHS pictogram implied by the item's H-codes."""
+    codes = sorted({p for h in item.hazards.all() for p in ghs.pictograms_for(h.code)})
+    return [(code, _PICTOGRAM_NAMES.get(code, code)) for code in codes]
+
+
 @require_permission("view_inventory")
 def item_detail(request: HttpRequest, pk: int) -> HttpResponse:
     item = get_object_or_404(
@@ -158,6 +168,7 @@ def item_detail(request: HttpRequest, pk: int) -> HttpResponse:
         "inventory/item_detail.html",
         {
             "item": item,
+            "pictograms": _item_pictograms(item),
             "custom_fields": _custom_field_rows(request.lab, item),
             "can_manage": request.user.can(request.lab, "manage_inventory"),
             "can_order": request.user.can(request.lab, "create_request"),

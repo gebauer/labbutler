@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{{ item.human_id }} · LabButler{% endblock %}
 
@@ -51,6 +52,17 @@
       {% include "inventory/_detail_row.html" with label="Signal word" value=item.get_signal_word_display %}
       {% include "inventory/_detail_row.html" with label="WGK" value=item.wgk %}
       {% include "inventory/_detail_row.html" with label="Storage class" value=item.storage_class %}
+      {% if pictograms %}
+        <div class="sm:col-span-2">
+          <dt class="text-xs uppercase tracking-wide text-gray-500">Pictograms</dt>
+          <dd class="mt-1 flex flex-wrap gap-2">
+            {% for code, name in pictograms %}
+              <img src="{% static 'img/ghs/' %}{{ code }}.svg" alt="{{ name }}"
+                   title="{{ code }} — {{ name }}" class="h-14 w-14">
+            {% endfor %}
+          </dd>
+        </div>
+      {% endif %}
       <div class="sm:col-span-2">
         <dt class="text-xs uppercase tracking-wide text-gray-500">Hazard statements</dt>
         <dd class="mt-1 flex flex-wrap gap-1">
