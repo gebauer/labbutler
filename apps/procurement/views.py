@@ -15,7 +15,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q
-from django.http import FileResponse, Http404, HttpRequest, HttpResponse
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -30,6 +30,7 @@ from apps.inventory.models import Item, Location
 from apps.tenancy.models import User
 from apps.tenancy.scoping import require_permission
 
+from . import product_lookup as product_lookup_client
 from . import services, suggestions
 from .forms import RequestForm
 from .models import PurchaseOrder, Request, Vendor
@@ -384,6 +385,47 @@ def _record_form_save_override(request: HttpRequest, req: Request) -> None:
 
 
 @require_permission("create_request")
+def product_lookup(request: HttpRequest) -> JsonResponse:
+    """Suggest request-form values (name, catalog number, CAS, price) for a product URL.
+
+    Backs the "Fetch details" button on the request form. Best-effort: an unsupported
+    shop or an unreadable page yields ``{"found": false}`` with a reason, never an
+    error the form would have to handle.
+    """
+    raw_url = (request.GET.get("url") or "").strip()
+    parts = product_lookup_client.split_product_url(raw_url)
+    if parts is None:
+        return JsonResponse({"error": "invalid_url"}, status=400)
+    parser = product_lookup_client.vendor_for(parts)
+    if parser is None:
+        return JsonResponse(
+            {
+                "found": False,
+                "reason": "unsupported",
+                "supported": product_lookup_client.supported_vendor_names(),
+            }
+        )
+    suggestion = product_lookup_client.lookup(raw_url)
+    if suggestion is None:
+        return JsonResponse({"found": False, "reason": "nothing"})
+    fields = {
+        name: getattr(suggestion, name)
+        for name in ("item_name", "catalog_number", "cas_number", "unit_price", "currency")
+        if getattr(suggestion, name)
+    }
+    return JsonResponse(
+        {
+            "found": True,
+            "vendor": {"name": suggestion.vendor_name, "aliases": list(parser.aliases)},
+            "fields": fields,
+            "pack_size": suggestion.pack_size,
+            "note": suggestion.note,
+            "live": suggestion.live,
+        }
+    )
+
+
+@require_permission("create_request")
 def request_create(request: HttpRequest) -> HttpResponse:
     # The form posts back to the same URL, so the reorder params survive into the POST.
     source_request, source_item = _reorder_source(request)
@@ -433,6 +475,7 @@ def request_create(request: HttpRequest) -> HttpResponse:
             "req": None,
             "route_config": _route_suggestion_config(form),
             "override_reasons": services.OVERRIDE_REASONS,
+            "lookup_vendors": product_lookup_client.client_vendor_spec(),
         },
     )
 
@@ -467,6 +510,7 @@ def request_edit(request: HttpRequest, pk: int) -> HttpResponse:
             "req": req,
             "route_config": _route_suggestion_config(form),
             "override_reasons": services.OVERRIDE_REASONS,
+            "lookup_vendors": product_lookup_client.client_vendor_spec(),
         },
     )
 

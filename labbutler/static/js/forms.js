@@ -12,6 +12,12 @@
                                       code, tooltips show the full statement
    - button[data-ghs-lookup]          fetches GHS suggestions for the form's CAS number
                                       from data-ghs-url and merges them into the pickers
+   - button[data-product-lookup]      fetches product data (name, catalog no., CAS,
+                                      price, vendor) for the form's product URL from
+                                      data-product-lookup-url and fills empty fields;
+                                      enabled only while the URL belongs to a shop in
+                                      #product-lookup-vendors, and every value it wrote
+                                      is restorable via button[data-product-lookup-undo]
    - form[data-request-form]          live total/VAT preview from the price fields, with
                                       the chosen currency echoed into [data-currency-echo];
                                       a unit price of 0 asks for confirmation on submit;
@@ -197,6 +203,8 @@
       setTimeout(function () { input.value = currentLabel(); }, 150);
     });
     bindPanelKeys(input, panel, openPanel);
+    // Fired after programmatic changes (e.g. the product-URL lookup picking a vendor).
+    select.addEventListener('lb:sync', function () { input.value = currentLabel(); });
 
     input.value = currentLabel();
   }
@@ -516,6 +524,182 @@
     }
   }
 
+  /* ——— Product URL → form prefill (server fetches the vendor page) ——— */
+
+  function bindProductLookup(button) {
+    var form = button.form;
+    var status = form.querySelector('[data-product-lookup-status]');
+    var undoButton = form.querySelector('[data-product-lookup-undo]');
+    var vendorsEl = document.getElementById('product-lookup-vendors');
+    var vendors = vendorsEl ? JSON.parse(vendorsEl.textContent) : [];
+    var say = function (text) { if (status) status.textContent = text; };
+
+    function field(name) { return form.querySelector('[name="' + name + '"]'); }
+
+    /* Server-side mirror: apps/procurement/product_lookup.VendorParser.matches(). */
+    function vendorFor(url) {
+      var host;
+      try {
+        var parsed = new URL(url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+        host = parsed.hostname.toLowerCase();
+      } catch (error) {
+        return null;
+      }
+      return vendors.find(function (vendor) {
+        return vendor.hosts.some(function (known) {
+          return host === known || host.slice(-(known.length + 1)) === '.' + known;
+        });
+      }) || null;
+    }
+
+    /* Every value the fetch changed, so "Undo fetch" can put the form back. */
+    var undoLog = [];
+
+    function change(input, value) {
+      undoLog.push({ input: input, previous: input.value });
+      input.value = value;
+    }
+
+    function refreshUndo() {
+      if (undoButton) undoButton.hidden = undoLog.length === 0;
+    }
+
+    if (undoButton) {
+      undoButton.addEventListener('click', function () {
+        // Restore in reverse, so a field touched twice ends on its original value.
+        undoLog.reverse().forEach(function (entry) { entry.input.value = entry.previous; });
+        undoLog = [];
+        refreshUndo();
+        var vendorSelect = field('vendor');
+        if (vendorSelect) vendorSelect.dispatchEvent(new Event('lb:sync'));
+        say('Fetched data removed — the fields are back as you had them.');
+        form.dispatchEvent(new Event('input'));
+      });
+    }
+
+    /* Fill an empty field; report a differing suggestion for a filled one. */
+    function merge(name, value, label, notes) {
+      var input = field(name);
+      if (!input || !value) return false;
+      if (!input.value.trim()) {
+        change(input, value);
+        return true;
+      }
+      if (input.value.trim() !== value) {
+        notes.push(label + ' on the page: “' + value + '” (kept yours).');
+      }
+      return false;
+    }
+
+    function applyVendor(vendor, notes) {
+      var select = field('vendor');
+      var createInput = field('new_vendor');
+      if (!select || select.value || (createInput && createInput.value)) return;
+      var names = [vendor.name].concat(vendor.aliases || []).map(function (n) {
+        return n.toLowerCase();
+      });
+      var options = Array.prototype.filter.call(select.options, function (opt) { return opt.value; });
+      var match = null;
+      names.some(function (name) {
+        match = options.find(function (opt) { return opt.text.toLowerCase() === name; });
+        if (!match) {
+          match = options.find(function (opt) { return opt.text.toLowerCase().indexOf(name) !== -1; });
+        }
+        return !!match;
+      });
+      if (match) {
+        change(select, match.value);
+        notes.push('Vendor: ' + match.text + '.');
+      } else if (createInput) {
+        // No such vendor in this lab yet — stage it for on-save creation.
+        change(createInput, vendor.name);
+        notes.push('Vendor “' + vendor.name + '” will be created on save.');
+      }
+      select.dispatchEvent(new Event('lb:sync'));
+    }
+
+    /* The button only offers what the server would actually accept. */
+    function refreshButton() {
+      var urlInput = field('product_url');
+      var vendor = vendorFor(urlInput ? urlInput.value.trim() : '');
+      button.disabled = vendor === null;
+      button.title = vendor
+        ? 'Read the product data from ' + vendor.name
+        : 'Paste a product URL from ' + vendors.map(function (v) { return v.name; }).join(', ');
+    }
+
+    var urlField = field('product_url');
+    if (urlField) {
+      urlField.addEventListener('input', refreshButton);
+      urlField.addEventListener('change', refreshButton);
+    }
+    refreshButton();
+
+    button.addEventListener('click', function () {
+      var urlInput = field('product_url');
+      var url = urlInput ? urlInput.value.trim() : '';
+      if (!vendorFor(url)) {
+        refreshButton();
+        return;
+      }
+      button.disabled = true;
+      say('Reading product data …');
+      fetch(button.getAttribute('data-product-lookup-url') + '?url=' + encodeURIComponent(url), {
+        headers: { Accept: 'application/json' },
+      })
+        .then(function (response) {
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          return response.json();
+        })
+        .then(apply)
+        .catch(function () {
+          say('Lookup failed — you can still fill the fields manually.');
+        })
+        .then(function () { refreshButton(); refreshUndo(); });
+    });
+
+    function apply(data) {
+      if (!data.found) {
+        say(data.reason === 'unsupported'
+          ? 'This shop is not supported yet. Supported: ' + (data.supported || []).join(', ') + '.'
+          : 'Could not read product data from that page — please fill the fields manually.');
+        return;
+      }
+      var notes = [];
+      var filled = 0;
+      var fields = data.fields || {};
+      if (merge('item_name', fields.item_name, 'Name', notes)) filled += 1;
+      if (merge('catalog_number', fields.catalog_number, 'Catalog #', notes)) filled += 1;
+      if (merge('cas_number', fields.cas_number, 'CAS', notes)) filled += 1;
+
+      var price = field('unit_price');
+      if (price && fields.unit_price && !(parseFloat(price.value) > 0)) {
+        change(price, fields.unit_price);
+        filled += 1;
+        var currency = field('currency');
+        if (currency && fields.currency) change(currency, fields.currency);
+      }
+      applyVendor(data.vendor || {}, notes);
+
+      notes.unshift(filled
+        ? 'Filled ' + filled + ' field' + (filled === 1 ? '' : 's') + '.'
+        : 'Nothing new to fill.');
+      if (!data.live) {
+        notes.push('The shop blocks automated reading — only data from the URL itself.');
+      }
+      if (data.pack_size) notes.push('Pack size on the page: ' + data.pack_size + '.');
+      if (data.note) notes.push(data.note);
+      if (fields.cas_number) {
+        notes.push('Tip: “Look up by CAS number” below suggests GHS hazard data.');
+      }
+      notes.push('Best-effort guess — verify against the vendor page.');
+      say(notes.join(' '));
+      // Refresh the total preview and the route nudge with the new values.
+      form.dispatchEvent(new Event('input'));
+    }
+  }
+
   /* ——— Live total & VAT preview ——— */
 
   function bindTotals(form) {
@@ -765,6 +949,7 @@
     document.querySelectorAll('select[data-tags]').forEach(enhanceTags);
     document.querySelectorAll('select[data-hazards]').forEach(enhanceHazards);
     document.querySelectorAll('button[data-ghs-lookup]').forEach(bindGhsLookup);
+    document.querySelectorAll('button[data-product-lookup]').forEach(bindProductLookup);
     document.querySelectorAll('section[data-preset-fields]').forEach(bindPresetFields);
     var form = document.querySelector('form[data-request-form]');
     if (form) {

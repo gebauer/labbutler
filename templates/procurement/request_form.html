@@ -30,7 +30,22 @@
         <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Item</h2>
         <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div class="sm:col-span-2">{% include "procurement/_form_field.html" with field=form.item_name tooltip="What you want to order, as named in the vendor's catalog — one item per request." help_url=docs_url|add:"user-guide/procurement/#raising-a-request" %}</div>
-          <div class="sm:col-span-2">{% include "procurement/_form_field.html" with field=form.product_url %}</div>
+          <div class="sm:col-span-2">
+            {% include "procurement/_form_field.html" with field=form.product_url %}
+            <div class="mt-1.5 flex flex-wrap items-start gap-3">
+              {# Enabled by forms.js once the URL belongs to a supported shop. #}
+              <button type="button" data-product-lookup data-product-lookup-url="{% url 'procurement:product_lookup' %}" disabled
+                      class="shrink-0 rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-transparent">
+                Fetch details from URL
+              </button>
+              <button type="button" data-product-lookup-undo hidden
+                      class="shrink-0 rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                Undo fetch
+              </button>
+              <div data-product-lookup-status class="min-w-0 flex-1 self-center text-xs text-gray-500">Fills empty fields (name, catalog number, CAS, price) from the product page. Works for Merck/Sigma, Carl Roth, Fisher, VWR, Cytiva and Amazon — always double-check the result.</div>
+            </div>
+            {{ lookup_vendors|json_script:"product-lookup-vendors" }}
+          </div>
           {% include "procurement/_form_field.html" with field=form.catalog_number %}
           {% include "procurement/_form_field.html" with field=form.cas_number %}
         </div>
