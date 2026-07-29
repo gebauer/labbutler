@@ -417,6 +417,57 @@ def test_request_search_matches_requester_email_and_friendly_name(client, lab):
     assert b"Gadget" in by_email.content and b"Widget" not in by_email.content
 
 
+def _listed_names(response) -> list[str]:
+    return [req.item_name for req in response.context["page"].object_list]
+
+
+@pytest.mark.django_db
+def test_request_list_sorts_by_column_and_toggles_direction(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    Request.objects.create(lab=lab, item_name="Beta", requested_by=member, total=Decimal("50.00"))
+    Request.objects.create(lab=lab, item_name="Alpha", requested_by=member, total=Decimal("9.00"))
+    client.force_login(member)
+
+    by_item = client.get(reverse("procurement:request_list"), {"sort": "item"})
+    assert _listed_names(by_item) == ["Alpha", "Beta"]
+    reversed_item = client.get(reverse("procurement:request_list"), {"sort": "-item"})
+    assert _listed_names(reversed_item) == ["Beta", "Alpha"]
+
+    by_total = client.get(reverse("procurement:request_list"), {"sort": "total"})
+    assert _listed_names(by_total) == ["Alpha", "Beta"]
+
+    # The active column advertises its direction; header links preserve the filters.
+    assert b'aria-sort="ascending"' in by_item.content
+
+
+@pytest.mark.django_db
+def test_request_list_default_and_invalid_sort_fall_back_to_newest_first(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    Request.objects.create(lab=lab, item_name="Older", requested_by=member)
+    Request.objects.create(lab=lab, item_name="Newer", requested_by=member)
+    client.force_login(member)
+
+    default = client.get(reverse("procurement:request_list"))
+    assert _listed_names(default) == ["Newer", "Older"]
+    bogus = client.get(reverse("procurement:request_list"), {"sort": "created_at); DROP"})
+    assert _listed_names(bogus) == ["Newer", "Older"]
+
+
+@pytest.mark.django_db
+def test_request_list_sort_combines_with_filters(client, lab):
+    member = _user(lab, "u@x.de", ["Member"])
+    sigma = Vendor.objects.create(lab=lab, name="Sigma")
+    Request.objects.create(lab=lab, item_name="Zeta tips", requested_by=member, vendor=sigma)
+    Request.objects.create(lab=lab, item_name="Alpha tips", requested_by=member, vendor=sigma)
+    Request.objects.create(lab=lab, item_name="Beta gloves", requested_by=member)
+    client.force_login(member)
+
+    resp = client.get(reverse("procurement:request_list"), {"vendor": sigma.pk, "sort": "item"})
+    assert _listed_names(resp) == ["Alpha tips", "Zeta tips"]
+    # Header links keep the vendor filter so re-sorting doesn't drop it.
+    assert f"vendor={sigma.pk}&amp;sort=".encode() in resp.content
+
+
 @pytest.mark.django_db
 def test_request_infinite_scroll_chunk(client, lab):
     member = _user(lab, "u@x.de", ["Member"])

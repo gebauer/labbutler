@@ -52,6 +52,45 @@ _REQ_FACETS = {
     "requester": "requested_by__pk",
     "assignee": "assigned_to__pk",
 }
+# Sortable list columns: sort key -> (header label, order_by fields). The requester
+# sorts by friendly name with email as fallback, mirroring how display_name renders.
+_REQ_SORTS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "item": ("Item", ("item_name",)),
+    "status": ("Status", ("status",)),
+    "vendor": ("Supplier", ("vendor__name",)),
+    "total": ("Total", ("total",)),
+    "requester": ("Requested by", ("requested_by__friendly_name", "requested_by__email")),
+    "raised": ("Raised", ("created_at",)),
+}
+_DEFAULT_SORT = "-raised"
+
+
+def _sort_fields(sort: str) -> tuple[str, ...]:
+    """order_by() fields for a validated sort value, with a pk tiebreak so paging
+    through equal values stays stable."""
+    descending = sort.startswith("-")
+    fields = _REQ_SORTS[sort.removeprefix("-")][1]
+    ordered = tuple(f"-{field}" if descending else field for field in fields)
+    return (*ordered, "-pk")
+
+
+def _sort_headers(sort: str, base_qs: str) -> list[dict]:
+    """Column headers as toggle links: first click sorts ascending, a second flips."""
+    active_key = sort.removeprefix("-")
+    descending = sort.startswith("-")
+    headers = []
+    for key, (label, _fields) in _REQ_SORTS.items():
+        active = key == active_key
+        next_sort = f"-{key}" if active and not descending else key
+        headers.append(
+            {
+                "label": label,
+                "active": active,
+                "descending": active and descending,
+                "qs": f"{base_qs}&sort={next_sort}" if base_qs else f"sort={next_sort}",
+            }
+        )
+    return headers
 
 
 def _filtered_requests(
@@ -61,12 +100,9 @@ def _filtered_requests(
 
     ``mine`` scopes to requests the given ``user`` is involved in — raised by them or
     forwarded to them to order — which the AND-only facets cannot express on their own.
+    Ordering is the caller's concern (see ``_sort_fields``).
     """
-    requests = (
-        Request.objects.filter(lab=lab)
-        .select_related("vendor", "budget", "requested_by")
-        .order_by("-created_at")
-    )
+    requests = Request.objects.filter(lab=lab).select_related("vendor", "budget", "requested_by")
     query = query.strip()
     if query:
         lookup = Q()
@@ -125,10 +161,10 @@ def _status_overview(lab, selected: list[str]) -> tuple[list[dict], list[dict]]:
     return [stage(c) for c in _PIPELINE], [stage(c) for c in _OFF_PATH]
 
 
-def _request_querystring(request: HttpRequest) -> str:
+def _request_querystring(request: HttpRequest, *, drop: tuple[str, ...] = ()) -> str:
     """Current filter params (minus paging/partial), preserving multiple status values."""
     params = request.GET.copy()
-    for transient in ("page", "partial"):
+    for transient in ("page", "partial", *drop):
         params.pop(transient, None)
     return params.urlencode()
 
@@ -140,9 +176,13 @@ def request_list(request: HttpRequest) -> HttpResponse:
     selected_statuses = request.GET.getlist("status")
     facets = {param: request.GET.get(param, "") for param in _REQ_FACETS}
     mine = request.GET.get("mine") == "1"
+    sort_param = request.GET.get("sort", "")
+    if sort_param.removeprefix("-") not in _REQ_SORTS:
+        sort_param = ""
+    sort = sort_param or _DEFAULT_SORT
     requests = _filtered_requests(
         lab, query, selected_statuses, facets, user=request.user, mine=mine
-    )
+    ).order_by(*_sort_fields(sort))
 
     page = Paginator(requests, PAGE_SIZE).get_page(request.GET.get("page"))
     pipeline, off_path = _status_overview(lab, selected_statuses)
@@ -155,6 +195,8 @@ def request_list(request: HttpRequest) -> HttpResponse:
         "pipeline": pipeline,
         "off_path": off_path,
         "filter_qs": _request_querystring(request),
+        "sort_param": sort_param,
+        "sort_headers": _sort_headers(sort, _request_querystring(request, drop=("sort",))),
         "has_filters": bool(query.strip())
         or bool(selected_statuses)
         or any(facets.values())
