@@ -58,6 +58,22 @@ def build(user, lab) -> list[Widget]:
             Widget(key, title, kind, list(queryset[:limit]), queryset.count(), view_all, empty)
         )
 
+    if user.can(lab, "manage_lab"):
+        # People waiting to be let in come first: until a manager acts they can't do
+        # anything at all. Only shown while there is something to decide.
+        from apps.tenancy.join import pending_requests
+
+        join_requests = pending_requests(lab)
+        if join_requests.exists():
+            add(
+                "join_requests",
+                "Join requests",
+                "join_requests",
+                join_requests,
+                reverse("manage:members") + "#join-requests",
+                "No one is waiting to join.",
+            )
+
     if user.can(lab, "approve_request"):
         # Newest first: with more entries than the limit, oldest-first pins the same
         # stale rows at the top forever (#7). "View all" still has the full queue.

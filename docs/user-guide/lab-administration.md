@@ -17,6 +17,32 @@ requires the `manage_lab` permission (held by the *Lab manager* template role).
 
 Email addresses are treated case-insensitively.
 
+!!! note "There is always a manager"
+    A change that would leave the lab without anyone holding `manage_lab` — removing
+    your own manager role, editing or deleting the only manager role, removing the
+    last manager — is refused. Give someone else the right first.
+
+### Join link — let people ask to join
+
+Instead of typing in every address, you can share a **join link** (e.g. in the lab
+chat or on the group wiki). Under **Manage → Members → Join link**, press **Create
+join link** and copy it.
+
+1. Whoever opens the link enters their name, email address and an optional message.
+2. LabButler emails them a confirmation link. Only **confirmed** requests reach you, so
+   typos and addresses typed in by someone else never show up.
+3. Everyone who can manage the lab gets an email, the request appears at the top of
+   **Manage → Members** and as a **Join requests** card on the dashboard.
+4. **Approve** it with the roles to grant (the lab's *Member* role is preselected) —
+   new people get the usual welcome email with a set-password link, people who already
+   have an account are told they can sign in. Or **Reject** it; they get a short,
+   neutral email.
+
+Nobody gets any access without your approval. **New link** replaces the link (the old
+one stops working at once — use it if the link leaked somewhere it shouldn't be);
+**Turn off** disables it. Unconfirmed requests are deleted after 7 days and decided
+ones after 90 days; each decision stays in the audit log.
+
 ## Roles and permissions
 
 Roles are **per lab and fully editable**: a role is just a named set of
@@ -63,6 +89,10 @@ action is refused server-side too.
 **Manage → Suppliers** is the lab's vendor list, referenced by items and requests.
 A supplier is just a name and can also be quick-created inline while filling in a
 request.
+
+Suppliers, budgets and shipping addresses that are still used by requests or items
+can't be deleted — that would erase them from those records' history. Merge duplicate
+suppliers (**Merge suppliers**) or rename the record instead.
 
 ## Budgets (Kostenstellen)
 

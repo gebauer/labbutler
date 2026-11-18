@@ -86,3 +86,45 @@ class NotificationSettingsForm(forms.ModelForm):
         for name, field in self.fields.items():
             if name != "expiry_owned_only":
                 field.widget.attrs.setdefault("class", _SELECT)
+
+
+class JoinRequestForm(forms.Form):
+    """Public "ask to join" form behind a lab's join link.
+
+    ``website`` is a honeypot: hidden from people, but naive bots fill every field. A
+    filled honeypot is answered like a success and silently dropped (see the view).
+    """
+
+    name = forms.CharField(
+        max_length=150, widget=forms.TextInput(attrs={"class": _INPUT, "autocomplete": "name"})
+    )
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={"class": _INPUT, "autocomplete": "email"})
+    )
+    message = forms.CharField(
+        required=False,
+        max_length=1000,
+        label="Message to the lab managers (optional)",
+        widget=forms.Textarea(
+            attrs={
+                "class": _INPUT,
+                "rows": 3,
+                "placeholder": "e.g. I'm the new PhD student in the group, starting in March.",
+            }
+        ),
+    )
+    website = forms.CharField(
+        required=False,
+        label="Leave this field empty",
+        widget=forms.TextInput(attrs={"tabindex": "-1", "autocomplete": "off"}),
+    )
+
+    def clean_email(self) -> str:
+        return self.cleaned_data["email"].strip()
+
+    def clean_name(self) -> str:
+        return self.cleaned_data["name"].strip()
+
+    @property
+    def is_bot(self) -> bool:
+        return bool(self.cleaned_data.get("website"))

@@ -27,7 +27,15 @@
           <ul class="divide-y divide-gray-100">
             {% for item in w.items %}
               <li class="px-4 py-2.5 text-sm">
-                {% if w.kind == 'approvals' %}
+                {% if w.kind == 'join_requests' %}
+                  <a href="{% url 'manage:members' %}#join-requests" class="flex items-center justify-between gap-2">
+                    <span class="min-w-0">
+                      <span class="block truncate font-medium text-gray-900">{{ item.name }}</span>
+                      <span class="block truncate text-xs text-gray-500">{{ item.email }}</span>
+                    </span>
+                    <span class="shrink-0 text-xs font-medium text-teal-700">Review</span>
+                  </a>
+                {% elif w.kind == 'approvals' %}
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
                       <a href="{% url 'procurement:request_detail' item.pk %}" class="block truncate font-medium text-gray-900 hover:text-teal-700">{{ item.item_name }}</a>

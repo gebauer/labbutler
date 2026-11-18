@@ -112,6 +112,18 @@ class Lab(TimeStampedModel):
     po_deviation_threshold_pct = models.DecimalField(
         "PO price deviation threshold (%)", max_digits=5, decimal_places=2, null=True, blank=True
     )
+    # Secret part of the shareable "ask to join" link; blank means the link is off.
+    # Regenerating it revokes every copy of the old link. See apps.tenancy.join.
+    join_token = models.CharField(max_length=64, blank=True, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["join_token"],
+                condition=~models.Q(join_token=""),
+                name="unique_lab_join_token",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.name
@@ -233,3 +245,48 @@ class Membership(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.user} @ {self.lab}"
+
+
+class JoinRequest(TimeStampedModel):
+    """Someone asking to join a lab through its join link.
+
+    Lifecycle: ``unconfirmed`` (submitted, waiting for the requester to confirm their
+    email) → ``pending`` (visible to the lab's managers) → ``approved`` / ``rejected``.
+    Only confirmed requests ever reach a manager, so a typo'd or spoofed address can't
+    put anything in front of them. Rows are personal data and are purged after a while
+    (see :func:`apps.tenancy.tasks.purge_old_join_requests`).
+    """
+
+    class Status(models.TextChoices):
+        UNCONFIRMED = "unconfirmed", "Waiting for email confirmation"
+        PENDING = "pending", "Waiting for a manager"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    OPEN_STATUSES = (Status.UNCONFIRMED, Status.PENDING)
+
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name="join_requests")
+    email = models.EmailField()
+    name = models.CharField(max_length=150)
+    message = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.UNCONFIRMED)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    decided_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [
+            # One open request per person and lab; a re-submit refreshes it instead.
+            models.UniqueConstraint(
+                "lab",
+                Lower("email"),
+                condition=models.Q(status__in=["unconfirmed", "pending"]),
+                name="unique_open_join_request_per_lab_email",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.email} → {self.lab} ({self.status})"

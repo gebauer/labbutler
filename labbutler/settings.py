@@ -195,6 +195,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.tenancy.tasks.purge_old_login_records",
         "schedule": crontab(hour=3, minute=15),
     },
+    "join-requests-retention-daily": {
+        "task": "apps.tenancy.tasks.purge_old_join_requests",
+        "schedule": crontab(hour=3, minute=20),
+    },
 }
 
 # --- Email ----------------------------------------------------------------------------

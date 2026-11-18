@@ -23,6 +23,7 @@ from apps.procurement.models import Request
 from apps.tenancy.models import (
     ExpiryAdvanceDays,
     ExpiryReportMode,
+    JoinRequest,
     Lab,
     Membership,
     NotificationFrequency,
@@ -266,6 +267,80 @@ def send_welcome_email(user_pk: int, lab_pk: int) -> int:
     content = emails.build_welcome(user, lab, url)
     _send(content, [user.email])
     return 1
+
+
+@shared_task(**SINGLE_EMAIL_RETRY)
+def send_join_confirmation(join_request_pk: int) -> int:
+    """Email the confirmation link for a fresh join request. Returns 0/1."""
+    from apps.tenancy import join
+
+    join_request = (
+        JoinRequest.objects.select_related("lab")
+        .filter(pk=join_request_pk, status=JoinRequest.Status.UNCONFIRMED)
+        .first()
+    )
+    if join_request is None:
+        return 0
+    path = reverse("tenancy:join_confirm", args=[join.confirmation_token(join_request)])
+    content = emails.build_join_confirmation(join_request, _absolute(path))
+    _send(content, [join_request.email])
+    return 1
+
+
+@shared_task(**SINGLE_EMAIL_RETRY)
+def notify_join_request(join_request_pk: int) -> int:
+    """Email every member who can manage the lab about a confirmed join request."""
+    join_request = (
+        JoinRequest.objects.select_related("lab")
+        .filter(pk=join_request_pk, status=JoinRequest.Status.PENDING)
+        .first()
+    )
+    if join_request is None:
+        return 0
+    recipients = sorted(
+        {
+            user.email
+            for user in User.objects.filter(
+                memberships__lab=join_request.lab,
+                memberships__roles__permissions__code="manage_lab",
+            ).exclude(email="")
+        }
+    )
+    if not recipients:
+        return 0
+    content = emails.build_join_request_notice(
+        join_request, _absolute(reverse("manage:members") + "#join-requests")
+    )
+    _send(content, recipients)
+    return len(recipients)
+
+
+@shared_task(**SINGLE_EMAIL_RETRY)
+def send_join_decision(join_request_pk: int) -> int:
+    """Tell the requester the outcome: approved (existing account) or rejected.
+
+    Brand-new accounts are told via the welcome email instead (it carries the
+    set-password link), so approval here only covers people who already had an account.
+    """
+    join_request = JoinRequest.objects.select_related("lab").filter(pk=join_request_pk).first()
+    if join_request is None:
+        return 0
+    if join_request.status == JoinRequest.Status.REJECTED:
+        content = emails.build_join_rejected(join_request)
+    elif join_request.status == JoinRequest.Status.APPROVED:
+        user = User.objects.filter(email__iexact=join_request.email).first()
+        if user is None:
+            return 0
+        content = emails.build_join_approved(user, join_request.lab, _absolute(reverse("login")))
+    else:
+        return 0
+    _send(content, [join_request.email])
+    return 1
+
+
+def _absolute(path: str) -> str:
+    base = _base_url()
+    return f"{base.rstrip('/')}{path}" if base else path
 
 
 # The expiry report runs weekly, so "new" covers what changed since the previous run.

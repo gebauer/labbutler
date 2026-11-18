@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Join request · LabButler{% endblock %}
+
+{% block content %}
+  <div class="mx-auto max-w-md rounded-xl border border-gray-200 bg-white px-6 py-10 text-center shadow-sm">
+    {% if error %}
+      <h1 class="text-lg font-semibold">Link not valid</h1>
+      <p class="mt-2 text-sm text-gray-600">{{ error }} You can send the join form again to get a fresh link.</p>
+    {% elif join_request.status == "pending" %}
+      <h1 class="text-lg font-semibold">Request sent</h1>
+      <p class="mt-2 text-sm text-gray-600">
+        Thanks, {{ join_request.name }} — your email is confirmed and the managers of
+        {{ join_request.lab.name }} have been notified. You'll get an email once they've
+        decided; if you're approved it contains a link to set your password.
+      </p>
+    {% elif join_request.status == "approved" %}
+      <h1 class="text-lg font-semibold">You're already a member</h1>
+      <p class="mt-2 text-sm text-gray-600">You already have access to {{ join_request.lab.name }}.</p>
+      <a href="{% url 'login' %}" class="mt-6 inline-block rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800">Sign in</a>
+    {% else %}
+      <h1 class="text-lg font-semibold">Already decided</h1>
+      <p class="mt-2 text-sm text-gray-600">This request has already been handled; you should have received an email about it.</p>
+    {% endif %}
+  </div>
+{% endblock %}

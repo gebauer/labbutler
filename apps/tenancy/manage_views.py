@@ -16,6 +16,7 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
@@ -23,10 +24,12 @@ from apps.inventory.models import FieldDefinition, FieldPreset, Item, Location
 from apps.procurement.models import Budget, Request, ShippingAddress, Vendor
 from apps.procurement.services import find_duplicate_vendors, merge_vendors
 
+from . import join as join_flow
 from .manage_forms import (
     BudgetForm,
     FieldDefinitionForm,
     FieldPresetForm,
+    JoinApproveForm,
     LabSettingsForm,
     LocationForm,
     MemberAddForm,
@@ -35,7 +38,7 @@ from .manage_forms import (
     ShippingAddressForm,
     VendorForm,
 )
-from .models import Membership, Role, User
+from .models import JoinRequest, Membership, Role, User
 from .scoping import require_permission
 from .services import LastManagerError, keeping_a_manager
 
@@ -306,6 +309,23 @@ def members(request: HttpRequest) -> HttpResponse:
         memberships = memberships.filter(
             Q(user__email__icontains=query) | Q(user__friendly_name__icontains=query)
         )
+    default_role = join_flow.default_role(request.lab)
+    join_requests = [
+        (
+            join_request,
+            JoinApproveForm(
+                lab=request.lab,
+                prefix=f"jr{join_request.pk}",
+                initial={"roles": [default_role] if default_role else []},
+            ),
+        )
+        for join_request in join_flow.pending_requests(request.lab)
+    ]
+    join_url = ""
+    if request.lab.join_token:
+        join_url = request.build_absolute_uri(
+            reverse("tenancy:join_request", args=[request.lab.join_token])
+        )
     return render(
         request,
         "manage/members.html",
@@ -313,8 +333,59 @@ def members(request: HttpRequest) -> HttpResponse:
             "memberships": memberships,
             "add_form": MemberAddForm(lab=request.lab),
             "query": query,
+            "join_requests": join_requests,
+            "join_url": join_url,
         },
     )
+
+
+@require_permission("manage_lab")
+@require_POST
+def join_link(request: HttpRequest) -> HttpResponse:
+    """Enable, regenerate (revoking the old link), or disable the lab's join link."""
+    action = request.POST.get("action")
+    if action in ("enable", "regenerate"):
+        join_flow.enable_join_link(request.lab, actor=request.user)
+        messages.success(
+            request,
+            "Join link created."
+            if action == "enable"
+            else "New join link created — the old one no longer works.",
+        )
+    elif action == "disable":
+        join_flow.disable_join_link(request.lab, actor=request.user)
+        messages.success(request, "Join link turned off.")
+    return redirect(reverse("manage:members") + "#join-link")
+
+
+@require_permission("manage_lab")
+@require_POST
+def join_approve(request: HttpRequest, pk: int) -> HttpResponse:
+    join_request = get_object_or_404(JoinRequest, pk=pk, lab=request.lab)
+    form = JoinApproveForm(request.POST, lab=request.lab, prefix=f"jr{pk}")
+    if not form.is_valid():
+        messages.error(request, "Choose valid roles.")
+        return redirect(reverse("manage:members") + "#join-requests")
+    try:
+        join_flow.approve(join_request, actor=request.user, roles=form.cleaned_data["roles"])
+    except join_flow.JoinError as exc:
+        messages.info(request, str(exc))
+    else:
+        messages.success(request, f"{join_request.email} is now a member.")
+    return redirect(reverse("manage:members") + "#join-requests")
+
+
+@require_permission("manage_lab")
+@require_POST
+def join_reject(request: HttpRequest, pk: int) -> HttpResponse:
+    join_request = get_object_or_404(JoinRequest, pk=pk, lab=request.lab)
+    try:
+        join_flow.reject(join_request, actor=request.user)
+    except join_flow.JoinError as exc:
+        messages.info(request, str(exc))
+    else:
+        messages.success(request, f"Request from {join_request.email} rejected.")
+    return redirect(reverse("manage:members") + "#join-requests")
 
 
 @require_permission("manage_lab")

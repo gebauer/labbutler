@@ -282,6 +282,62 @@ def build_welcome(user, lab, set_password_url: str) -> EmailContent:
     )
 
 
+def build_join_confirmation(join_request, confirm_url: str) -> EmailContent:
+    """Ask someone who used a lab's join link to confirm their email address."""
+    lab = join_request.lab
+    return _email(
+        f"[LabButler] Confirm your request to join {lab.name}",
+        greeting=f"Hello {join_request.name},",
+        intro=f"Someone — hopefully you — asked to join {lab.name} on LabButler with this "
+        "email address. Confirm it, and the lab's managers will review your request:",
+        action_url=confirm_url,
+        action_label="Confirm my request",
+        postscript="If this wasn't you, ignore this email — nothing happens without "
+        "confirmation, and the request is deleted after a few days.",
+    )
+
+
+def build_join_request_notice(join_request, review_url: str) -> EmailContent:
+    """Tell a lab's managers that a confirmed join request awaits their decision."""
+    lab = join_request.lab
+    rows = [("Name", join_request.name), ("Email", join_request.email)]
+    if join_request.message:
+        rows.append(("Message", join_request.message))
+    return _email(
+        f"[LabButler] {join_request.name} asks to join {lab.name}",
+        intro=f"A new request to join {lab.name} came in through the lab's join link. "
+        "The email address has been confirmed.",
+        rows=rows,
+        closing="Approve it (and choose the roles) or reject it here:",
+        action_url=review_url,
+        action_label="Review join requests",
+        footer="Sent to everyone who can manage this lab.",
+    )
+
+
+def build_join_approved(user, lab, sign_in_url: str) -> EmailContent:
+    """Tell someone who already has an account that their join request was approved."""
+    return _email(
+        f"[LabButler] You're now a member of {lab.name}",
+        greeting=f"Hello {user.display_name},",
+        intro=f"Your request to join {lab.name} was approved. Sign in with your existing "
+        "LabButler account; you can switch between your labs in the navigation bar.",
+        action_url=sign_in_url,
+        action_label="Sign in",
+    )
+
+
+def build_join_rejected(join_request) -> EmailContent:
+    """A short, neutral note that a join request was declined."""
+    lab = join_request.lab
+    return _email(
+        f"[LabButler] Your request to join {lab.name}",
+        greeting=f"Hello {join_request.name},",
+        intro=f"Your request to join {lab.name} on LabButler was not approved. If you "
+        "think this is a mistake, please contact the lab directly.",
+    )
+
+
 def build_expiry_digest(
     lab,
     expired: list,

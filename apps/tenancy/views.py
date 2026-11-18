@@ -16,8 +16,9 @@ from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
 
+from . import join as join_flow
 from .catalog import ALL_PERMISSION_CODES, PERMISSION_CATALOG
-from .forms import NotificationSettingsForm, ProfileForm
+from .forms import JoinRequestForm, NotificationSettingsForm, ProfileForm
 from .middleware import SESSION_KEY
 from .models import Membership, Permission, User
 from .scoping import get_current_lab
@@ -184,3 +185,47 @@ def stop_impersonating(request: HttpRequest) -> HttpResponse:
     if getattr(request, "impersonator", None) is not None:
         _record_impersonation(request, "tenancy.impersonation_stopped", request.user)
     return redirect(_safe_next(request))
+
+
+# --- Join link (public) ----------------------------------------------------------------
+
+
+def join_request(request: HttpRequest, token: str) -> HttpResponse:
+    """Public "ask to join" form behind a lab's join link.
+
+    Whatever the email (new, existing account, already a member), a valid submission gets
+    the same "check your inbox" answer — the page never reveals who has an account.
+    """
+    lab = join_flow.lab_for_token(token)
+    if lab is None:
+        return render(request, "tenancy/join_closed.html", status=404)
+
+    form = JoinRequestForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        if form.is_bot:
+            return render(request, "tenancy/join_sent.html", {"lab": lab})
+        try:
+            join_flow.submit(
+                lab,
+                email=form.cleaned_data["email"],
+                name=form.cleaned_data["name"],
+                message=form.cleaned_data["message"],
+            )
+        except join_flow.JoinError as exc:
+            form.add_error(None, str(exc))
+        else:
+            return render(
+                request,
+                "tenancy/join_sent.html",
+                {"lab": lab, "email": form.cleaned_data["email"]},
+            )
+    return render(request, "tenancy/join.html", {"lab": lab, "form": form})
+
+
+def join_confirm(request: HttpRequest, token: str) -> HttpResponse:
+    """Landing page of the confirmation link emailed to a join requester."""
+    try:
+        confirmed = join_flow.confirm(token)
+    except join_flow.JoinError as exc:
+        return render(request, "tenancy/join_confirmed.html", {"error": str(exc)}, status=400)
+    return render(request, "tenancy/join_confirmed.html", {"join_request": confirmed})
