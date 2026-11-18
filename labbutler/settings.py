@@ -191,6 +191,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.notifications.tasks.send_notification_digests",
         "schedule": crontab(hour=env.int("NOTIFY_DIGEST_HOUR", default=7), minute=30),
     },
+    "login-records-retention-daily": {
+        "task": "apps.tenancy.tasks.purge_old_login_records",
+        "schedule": crontab(hour=3, minute=15),
+    },
 }
 
 # --- Email ----------------------------------------------------------------------------
@@ -285,6 +289,8 @@ AXES_HTTP_RESPONSE_CODE = 429
 # Behind a reverse proxy set the number of proxies so the *client* IP is used, not the
 # proxy's (otherwise everyone shares one IP). 0 = trust REMOTE_ADDR (no proxy).
 AXES_IPWARE_PROXY_COUNT = env.int("AXES_IPWARE_PROXY_COUNT", default=0) or None
+# Sign-in records (IP, user agent) are personal data: purged daily after this many days.
+LABBUTLER_LOGIN_RECORD_RETENTION_DAYS = env.int("LABBUTLER_LOGIN_RECORD_RETENTION_DAYS", default=90)
 
 # --- Security (prod-friendly defaults, relaxed when DEBUG) -----------------------------
 # Sent on every response (see labbutler.middleware.ContentSecurityPolicyMiddleware).

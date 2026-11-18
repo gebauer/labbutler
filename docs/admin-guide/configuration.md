@@ -63,6 +63,7 @@ containers, so the built-in default applies.
 | `AXES_FAILURE_LIMIT` | `5` | Failed sign-ins (per IP + username) before lockout. Lockouts answer HTTP 429 and reset on a successful login. |
 | `AXES_COOLOFF_HOURS` | `1` | Hours before an automatic unlock. |
 | `AXES_IPWARE_PROXY_COUNT` | `0` | **Number of reverse proxies in front.** With `0` behind a proxy, all users share the proxy's IP — set it (usually `1`). |
+| `LABBUTLER_LOGIN_RECORD_RETENTION_DAYS` | `90` | Sign-in records (IP address, browser) are deleted after this many days by a nightly job (03:15, needs `beat`). |
 
 ## HTTPS hardening
 
