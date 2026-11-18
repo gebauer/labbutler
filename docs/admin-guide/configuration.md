@@ -14,6 +14,7 @@ the image. There are no secrets in the repository.
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | (empty) | Comma-separated origins incl. scheme, e.g. `https://labbutler.your.domain`. |
 | `DJANGO_TIME_ZONE` | `Europe/Berlin` | Display/default time zone. |
 | `DJANGO_MEDIA_ROOT` | `/data/media` | Where uploaded attachments are stored (the compose media volume). |
+| `LABBUTLER_PRIVACY_CONTACT` | (empty) | Data-controller contact shown on the privacy notice, e.g. `AG Example, University of X — privacy@example.org`. Set this before going live. |
 | `DJANGO_LOG_LEVEL` | `INFO` | Log level for everything written to stdout (`docker compose logs`), incl. server-error tracebacks. |
 | `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` | (unset) | Outbound proxy for the PubChem GHS lookup and vendor product lookups, if your network requires one. |
 

@@ -213,6 +213,10 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="labbutler@localhost")
 # Absolute base URL used to build links in emails (blank omits links, e.g. in dev).
 LABBUTLER_BASE_URL = env("LABBUTLER_BASE_URL", default="")
 
+# Who to contact about personal data (shown on the privacy notice), e.g.
+# "AG Example, University of X — privacy@example.org". Blank shows a generic hint.
+LABBUTLER_PRIVACY_CONTACT = env("LABBUTLER_PRIVACY_CONTACT", default="")
+
 # --- Central purchasing (Zentraleinkauf) ------------------------------------------------
 # Instance-wide defaults for the route/PO suggestion engine; labs can override the two
 # thresholds in their lab settings. Resolution lives in apps.procurement.suggestions.

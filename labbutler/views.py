@@ -1,8 +1,10 @@
+from django.conf import settings
 from django.db import connection
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 
+from apps.procurement import product_lookup
 from apps.tenancy.scoping import get_current_lab
 
 from . import dashboard
@@ -28,5 +30,15 @@ def home(request: HttpRequest) -> HttpResponse:
 
 
 def privacy(request: HttpRequest) -> HttpResponse:
-    """Static privacy notice, publicly reachable so it can be read before signing in."""
-    return render(request, "privacy.html")
+    """Privacy notice, publicly reachable so it can be read before signing in.
+
+    Facts that change with code or configuration (vendor list, retention, operator
+    contact) are passed in rather than written into the template, so the notice can't
+    drift from what the installation actually does.
+    """
+    context = {
+        "controller_contact": settings.LABBUTLER_PRIVACY_CONTACT,
+        "login_retention_days": settings.LABBUTLER_LOGIN_RECORD_RETENTION_DAYS,
+        "lookup_vendors": product_lookup.supported_vendor_names(),
+    }
+    return render(request, "privacy.html", context)
