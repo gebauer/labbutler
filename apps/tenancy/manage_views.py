@@ -19,8 +19,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
-from apps.inventory.models import FieldDefinition, FieldPreset, Location
-from apps.procurement.models import Budget, ShippingAddress, Vendor
+from apps.inventory.models import FieldDefinition, FieldPreset, Item, Location
+from apps.procurement.models import Budget, Request, ShippingAddress, Vendor
 from apps.procurement.services import find_duplicate_vendors, merge_vendors
 
 from .manage_forms import (
@@ -124,10 +124,49 @@ def crud_form(request: HttpRequest, kind: str, pk: int | None = None) -> HttpRes
     )
 
 
+# Lookup records that requests/items point at with SET_NULL: deleting one in use would
+# silently erase it from those records' history, so it is refused while referenced.
+_KEEP_WHILE_USED = {"suppliers", "budgets", "addresses"}
+
+
+def _usage_blocker(kind: str, obj) -> str:
+    """Why ``obj`` can't be deleted (it is still referenced), or "" if it can."""
+    if kind not in _KEEP_WHILE_USED:
+        return ""
+    counts = []
+    for relation in obj._meta.related_objects:
+        if relation.one_to_many and relation.related_model in (Request, Item):
+            count = getattr(obj, relation.get_accessor_name()).count()
+            if count:
+                noun = relation.related_model._meta.verbose_name
+                counts.append(f"{count} {noun}{'s' if count != 1 else ''}")
+    if not counts:
+        return ""
+    advice = (
+        "merge it into another supplier or rename it"
+        if kind == "suppliers"
+        else ("rename or edit it instead")
+    )
+    return (
+        f"“{obj}” is used by {' and '.join(counts)}; deleting it would erase it from their "
+        f"history. To clean up, {advice}."
+    )
+
+
 @require_permission("manage_lab")
 def crud_delete(request: HttpRequest, kind: str, pk: int) -> HttpResponse:
     config = _config(kind)
     obj = get_object_or_404(config.model, pk=pk, lab=request.lab)
+    blocker = _usage_blocker(kind, obj)
+    if blocker:
+        if request.method == "POST":
+            messages.error(request, blocker)
+            return redirect("manage:list", kind=kind)
+        return render(
+            request,
+            "manage/confirm_delete.html",
+            {"kind": kind, "config": config, "object": obj, "blocker": blocker},
+        )
     if request.method == "POST":
         label = str(obj)
         AuditEntry.record(

@@ -379,3 +379,39 @@ def test_supplier_list_links_merge_with_duplicate_badge(client, lab):
     resp = client.get(reverse("manage:list", args=["suppliers"]))
     assert reverse("manage:supplier_merge").encode() in resp.content
     assert b"Merge duplicates" in resp.content
+
+
+@pytest.mark.django_db
+def test_supplier_in_use_cannot_be_deleted(client, lab):
+    from apps.inventory.models import Item
+    from apps.procurement.models import Request
+
+    boss = _user(lab, "boss@x.de", ["Lab manager"])
+    client.force_login(boss)
+    vendor = Vendor.objects.create(lab=lab, name="Sigma")
+    Request.objects.create(lab=lab, item_name="Tips", requested_by=boss, vendor=vendor)
+    Item.objects.create(lab=lab, human_id="AGB-1", name="Ethanol", vendor=vendor)
+
+    page = client.get(reverse("manage:delete", args=["suppliers", vendor.pk])).content.decode()
+    assert "used by 1 item and 1 request" in page
+    assert "Merge suppliers" in page and ">Delete</button>" not in page
+
+    client.post(reverse("manage:delete", args=["suppliers", vendor.pk]))
+    assert Vendor.objects.filter(pk=vendor.pk).exists()
+
+
+@pytest.mark.django_db
+def test_budget_in_use_cannot_be_deleted_but_unused_one_can(client, lab):
+    from apps.procurement.models import Request
+
+    boss = _user(lab, "boss@x.de", ["Lab manager"])
+    client.force_login(boss)
+    used = Budget.objects.create(lab=lab, number="B-1")
+    unused = Budget.objects.create(lab=lab, number="B-2")
+    Request.objects.create(lab=lab, item_name="Tips", requested_by=boss, budget=used)
+
+    client.post(reverse("manage:delete", args=["budgets", used.pk]))
+    client.post(reverse("manage:delete", args=["budgets", unused.pk]))
+
+    assert Budget.objects.filter(pk=used.pk).exists()
+    assert not Budget.objects.filter(pk=unused.pk).exists()
