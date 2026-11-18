@@ -1,5 +1,8 @@
 """Tenancy operations that span multiple models (kept out of views/commands)."""
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 from django.db import transaction
 from django.utils.text import slugify
 
@@ -31,3 +34,37 @@ def add_member(*, user: User, lab: Lab, role_names: list[str] | None = None) -> 
     if role_names:
         membership.roles.set(Role.objects.filter(lab=lab, name__in=role_names))
     return membership
+
+
+MANAGE_LAB = "manage_lab"
+
+
+class LastManagerError(Exception):
+    """A membership or role change would leave the lab with no member who can manage it."""
+
+    message = (
+        "This change would leave the lab without anyone who can manage it. Give another "
+        "member the “manage lab” right first."
+    )
+
+
+def lab_has_manager(lab: Lab) -> bool:
+    """Whether any member of ``lab`` holds ``manage_lab`` (superusers don't count)."""
+    return Membership.objects.filter(lab=lab, roles__permissions__code=MANAGE_LAB).exists()
+
+
+@contextmanager
+def keeping_a_manager(lab: Lab) -> Iterator[None]:
+    """Apply a membership/role change atomically, undoing it if no manager is left.
+
+    Checking the outcome after the fact (instead of predicting each kind of change)
+    covers every path at once: editing a member's roles, removing a member, editing a
+    role's permissions, deleting a role. Raises :class:`LastManagerError` after rolling
+    back. A lab that already had no manager isn't blocked — that can only be repaired
+    by a superuser, and blocking unrelated edits wouldn't help.
+    """
+    had_manager = lab_has_manager(lab)
+    with transaction.atomic():
+        yield
+        if had_manager and not lab_has_manager(lab):
+            raise LastManagerError(LastManagerError.message)

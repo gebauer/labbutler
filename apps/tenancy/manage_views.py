@@ -37,6 +37,7 @@ from .manage_forms import (
 )
 from .models import Membership, Role, User
 from .scoping import require_permission
+from .services import LastManagerError, keeping_a_manager
 
 
 @dataclass(frozen=True)
@@ -315,16 +316,21 @@ def member_edit(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method == "POST":
         form = MemberRolesForm(request.POST, lab=request.lab)
         if form.is_valid():
-            membership.roles.set(form.cleaned_data["roles"])
-            AuditEntry.record(
-                lab=request.lab,
-                actor=request.user,
-                action="lab.member_updated",
-                target=membership,
-                changes={"roles": [r.name for r in form.cleaned_data["roles"]]},
-            )
-            messages.success(request, f"Updated {membership.user.email}.")
-            return redirect("manage:members")
+            try:
+                with keeping_a_manager(request.lab):
+                    membership.roles.set(form.cleaned_data["roles"])
+                    AuditEntry.record(
+                        lab=request.lab,
+                        actor=request.user,
+                        action="lab.member_updated",
+                        target=membership,
+                        changes={"roles": [r.name for r in form.cleaned_data["roles"]]},
+                    )
+            except LastManagerError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(request, f"Updated {membership.user.email}.")
+                return redirect("manage:members")
     else:
         form = MemberRolesForm(lab=request.lab, initial={"roles": membership.roles.all()})
     return render(request, "manage/member_form.html", {"form": form, "membership": membership})
@@ -338,14 +344,19 @@ def member_remove(request: HttpRequest, pk: int) -> HttpResponse:
         messages.error(request, "You can't remove yourself from the lab.")
         return redirect("manage:members")
     email = membership.user.email
-    AuditEntry.record(
-        lab=request.lab,
-        actor=request.user,
-        action="lab.member_removed",
-        target=("Membership", membership.pk),
-        changes={"email": email},
-    )
-    membership.delete()
+    try:
+        with keeping_a_manager(request.lab):
+            AuditEntry.record(
+                lab=request.lab,
+                actor=request.user,
+                action="lab.member_removed",
+                target=("Membership", membership.pk),
+                changes={"email": email},
+            )
+            membership.delete()
+    except LastManagerError as exc:
+        messages.error(request, str(exc))
+        return redirect("manage:members")
     messages.success(request, f"Removed {email}.")
     return redirect("manage:members")
 
@@ -369,16 +380,21 @@ def role_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
     if request.method == "POST":
         form = RoleForm(request.POST, instance=instance, lab=request.lab)
         if form.is_valid():
-            role = form.save()
-            AuditEntry.record(
-                lab=request.lab,
-                actor=request.user,
-                action="lab.role_updated" if instance else "lab.role_created",
-                target=role,
-                changes={"name": role.name},
-            )
-            messages.success(request, f"Saved role “{role.name}”.")
-            return redirect("manage:roles")
+            try:
+                with keeping_a_manager(request.lab):
+                    role = form.save()
+                    AuditEntry.record(
+                        lab=request.lab,
+                        actor=request.user,
+                        action="lab.role_updated" if instance else "lab.role_created",
+                        target=role,
+                        changes={"name": role.name},
+                    )
+            except LastManagerError as exc:
+                form.add_error(None, str(exc))
+            else:
+                messages.success(request, f"Saved role “{role.name}”.")
+                return redirect("manage:roles")
     else:
         form = RoleForm(instance=instance, lab=request.lab)
     return render(request, "manage/role_form.html", {"form": form, "role": instance})
@@ -389,13 +405,18 @@ def role_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
 def role_delete(request: HttpRequest, pk: int) -> HttpResponse:
     role = get_object_or_404(Role, pk=pk, lab=request.lab, is_template=False)
     name = role.name
-    AuditEntry.record(
-        lab=request.lab,
-        actor=request.user,
-        action="lab.role_deleted",
-        target=("Role", role.pk),
-        changes={"name": name},
-    )
-    role.delete()
+    try:
+        with keeping_a_manager(request.lab):
+            AuditEntry.record(
+                lab=request.lab,
+                actor=request.user,
+                action="lab.role_deleted",
+                target=("Role", role.pk),
+                changes={"name": name},
+            )
+            role.delete()
+    except LastManagerError as exc:
+        messages.error(request, str(exc))
+        return redirect("manage:roles")
     messages.success(request, f"Deleted role “{name}”.")
     return redirect("manage:roles")
