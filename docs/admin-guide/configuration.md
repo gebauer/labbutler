@@ -51,7 +51,7 @@ containers, so the built-in default applies.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `LABBUTLER_BASE_URL` | (empty) | Absolute public URL used for links in emails. Leave blank to omit links — but then set-password links in welcome emails won't work. |
+| `LABBUTLER_BASE_URL` | — (required in production) | Absolute public URL of the installation, e.g. `https://labbutler.your.domain`; every link in emails is built from it. With `DJANGO_DEBUG=false` a missing or relative value is a startup error (`labbutler.E001`), so the web container stops at `migrate` rather than sending unusable invitation links. |
 | `EXPIRY_DIGEST_WEEKDAY` | `mon` | Day the weekly expiry report is sent (celery crontab `day_of_week` syntax). Content — look-ahead window, only-new filter, owned-only — is a per-member setting. |
 | `EXPIRY_DIGEST_HOUR` | `7` | Local hour the weekly expiry report is sent. |
 | `NOTIFY_DIGEST_HOUR` | `7` | Local hour the daily procurement digest is sent (at :30). |
