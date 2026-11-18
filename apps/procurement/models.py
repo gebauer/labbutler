@@ -3,6 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
+from django.contrib.contenttypes.fields import GenericRelation
 from django.db import IntegrityError, models, transaction
 
 from apps.tenancy.models import Lab
@@ -282,6 +283,11 @@ class Request(TimeStampedModel):
     hazards = models.ManyToManyField(
         "inventory.HazardStatement", related_name="requests", blank=True
     )
+
+    # Reverse generic relations: deleting this row also deletes its attachments (files
+    # removed by a post_delete hook) and comments, which would otherwise be orphaned.
+    attachments = GenericRelation("attachments.Attachment")
+    comments = GenericRelation("comments.Comment")
 
     def __str__(self) -> str:
         return f"{self.item_name} [{self.get_status_display()}]"

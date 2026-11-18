@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 
@@ -257,6 +258,11 @@ class Item(TimeStampedModel):
 
     tags = models.ManyToManyField(Tag, related_name="items", blank=True)
     hazards = models.ManyToManyField(HazardStatement, related_name="items", blank=True)
+
+    # Reverse generic relations: deleting this row also deletes its attachments (files
+    # removed by a post_delete hook) and comments, which would otherwise be orphaned.
+    attachments = GenericRelation("attachments.Attachment")
+    comments = GenericRelation("comments.Comment")
 
     class Meta:
         constraints = [

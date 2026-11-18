@@ -103,7 +103,7 @@ def test_disallowed_extension_is_rejected(client, lab):
 
 
 @pytest.mark.django_db
-def test_delete_removes_row_and_file(client, lab):
+def test_delete_removes_row_and_file(client, lab, django_capture_on_commit_callbacks):
     member = _user(lab, "m@x.de", ["Member"])
     item = _item(lab)
     client.force_login(member)
@@ -112,7 +112,8 @@ def test_delete_removes_row_and_file(client, lab):
     storage, name = attachment.file.storage, attachment.file.name
     assert storage.exists(name)
 
-    resp = client.post(reverse("attachments:delete", args=[attachment.pk]))
+    with django_capture_on_commit_callbacks(execute=True):
+        resp = client.post(reverse("attachments:delete", args=[attachment.pk]))
     assert resp.status_code == 302
     assert not Attachment.for_object(item).exists()
     assert not storage.exists(name)
@@ -139,3 +140,50 @@ def test_copy_to_duplicates_file_independently(lab):
     copy.refresh_from_db()
     with copy.file.open("rb") as fh:
         assert fh.read() == b"manual body"
+
+
+@pytest.mark.django_db
+def test_deleting_an_item_removes_its_attachments_files_and_comments(
+    client, lab, django_capture_on_commit_callbacks
+):
+    from apps.comments.models import Comment
+
+    manager = _user(lab, "boss@x.de", ["Lab manager"])
+    item, other = _item(lab), _item(lab, name="Acetone")
+    client.force_login(manager)
+    for target in (item, other):
+        client.post(reverse("attachments:add", args=["item", target.pk]), {"file": _pdf()})
+        Comment.objects.create(lab=lab, author=manager, target=target, body="note")
+    doomed = Attachment.for_object(item).get()
+    storage, name = doomed.file.storage, doomed.file.name
+
+    with django_capture_on_commit_callbacks(execute=True):
+        client.post(reverse("inventory:item_delete", args=[item.pk]))
+
+    assert not Attachment.objects.filter(pk=doomed.pk).exists()
+    assert not storage.exists(name)
+    assert Comment.objects.filter(object_id=item.pk, lab=lab).count() == 0
+    # The other item's attachment and comment are untouched.
+    assert Attachment.for_object(other).count() == 1
+    assert Comment.for_object(other).count() == 1
+
+
+@pytest.mark.django_db
+def test_rolled_back_delete_keeps_the_file(lab, django_capture_on_commit_callbacks):
+    from django.db import transaction
+
+    member = _user(lab, "m@x.de", ["Member"])
+    attachment = Attachment.objects.create(
+        lab=lab, uploaded_by=member, target=_item(lab), file=_pdf(), original_name="a.pdf"
+    )
+    storage, name = attachment.file.storage, attachment.file.name
+
+    with django_capture_on_commit_callbacks(execute=True):
+        try:
+            with transaction.atomic():
+                attachment.delete()
+                raise RuntimeError("abort")
+        except RuntimeError:
+            pass
+
+    assert storage.exists(name)
