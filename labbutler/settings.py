@@ -250,6 +250,28 @@ LABBUTLER_EU_COUNTRIES = env.list(
     ],
 )
 
+# --- Logging --------------------------------------------------------------------------
+# Everything goes to stdout (→ `docker logs`). Without this, Django's defaults only log
+# to the console when DEBUG is on and otherwise mail tracebacks to ADMINS — which is
+# empty here, so production 500s would vanish without a trace.
+LOG_LEVEL = env("DJANGO_LOG_LEVEL", default="INFO").upper()
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "plain": {"format": "{asctime} {levelname} {name}: {message}", "style": "{"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "plain"},
+    },
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+    "loggers": {
+        # propagate=False: the root logger already has the console handler; letting
+        # Django's own (DEBUG-only) handlers run too would double every line in dev.
+        "django": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
+    },
+}
+
 # --- Login brute-force protection (django-axes) ----------------------------------------
 AXES_ENABLED = env.bool("AXES_ENABLED", default=True)
 # Lock the specific (client IP, username) pair — stops targeted guessing without letting a
