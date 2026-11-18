@@ -343,3 +343,38 @@ def test_forward_assigns_and_audits(lab):
     assert AuditEntry.objects.filter(
         action="procurement.request_forwarded", target_id=str(req.pk)
     ).exists()
+
+
+# --- Double submits -------------------------------------------------------------------
+# A second POST acts on a Request loaded before the first one committed; simulate it
+# with a second, stale in-memory copy of the same row.
+
+
+@pytest.mark.django_db
+def test_stale_double_approve_is_rejected(lab, django_capture_on_commit_callbacks):
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    req = _request(lab, _user(lab, "u@x.de", ["Member"]))
+    stale = Request.objects.get(pk=req.pk)
+
+    with django_capture_on_commit_callbacks() as callbacks:
+        perform_transition(req, "approve", actor=manager)
+        with pytest.raises(TransitionError):
+            perform_transition(stale, "approve", actor=manager)
+
+    assert len(callbacks) == 1  # one status email, not two
+    assert stale.status == Status.APPROVED  # the stale copy was refreshed
+
+
+@pytest.mark.django_db
+def test_stale_double_check_in_creates_one_item(lab):
+    from apps.inventory.models import Item
+
+    manager = _user(lab, "m@x.de", ["Lab manager"])
+    req = _request(lab, manager, status=Status.ORDERED)
+    stale = Request.objects.get(pk=req.pk)
+
+    services.receive(req, actor=manager, create_item=True)
+    with pytest.raises(TransitionError):
+        services.receive(stale, actor=manager, create_item=True)
+
+    assert Item.objects.filter(lab=lab).count() == 1
