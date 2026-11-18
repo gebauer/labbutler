@@ -111,6 +111,19 @@ class TransitionError(ValueError):
     """Raised when a workflow move is not valid from the request's current status."""
 
 
+def _lock(req: Request) -> None:
+    """Row-lock ``req`` until the surrounding transaction ends and reload its state.
+
+    Every status-changing service calls this first, so two concurrent submits (a double
+    click, two managers at once) serialize: the second waits for the first to commit,
+    then sees the new status and fails its precondition check with a clean
+    TransitionError instead of acting twice (duplicate emails, a second checked-in item).
+    Must run inside ``transaction.atomic``.
+    """
+    list(Request.objects.select_for_update().filter(pk=req.pk).values_list("pk", flat=True))
+    req.refresh_from_db()
+
+
 def request_manager(req: Request) -> User | None:
     """The person managing this particular request: the assignee if it was forwarded,
     else the original requester. PO handoffs address this specific person, never a role."""
@@ -156,6 +169,7 @@ def perform_transition(
     Raises :class:`TransitionError` if the move is not allowed from the current status;
     permission is the caller's responsibility (see :func:`may_perform`).
     """
+    _lock(req)
     transition = TRANSITIONS.get(action)
     if transition is None:
         raise TransitionError(f"unknown action: {action!r}")
@@ -302,6 +316,7 @@ def create_po(req: Request, *, actor, upload) -> PurchaseOrder:
     superseded and the state returns to ``PO created`` — signatures on a superseded PO
     are moot, so recreation implies re-signing. v1 stores the PDF without inspecting it.
     """
+    _lock(req)
     if req.procurement_route != Route.CENTRAL:
         raise TransitionError("a purchase order only exists on the central-purchasing route")
     if req.status not in ROUTE_MUTABLE_STATUSES:
@@ -353,6 +368,7 @@ def upload_signed_po(req: Request, *, actor, upload) -> PurchaseOrder:
     Trust-based in v1 — no signature verification; the audit entry records who uploaded.
     Enqueues the forward-ready ZK email to the request's manager on commit.
     """
+    _lock(req)
     if req.status != Status.PO_CREATED:
         raise TransitionError(
             f"cannot upload a signed form for a request that is {req.get_status_display()!r}"
@@ -409,6 +425,7 @@ def reroute(
     it is moot on the direct path. From ``PO sent`` onward this raises: beyond the lock
     a route change is a cancellation, which is a separate (deferred) workflow.
     """
+    _lock(req)
     if req.status not in ROUTE_MUTABLE_STATUSES:
         raise TransitionError(
             f"the route is locked once the PO left the organization ({req.get_status_display()})"
@@ -536,6 +553,7 @@ def self_approve(req: Request, *, actor, note: str = "") -> Request:
     posts a visible comment so the self-approval stays on the record. Raises
     :class:`TransitionError` if the request is not awaiting approval.
     """
+    _lock(req)
     if req.status != Status.REQUESTED:
         raise TransitionError(f"cannot self-approve a request that is {req.get_status_display()!r}")
 
@@ -587,6 +605,7 @@ def receive(
     default: POs and invoices usually don't belong on the inventory item, only things
     like an SDS or manual do.
     """
+    _lock(req)
     if req.status not in (Status.ORDERED, Status.DELIVERED):
         raise TransitionError(f"cannot receive a request that is {req.get_status_display()!r}")
 

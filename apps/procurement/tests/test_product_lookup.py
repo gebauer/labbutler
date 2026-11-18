@@ -521,3 +521,45 @@ def test_endpoint_omits_empty_fields(client, member, monkeypatch):
     data = client.get(reverse("procurement:product_lookup"), {"url": SIGMA_URL}).json()
     assert data["fields"] == {"catalog_number": "GAGO20"}
     assert data["live"] is False
+
+
+# --- Redirect guard ----------------------------------------------------------------------
+
+
+def _redirect(newurl: str):
+    import urllib.request
+
+    handler = product_lookup._VendorOnlyRedirectHandler()
+    original = urllib.request.Request("https://www.carlroth.com/de/de/p/x")
+    return handler.redirect_request(original, None, 302, "Found", {}, newurl)
+
+
+def test_redirect_within_vendor_hosts_is_followed():
+    followed = _redirect("https://www.carlroth.de/de/de/p/x")
+    assert followed.full_url == "https://www.carlroth.de/de/de/p/x"
+
+
+@pytest.mark.parametrize(
+    "newurl",
+    [
+        "http://127.0.0.1:6379/",
+        "http://broker:6379/",
+        "https://carlroth.com.evil.example/",
+        "file:///etc/passwd",
+    ],
+)
+def test_redirect_off_the_vendor_allowlist_is_refused(newurl):
+    import urllib.error
+
+    with pytest.raises(urllib.error.HTTPError):
+        _redirect(newurl)
+
+
+def test_transport_reports_a_refused_redirect_as_no_data(monkeypatch):
+    import urllib.error
+
+    def refuse(request, timeout):
+        raise urllib.error.HTTPError(request.full_url, 302, "refused", {}, None)
+
+    monkeypatch.setattr(product_lookup._opener, "open", refuse)
+    assert product_lookup._get_html("https://www.carlroth.com/de/de/p/x") is None

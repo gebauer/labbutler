@@ -14,6 +14,12 @@ the image. There are no secrets in the repository.
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | (empty) | Comma-separated origins incl. scheme, e.g. `https://labbutler.your.domain`. |
 | `DJANGO_TIME_ZONE` | `Europe/Berlin` | Display/default time zone. |
 | `DJANGO_MEDIA_ROOT` | `/data/media` | Where uploaded attachments are stored (the compose media volume). |
+| `LABBUTLER_PRIVACY_CONTACT` | (empty) | Data-controller contact shown on the privacy notice, e.g. `AG Example, University of X — privacy@example.org`. Set this before going live. |
+| `DJANGO_LOG_LEVEL` | `INFO` | Log level for everything written to stdout (`docker compose logs`), incl. server-error tracebacks. |
+| `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` | (unset) | Outbound proxy for the PubChem GHS lookup and vendor product lookups, if your network requires one. |
+
+Optional variables shown with a default but left out of `.env` stay unset in the
+containers, so the built-in default applies.
 
 ## Database
 
@@ -45,7 +51,7 @@ the image. There are no secrets in the repository.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `LABBUTLER_BASE_URL` | (empty) | Absolute public URL used for links in emails. Leave blank to omit links — but then set-password links in welcome emails won't work. |
+| `LABBUTLER_BASE_URL` | — (required in production) | Absolute public URL of the installation, e.g. `https://labbutler.your.domain`; every link in emails is built from it. With `DJANGO_DEBUG=false` a missing or relative value is a startup error (`labbutler.E001`), so the web container stops at `migrate` rather than sending unusable invitation links. |
 | `EXPIRY_DIGEST_WEEKDAY` | `mon` | Day the weekly expiry report is sent (celery crontab `day_of_week` syntax). Content — look-ahead window, only-new filter, owned-only — is a per-member setting. |
 | `EXPIRY_DIGEST_HOUR` | `7` | Local hour the weekly expiry report is sent. |
 | `NOTIFY_DIGEST_HOUR` | `7` | Local hour the daily procurement digest is sent (at :30). |
@@ -58,6 +64,7 @@ the image. There are no secrets in the repository.
 | `AXES_FAILURE_LIMIT` | `5` | Failed sign-ins (per IP + username) before lockout. Lockouts answer HTTP 429 and reset on a successful login. |
 | `AXES_COOLOFF_HOURS` | `1` | Hours before an automatic unlock. |
 | `AXES_IPWARE_PROXY_COUNT` | `0` | **Number of reverse proxies in front.** With `0` behind a proxy, all users share the proxy's IP — set it (usually `1`). |
+| `LABBUTLER_LOGIN_RECORD_RETENTION_DAYS` | `90` | Sign-in records (IP address, browser) are deleted after this many days by a nightly job (03:15, needs `beat`). |
 
 ## HTTPS hardening
 
@@ -69,6 +76,15 @@ can use plain HTTP.
 |---|---|---|
 | `DJANGO_SECURE_SSL_REDIRECT` | `true` | Redirect http→https in the app. Set `false` if the proxy already does it (e.g. Coolify) and you hit a redirect loop. |
 | `DJANGO_SECURE_HSTS_SECONDS` | `31536000` | HSTS max-age (1 year), incl. subdomains + preload. |
+| `DJANGO_CONTENT_SECURITY_POLICY` | strict same-origin policy | Full `Content-Security-Policy` header value; override only if you know why. |
+
+## Central purchasing (Zentraleinkauf)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `LABBUTLER_CENTRAL_PURCHASING_THRESHOLD_NET` | `1000` | Net order value from which the central-purchasing route is suggested (labs can override in their settings). |
+| `LABBUTLER_PO_DEVIATION_THRESHOLD_PCT` | `15` | Price deviation (%) that flags a purchase order (labs can override). |
+| `LABBUTLER_EU_COUNTRIES` | EU-27 | Comma-separated ISO country codes treated as EU for the non-EU vendor signal. |
 
 Secure session/CSRF cookies are always on outside debug.
 

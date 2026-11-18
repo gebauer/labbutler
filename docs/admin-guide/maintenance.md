@@ -59,7 +59,7 @@ Run any of these via `docker compose run --rm web python manage.py <command>`:
 | `import_labsuit <file>` | Import a LabSuit inventory export from the command line (same engine as the web wizard). |
 | `import_labsuit_orders <file>` | Import LabSuit order history as procurement requests, keeping historical workflow dates. |
 | `backfill_order_timestamps` | Align created/updated timestamps of imported requests with their historical dates. |
-| `send_expiry_digests` | Send the expiry digest immediately (normally done daily by beat). |
+| `send_expiry_digests` | Send the expiry report immediately (normally done weekly by beat). |
 | `axes_reset` | Clear all login lockouts. |
 
 ## The Django admin

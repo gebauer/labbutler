@@ -615,7 +615,10 @@ def request_receive(request: HttpRequest, pk: int) -> HttpResponse:
 
     if request.method == "POST":
         if request.POST.get("outcome") == "no_item":
-            services.receive(req, actor=request.user, create_item=False)
+            try:
+                services.receive(req, actor=request.user, create_item=False)
+            except services.TransitionError:
+                return _already_handled(request, req)
             messages.success(request, "Recorded as received — no inventory item created.")
             return redirect("procurement:request_detail", pk=req.pk)
 
@@ -636,14 +639,17 @@ def request_receive(request: HttpRequest, pk: int) -> HttpResponse:
             # Checking in with no location is allowed, but only after an explicit confirm.
             return dialog(warn_no_location=True, entered_id=human_id)
 
-        services.receive(
-            req,
-            actor=request.user,
-            create_item=True,
-            location=location,
-            human_id=human_id,
-            carry_attachments=bool(request.POST.get("carry_attachments")),
-        )
+        try:
+            services.receive(
+                req,
+                actor=request.user,
+                create_item=True,
+                location=location,
+                human_id=human_id,
+                carry_attachments=bool(request.POST.get("carry_attachments")),
+            )
+        except services.TransitionError:
+            return _already_handled(request, req)
         messages.success(request, f"Checked in as {req.created_item.human_id}.")
         return redirect("inventory:item_label", pk=req.created_item_id)
 
@@ -787,6 +793,14 @@ def request_resend_zk_email(request: HttpRequest, pk: int) -> HttpResponse:
     return redirect("procurement:request_detail", pk=req.pk)
 
 
+def _already_handled(request: HttpRequest, req: Request) -> HttpResponse:
+    """Answer a submit that lost a race (double click, two people at once): the service
+    refused because the request has moved on, so show where it stands now."""
+    req.refresh_from_db()
+    messages.info(request, f"This request is already {req.get_status_display()}.")
+    return redirect("procurement:request_detail", pk=req.pk)
+
+
 @require_permission("view_requests")
 def request_self_approve(request: HttpRequest, pk: int) -> HttpResponse:
     """Confirmation dialog for approving one's own request (needs the self_approve right)."""
@@ -798,9 +812,12 @@ def request_self_approve(request: HttpRequest, pk: int) -> HttpResponse:
         if not request.POST.get("confirm"):
             messages.error(request, "Please tick the box to confirm the self-approval.")
             return render(request, "procurement/self_approve.html", {"req": req})
-        services.self_approve(
-            req, actor=request.user, note=(request.POST.get("note") or "").strip()
-        )
+        try:
+            services.self_approve(
+                req, actor=request.user, note=(request.POST.get("note") or "").strip()
+            )
+        except services.TransitionError:
+            return _already_handled(request, req)
         messages.success(request, "Request self-approved.")
         return redirect("procurement:request_detail", pk=req.pk)
 

@@ -16,17 +16,20 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.audit.models import AuditEntry
-from apps.inventory.models import FieldDefinition, FieldPreset, Location
-from apps.procurement.models import Budget, ShippingAddress, Vendor
+from apps.inventory.models import FieldDefinition, FieldPreset, Item, Location
+from apps.procurement.models import Budget, Request, ShippingAddress, Vendor
 from apps.procurement.services import find_duplicate_vendors, merge_vendors
 
+from . import join as join_flow
 from .manage_forms import (
     BudgetForm,
     FieldDefinitionForm,
     FieldPresetForm,
+    JoinApproveForm,
     LabSettingsForm,
     LocationForm,
     MemberAddForm,
@@ -35,8 +38,9 @@ from .manage_forms import (
     ShippingAddressForm,
     VendorForm,
 )
-from .models import Membership, Role, User
+from .models import JoinRequest, Membership, Role, User
 from .scoping import require_permission
+from .services import LastManagerError, keeping_a_manager
 
 
 @dataclass(frozen=True)
@@ -123,10 +127,49 @@ def crud_form(request: HttpRequest, kind: str, pk: int | None = None) -> HttpRes
     )
 
 
+# Lookup records that requests/items point at with SET_NULL: deleting one in use would
+# silently erase it from those records' history, so it is refused while referenced.
+_KEEP_WHILE_USED = {"suppliers", "budgets", "addresses"}
+
+
+def _usage_blocker(kind: str, obj) -> str:
+    """Why ``obj`` can't be deleted (it is still referenced), or "" if it can."""
+    if kind not in _KEEP_WHILE_USED:
+        return ""
+    counts = []
+    for relation in obj._meta.related_objects:
+        if relation.one_to_many and relation.related_model in (Request, Item):
+            count = getattr(obj, relation.get_accessor_name()).count()
+            if count:
+                noun = relation.related_model._meta.verbose_name
+                counts.append(f"{count} {noun}{'s' if count != 1 else ''}")
+    if not counts:
+        return ""
+    advice = (
+        "merge it into another supplier or rename it"
+        if kind == "suppliers"
+        else ("rename or edit it instead")
+    )
+    return (
+        f"“{obj}” is used by {' and '.join(counts)}; deleting it would erase it from their "
+        f"history. To clean up, {advice}."
+    )
+
+
 @require_permission("manage_lab")
 def crud_delete(request: HttpRequest, kind: str, pk: int) -> HttpResponse:
     config = _config(kind)
     obj = get_object_or_404(config.model, pk=pk, lab=request.lab)
+    blocker = _usage_blocker(kind, obj)
+    if blocker:
+        if request.method == "POST":
+            messages.error(request, blocker)
+            return redirect("manage:list", kind=kind)
+        return render(
+            request,
+            "manage/confirm_delete.html",
+            {"kind": kind, "config": config, "object": obj, "blocker": blocker},
+        )
     if request.method == "POST":
         label = str(obj)
         AuditEntry.record(
@@ -266,6 +309,23 @@ def members(request: HttpRequest) -> HttpResponse:
         memberships = memberships.filter(
             Q(user__email__icontains=query) | Q(user__friendly_name__icontains=query)
         )
+    default_role = join_flow.default_role(request.lab)
+    join_requests = [
+        (
+            join_request,
+            JoinApproveForm(
+                lab=request.lab,
+                prefix=f"jr{join_request.pk}",
+                initial={"roles": [default_role] if default_role else []},
+            ),
+        )
+        for join_request in join_flow.pending_requests(request.lab)
+    ]
+    join_url = ""
+    if request.lab.join_token:
+        join_url = request.build_absolute_uri(
+            reverse("tenancy:join_request", args=[request.lab.join_token])
+        )
     return render(
         request,
         "manage/members.html",
@@ -273,8 +333,59 @@ def members(request: HttpRequest) -> HttpResponse:
             "memberships": memberships,
             "add_form": MemberAddForm(lab=request.lab),
             "query": query,
+            "join_requests": join_requests,
+            "join_url": join_url,
         },
     )
+
+
+@require_permission("manage_lab")
+@require_POST
+def join_link(request: HttpRequest) -> HttpResponse:
+    """Enable, regenerate (revoking the old link), or disable the lab's join link."""
+    action = request.POST.get("action")
+    if action in ("enable", "regenerate"):
+        join_flow.enable_join_link(request.lab, actor=request.user)
+        messages.success(
+            request,
+            "Join link created."
+            if action == "enable"
+            else "New join link created — the old one no longer works.",
+        )
+    elif action == "disable":
+        join_flow.disable_join_link(request.lab, actor=request.user)
+        messages.success(request, "Join link turned off.")
+    return redirect(reverse("manage:members") + "#join-link")
+
+
+@require_permission("manage_lab")
+@require_POST
+def join_approve(request: HttpRequest, pk: int) -> HttpResponse:
+    join_request = get_object_or_404(JoinRequest, pk=pk, lab=request.lab)
+    form = JoinApproveForm(request.POST, lab=request.lab, prefix=f"jr{pk}")
+    if not form.is_valid():
+        messages.error(request, "Choose valid roles.")
+        return redirect(reverse("manage:members") + "#join-requests")
+    try:
+        join_flow.approve(join_request, actor=request.user, roles=form.cleaned_data["roles"])
+    except join_flow.JoinError as exc:
+        messages.info(request, str(exc))
+    else:
+        messages.success(request, f"{join_request.email} is now a member.")
+    return redirect(reverse("manage:members") + "#join-requests")
+
+
+@require_permission("manage_lab")
+@require_POST
+def join_reject(request: HttpRequest, pk: int) -> HttpResponse:
+    join_request = get_object_or_404(JoinRequest, pk=pk, lab=request.lab)
+    try:
+        join_flow.reject(join_request, actor=request.user)
+    except join_flow.JoinError as exc:
+        messages.info(request, str(exc))
+    else:
+        messages.success(request, f"Request from {join_request.email} rejected.")
+    return redirect(reverse("manage:members") + "#join-requests")
 
 
 @require_permission("manage_lab")
@@ -294,8 +405,8 @@ def member_add(request: HttpRequest) -> HttpResponse:
         # added to another lab already have credentials, so they get nothing here.
         from apps.notifications.tasks import send_welcome_email
 
-        lab_pk = request.lab.pk
-        transaction.on_commit(lambda: send_welcome_email.delay(user.pk, lab_pk))
+        lab_pk, actor_pk = request.lab.pk, request.user.pk
+        transaction.on_commit(lambda: send_welcome_email.delay(user.pk, lab_pk, actor_pk))
     AuditEntry.record(
         lab=request.lab,
         actor=request.user,
@@ -315,16 +426,21 @@ def member_edit(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method == "POST":
         form = MemberRolesForm(request.POST, lab=request.lab)
         if form.is_valid():
-            membership.roles.set(form.cleaned_data["roles"])
-            AuditEntry.record(
-                lab=request.lab,
-                actor=request.user,
-                action="lab.member_updated",
-                target=membership,
-                changes={"roles": [r.name for r in form.cleaned_data["roles"]]},
-            )
-            messages.success(request, f"Updated {membership.user.email}.")
-            return redirect("manage:members")
+            try:
+                with keeping_a_manager(request.lab):
+                    membership.roles.set(form.cleaned_data["roles"])
+                    AuditEntry.record(
+                        lab=request.lab,
+                        actor=request.user,
+                        action="lab.member_updated",
+                        target=membership,
+                        changes={"roles": [r.name for r in form.cleaned_data["roles"]]},
+                    )
+            except LastManagerError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(request, f"Updated {membership.user.email}.")
+                return redirect("manage:members")
     else:
         form = MemberRolesForm(lab=request.lab, initial={"roles": membership.roles.all()})
     return render(request, "manage/member_form.html", {"form": form, "membership": membership})
@@ -338,14 +454,19 @@ def member_remove(request: HttpRequest, pk: int) -> HttpResponse:
         messages.error(request, "You can't remove yourself from the lab.")
         return redirect("manage:members")
     email = membership.user.email
-    AuditEntry.record(
-        lab=request.lab,
-        actor=request.user,
-        action="lab.member_removed",
-        target=("Membership", membership.pk),
-        changes={"email": email},
-    )
-    membership.delete()
+    try:
+        with keeping_a_manager(request.lab):
+            AuditEntry.record(
+                lab=request.lab,
+                actor=request.user,
+                action="lab.member_removed",
+                target=("Membership", membership.pk),
+                changes={"email": email},
+            )
+            membership.delete()
+    except LastManagerError as exc:
+        messages.error(request, str(exc))
+        return redirect("manage:members")
     messages.success(request, f"Removed {email}.")
     return redirect("manage:members")
 
@@ -369,16 +490,21 @@ def role_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
     if request.method == "POST":
         form = RoleForm(request.POST, instance=instance, lab=request.lab)
         if form.is_valid():
-            role = form.save()
-            AuditEntry.record(
-                lab=request.lab,
-                actor=request.user,
-                action="lab.role_updated" if instance else "lab.role_created",
-                target=role,
-                changes={"name": role.name},
-            )
-            messages.success(request, f"Saved role “{role.name}”.")
-            return redirect("manage:roles")
+            try:
+                with keeping_a_manager(request.lab):
+                    role = form.save()
+                    AuditEntry.record(
+                        lab=request.lab,
+                        actor=request.user,
+                        action="lab.role_updated" if instance else "lab.role_created",
+                        target=role,
+                        changes={"name": role.name},
+                    )
+            except LastManagerError as exc:
+                form.add_error(None, str(exc))
+            else:
+                messages.success(request, f"Saved role “{role.name}”.")
+                return redirect("manage:roles")
     else:
         form = RoleForm(instance=instance, lab=request.lab)
     return render(request, "manage/role_form.html", {"form": form, "role": instance})
@@ -389,13 +515,18 @@ def role_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
 def role_delete(request: HttpRequest, pk: int) -> HttpResponse:
     role = get_object_or_404(Role, pk=pk, lab=request.lab, is_template=False)
     name = role.name
-    AuditEntry.record(
-        lab=request.lab,
-        actor=request.user,
-        action="lab.role_deleted",
-        target=("Role", role.pk),
-        changes={"name": name},
-    )
-    role.delete()
+    try:
+        with keeping_a_manager(request.lab):
+            AuditEntry.record(
+                lab=request.lab,
+                actor=request.user,
+                action="lab.role_deleted",
+                target=("Role", role.pk),
+                changes={"name": name},
+            )
+            role.delete()
+    except LastManagerError as exc:
+        messages.error(request, str(exc))
+        return redirect("manage:roles")
     messages.success(request, f"Deleted role “{name}”.")
     return redirect("manage:roles")

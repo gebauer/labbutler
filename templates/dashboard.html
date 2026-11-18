@@ -9,6 +9,37 @@
     <span class="text-sm text-gray-500">{{ current_lab.name }}</span>
   </div>
 
+  {% if checklist %}
+    <section class="mt-5 rounded-xl border border-teal-200 bg-teal-50/60 p-4 shadow-sm" aria-labelledby="getting-started">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h2 id="getting-started" class="font-medium text-gray-900">Getting started</h2>
+          <p class="text-xs text-gray-500">Each step ticks itself off once it's done.</p>
+        </div>
+        <form method="post" action="{% url 'tenancy:checklist_dismiss' %}">
+          {% csrf_token %}
+          <button type="submit" class="text-xs text-gray-500 hover:text-gray-900 hover:underline">Hide</button>
+        </form>
+      </div>
+      <ul class="mt-3 grid gap-2 sm:grid-cols-2">
+        {% for step in checklist %}
+          <li class="flex items-start gap-2 text-sm">
+            {% if step.done %}
+              <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-teal-600 text-[10px] text-white" aria-label="done">✓</span>
+              <span class="text-gray-500 line-through">{{ step.label }}</span>
+            {% else %}
+              <span class="mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 border-teal-600" aria-label="to do"></span>
+              <span>
+                <a href="{{ step.url }}" class="font-medium text-teal-800 hover:underline">{{ step.label }}</a>
+                {% if step.hint %}<span class="block text-xs text-gray-500">{{ step.hint }}</span>{% endif %}
+              </span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
   {% if widgets %}
     <div id="dashboard-grid" class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
       {% for w in widgets %}
@@ -27,7 +58,15 @@
           <ul class="divide-y divide-gray-100">
             {% for item in w.items %}
               <li class="px-4 py-2.5 text-sm">
-                {% if w.kind == 'approvals' %}
+                {% if w.kind == 'join_requests' %}
+                  <a href="{% url 'manage:members' %}#join-requests" class="flex items-center justify-between gap-2">
+                    <span class="min-w-0">
+                      <span class="block truncate font-medium text-gray-900">{{ item.name }}</span>
+                      <span class="block truncate text-xs text-gray-500">{{ item.email }}</span>
+                    </span>
+                    <span class="shrink-0 text-xs font-medium text-teal-700">Review</span>
+                  </a>
+                {% elif w.kind == 'approvals' %}
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
                       <a href="{% url 'procurement:request_detail' item.pk %}" class="block truncate font-medium text-gray-900 hover:text-teal-700">{{ item.item_name }}</a>

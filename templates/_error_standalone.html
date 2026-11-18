@@ -1,0 +1,22 @@
+{% load static %}<!DOCTYPE html>
+{% comment %}
+  Self-contained error page for responses Django renders WITHOUT the request context
+  (500, CSRF failure): no context processors, no user, no lab — so nothing here may
+  depend on them, and it must not be able to fail itself. Only static assets are used.
+{% endcomment %}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}LabButler{% endblock %}</title>
+  <link rel="icon" href="{% static 'icons/favicon.ico' %}" sizes="any">
+  <link rel="stylesheet" href="{% static 'css/dist.css' %}">
+</head>
+<body class="flex min-h-screen items-center justify-center bg-gray-50 px-4 text-gray-900 antialiased">
+  <main class="w-full max-w-md rounded-xl border border-gray-200 bg-white px-6 py-10 text-center shadow-sm">
+    <p class="text-sm font-semibold uppercase tracking-wide text-teal-700">LabButler</p>
+    {% block content %}{% endblock %}
+    <a href="/" class="mt-6 inline-block rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800">Back to the start page</a>
+  </main>
+</body>
+</html>

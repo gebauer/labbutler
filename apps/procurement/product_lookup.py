@@ -42,6 +42,7 @@ import hashlib
 import html as html_lib
 import json
 import re
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -188,6 +189,28 @@ def _build_suggestion(parser: VendorParser, parts: SplitResult) -> ProductSugges
     )
 
 
+class _VendorOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Follow redirects only to registered vendor hosts over http(s).
+
+    The vendor allowlist is the SSRF guard, but urllib follows redirects on its own, so
+    an open redirect on a shop's site could otherwise bounce the fetch to an internal
+    address. Shops do redirect legitimately (country shop, ``www.``), so redirects are
+    re-checked rather than refused outright. A refused redirect raises ``HTTPError``,
+    which the transport functions treat like any other network failure.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        parts = split_product_url(newurl)
+        if parts is None or vendor_for(parts) is None:
+            raise urllib.error.HTTPError(
+                newurl, code, f"redirect off the vendor allowlist: {newurl}", headers, fp
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_opener = urllib.request.build_opener(_VendorOnlyRedirectHandler)
+
+
 def _get_html(url: str) -> str | None:
     """GET a page as text; ``None`` on any transport or HTTP problem.
 
@@ -198,7 +221,7 @@ def _get_html(url: str) -> str | None:
         headers={"User-Agent": _USER_AGENT, "Accept-Language": "de-DE,de;q=0.9,en;q=0.8"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
+        with _opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
             raw = response.read(_MAX_PAGE_BYTES)
     except (OSError, ValueError):
         return None
@@ -216,7 +239,7 @@ def _post_json(url: str, payload: dict, headers: dict) -> dict | None:
         headers={"User-Agent": _USER_AGENT, "Content-Type": "application/json", **headers},
     )
     try:
-        with urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
+        with _opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
             return json.load(response)
     except (OSError, ValueError):
         return None

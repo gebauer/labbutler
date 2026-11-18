@@ -263,22 +263,85 @@ def build_zk_forward(req: Request, recipient) -> EmailContent:
     return EmailContent(f"Beschaffungsantrag {req.item_name}", body)
 
 
-def build_welcome(user, lab, set_password_url: str) -> EmailContent:
+def build_welcome(
+    user, lab, set_password_url: str, *, invited_by=None, roles: list[str] | None = None
+) -> EmailContent:
     """Welcome a newly-added member and hand them a link to set their password.
 
     The link is passed in fully-formed — generating the reset token is an effect that
-    lives in :mod:`apps.notifications.tasks`, keeping this builder pure.
+    lives in :mod:`apps.notifications.tasks`, keeping this builder pure. ``invited_by``
+    and ``roles`` let the newcomer see who let them in and what they can do.
     """
+    added_by = f" by {_person(invited_by)}" if invited_by is not None else ""
+    rows = [("Your roles", ", ".join(roles))] if roles else []
     return _email(
         f"[LabButler] Welcome to {lab.name}",
         greeting=f"Hello {user.display_name},",
-        intro=f"You've been added to {lab.name} on LabButler — the lab's shared "
-        "inventory and ordering tool.",
+        intro=f"You've been added to {lab.name} on LabButler{added_by} — the lab's shared "
+        "inventory and ordering tool. After you've set your password, a short tour shows "
+        "you around.",
+        rows=rows,
         closing="To get started, set a password for your account:",
         action_url=set_password_url,
         action_label="Set your password",
         postscript="For security, this link expires after a while — if it stops working, "
         "use the “Forgot your password?” link on the sign-in page to request a fresh one.",
+    )
+
+
+def build_join_confirmation(join_request, confirm_url: str) -> EmailContent:
+    """Ask someone who used a lab's join link to confirm their email address."""
+    lab = join_request.lab
+    return _email(
+        f"[LabButler] Confirm your request to join {lab.name}",
+        greeting=f"Hello {join_request.name},",
+        intro=f"Someone — hopefully you — asked to join {lab.name} on LabButler with this "
+        "email address. Confirm it, and the lab's managers will review your request:",
+        action_url=confirm_url,
+        action_label="Confirm my request",
+        postscript="If this wasn't you, ignore this email — nothing happens without "
+        "confirmation, and the request is deleted after a few days.",
+    )
+
+
+def build_join_request_notice(join_request, review_url: str) -> EmailContent:
+    """Tell a lab's managers that a confirmed join request awaits their decision."""
+    lab = join_request.lab
+    rows = [("Name", join_request.name), ("Email", join_request.email)]
+    if join_request.message:
+        rows.append(("Message", join_request.message))
+    return _email(
+        f"[LabButler] {join_request.name} asks to join {lab.name}",
+        intro=f"A new request to join {lab.name} came in through the lab's join link. "
+        "The email address has been confirmed.",
+        rows=rows,
+        closing="Approve it (and choose the roles) or reject it here:",
+        action_url=review_url,
+        action_label="Review join requests",
+        footer="Sent to everyone who can manage this lab.",
+    )
+
+
+def build_join_approved(user, lab, sign_in_url: str) -> EmailContent:
+    """Tell someone who already has an account that their join request was approved."""
+    return _email(
+        f"[LabButler] You're now a member of {lab.name}",
+        greeting=f"Hello {user.display_name},",
+        intro=f"Your request to join {lab.name} was approved. Sign in with your existing "
+        "LabButler account; you can switch between your labs in the navigation bar.",
+        action_url=sign_in_url,
+        action_label="Sign in",
+    )
+
+
+def build_join_rejected(join_request) -> EmailContent:
+    """A short, neutral note that a join request was declined."""
+    lab = join_request.lab
+    return _email(
+        f"[LabButler] Your request to join {lab.name}",
+        greeting=f"Hello {join_request.name},",
+        intro=f"Your request to join {lab.name} on LabButler was not approved. If you "
+        "think this is a mistake, please contact the lab directly.",
     )
 
 

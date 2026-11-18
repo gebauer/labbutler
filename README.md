@@ -100,7 +100,7 @@ App is then at <http://localhost:8000>.
 ## Deploying (production)
 
 Production runs the whole stack via **Docker Compose**: `web` (Django/Gunicorn), `db`
-(Postgres), `worker` + `beat` (Celery for status emails and the daily expiry digest),
+(Postgres), `worker` + `beat` (Celery for status emails and the weekly expiry report),
 `broker` (Redis), and a **media volume**. Email is sent over SMTP.
 
 ```bash
@@ -192,7 +192,7 @@ labbutler/
     ├── inventory/        # Item, Location, Tag, FieldDefinition, HazardStatement
     ├── procurement/      # Request workflow, Budget, Vendor, ShippingAddress
     ├── imports/          # LabSuit profile + generic mapper, dry-run preview
-    ├── notifications/    # status emails + daily expiry digest (Celery)
+    ├── notifications/    # status emails, digests, weekly expiry report (Celery)
     ├── comments/         # generic comment threads on items & requests
     └── audit/            # immutable AuditEntry
 ```

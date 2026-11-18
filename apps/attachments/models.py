@@ -15,7 +15,9 @@ from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
-from django.db import models
+from django.db import models, transaction
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 from apps.tenancy.models import Lab
 from labbutler.abstract import TimeStampedModel
@@ -75,11 +77,15 @@ class Attachment(TimeStampedModel):
             size=self.size,
         )
 
-    def delete(self, *args, **kwargs):
-        storage, name = self.file.storage, self.file.name
-        result = super().delete(*args, **kwargs)
-        # Remove the blob only after the row is gone; a stray file is better than a
-        # dangling row pointing at nothing.
-        if name:
-            storage.delete(name)
-        return result
+
+@receiver(post_delete, sender=Attachment)
+def _remove_file(sender, instance: Attachment, **kwargs) -> None:
+    """Delete the stored blob once the row's deletion is committed.
+
+    A signal rather than a ``delete()`` override, so it also runs when attachments go
+    away in a cascade (deleting an item or request). After commit, so a rolled-back
+    delete never loses the file — a stray file is better than a row pointing at nothing.
+    """
+    storage, name = instance.file.storage, instance.file.name
+    if name:
+        transaction.on_commit(lambda: storage.delete(name))

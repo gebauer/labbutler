@@ -17,8 +17,9 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/usr/local
 
-# uv for fast, locked dependency installs.
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# uv for fast, locked dependency installs. Pinned so a rebuild of the same commit gets
+# the same installer; bump deliberately (match the version used in development).
+COPY --from=ghcr.io/astral-sh/uv:0.11.28 /uv /uvx /bin/
 
 WORKDIR /app
 

@@ -258,3 +258,16 @@ class RoleForm(forms.ModelForm):
         self.fields["permissions"].queryset = Permission.objects.all()
         self.fields["permissions"].label_from_instance = lambda perm: perm.label
         self.fields["name"].widget.attrs.setdefault("class", _INPUT)
+
+
+class JoinApproveForm(forms.Form):
+    """Roles to grant when approving a join request."""
+
+    roles = forms.ModelMultipleChoiceField(
+        queryset=Role.objects.none(), required=False, widget=forms.CheckboxSelectMultiple
+    )
+
+    def __init__(self, *args, lab: Lab, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["roles"].queryset = _lab_roles(lab)
+        self.fields["roles"].label_from_instance = lambda role: role.name

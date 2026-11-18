@@ -7,9 +7,14 @@
     <h1 class="text-2xl font-semibold tracking-tight">Privacy notice</h1>
     <p class="mt-2 text-sm text-gray-500">
       LabButler is self-hosted software. The organisation running this installation is the
-      data controller; contact them for requests about your data. This page describes what
-      the software itself stores and transmits.
+      data controller; contact them for requests about your data (access, correction,
+      deletion). This page describes what the software itself stores and transmits.
     </p>
+    {% if controller_contact %}
+      <p class="mt-2 text-sm text-gray-700">
+        <span class="font-medium">Contact for this installation:</span> {{ controller_contact }}
+      </p>
+    {% endif %}
 
     <div class="mt-6 space-y-6 text-sm text-gray-700">
       <section>
@@ -42,6 +47,17 @@
       </section>
 
       <section>
+        <h2 class="text-base font-semibold text-gray-900">Join requests</h2>
+        <p class="mt-1.5">
+          If a lab shares a join link, people can ask to join with their name, email
+          address, and an optional message. LabButler emails a confirmation link first; only
+          confirmed requests are shown to the lab's managers, who approve or reject them.
+          Unconfirmed requests are deleted after 7 days and decided ones after 90 days;
+          the decision itself stays in the audit log.
+        </p>
+      </section>
+
+      <section>
         <h2 class="text-base font-semibold text-gray-900">Audit log</h2>
         <p class="mt-1.5">
           Changes to inventory and procurement data are recorded in an append-only audit
@@ -54,9 +70,12 @@
       <section>
         <h2 class="text-base font-semibold text-gray-900">Login protection</h2>
         <p class="mt-1.5">
-          To defend against password guessing, failed sign-in attempts are recorded with
-          the IP address and the username used. After repeated failures the combination is
-          temporarily locked out. These records serve security (legitimate interest).
+          To defend against password guessing, every sign-in — successful or failed — is
+          recorded with the time, IP address, browser identification, and the username
+          used. After repeated failures the combination is temporarily locked out. These
+          records serve security (legitimate interest) and are deleted automatically after
+          {{ login_retention_days }} days; failed-attempt counters are cleared once a
+          lockout expires.
         </p>
       </section>
 
@@ -64,20 +83,31 @@
         <h2 class="text-base font-semibold text-gray-900">External services</h2>
         <p class="mt-1.5">
           All pages are served entirely from this installation — no fonts, scripts, or
-          images are loaded from third parties, and no tracking takes place. One optional
-          feature contacts an external service: when you press the GHS suggestion button
-          on a chemical, the <em>server</em> queries PubChem (a service of the U.S.
-          National Institutes of Health) with the CAS number you entered. Your browser
-          never contacts PubChem, and no personal data is transmitted — only the CAS
-          number and the server's own address.
+          images are loaded from third parties, and no tracking takes place. Two optional
+          features make the <em>server</em> contact external websites, only when you press
+          their button; your browser never contacts these sites, and no personal data is
+          transmitted — only the data named below and the server's own address.
         </p>
+        <ul class="mt-1.5 list-disc space-y-1 pl-5">
+          <li>
+            <span class="font-medium">GHS suggestion</span> on a chemical: queries PubChem
+            (a service of the U.S. National Institutes of Health) with the CAS number you
+            entered.
+          </li>
+          <li>
+            <span class="font-medium">Fetch details</span> on a request: retrieves the
+            product page (or the shop's product service) for the URL you pasted, from the
+            supported shop it belongs to: {{ lookup_vendors|join:", " }}.
+          </li>
+        </ul>
       </section>
 
       <section>
         <h2 class="text-base font-semibold text-gray-900">Email</h2>
         <p class="mt-1.5">
-          The application may send emails (for example password resets) through the mail
-          server configured by the operator of this installation.
+          The application sends emails — invitations, password resets, request status
+          updates, and the reports you opted into under Account settings — through the
+          mail server configured by the operator of this installation.
         </p>
       </section>
     </div>

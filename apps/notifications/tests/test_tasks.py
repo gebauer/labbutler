@@ -1,5 +1,6 @@
 """Notification task tests: recipient resolution, sending, and the transition hook."""
 
+import smtplib
 from datetime import timedelta
 
 import pytest
@@ -429,3 +430,58 @@ def test_send_notification_digests_skips_approver_own_pending(lab, mailoutbox):
     )
     assert send_notification_digests() == 0
     assert mailoutbox == []
+
+
+def _flaky_send(monkeypatch, fail_for: set[str] | None = None, fail_times: int = 0):
+    """Replace the transport: fail for given recipients, or the first ``fail_times`` calls."""
+    calls: list[list[str]] = []
+    real_send = tasks._send
+
+    def send(content, recipients, attachments=None):
+        calls.append(list(recipients))
+        if (fail_for and set(recipients) & fail_for) or len(calls) <= fail_times:
+            raise smtplib.SMTPServerDisconnected("relay went away")
+        real_send(content, recipients, attachments)
+
+    monkeypatch.setattr(tasks, "_send", send)
+    return calls
+
+
+@pytest.mark.django_db
+def test_single_email_task_retries_after_smtp_error(lab, mailoutbox, monkeypatch):
+    user = _user(lab, "new@x.de", ["Member"])
+    calls = _flaky_send(monkeypatch, fail_times=1)
+
+    send_welcome_email.apply(args=[user.pk, lab.pk])
+
+    assert len(calls) == 2  # first attempt failed, the retry delivered
+    assert [m.to for m in mailoutbox] == [["new@x.de"]]
+
+
+def test_every_single_email_task_is_configured_to_retry():
+    for task in (
+        tasks.notify_request_transition,
+        tasks.notify_request_created,
+        tasks.notify_request_assigned,
+        tasks.notify_po_signature_needed,
+        tasks.send_zk_forward_email,
+        send_welcome_email,
+    ):
+        assert smtplib.SMTPException in task.autoretry_for or OSError in task.autoretry_for
+        assert task.max_retries >= 3
+
+
+@pytest.mark.django_db
+def test_digest_continues_past_a_failing_recipient(lab, mailoutbox, monkeypatch):
+    for email in ("a@x.de", "b@x.de"):
+        _user(lab, email, ["Lab manager"], expiry_notifications=ExpiryReportMode.WEEKLY_ALL)
+    Item.objects.create(
+        lab=lab,
+        human_id="LB-1",
+        name="OldStock",
+        expiration_date=timezone.localdate() - timedelta(days=3),
+    )
+    _flaky_send(monkeypatch, fail_for={"a@x.de"})
+
+    assert send_expiry_digests() == 1
+    assert [m.to for m in mailoutbox] == [["b@x.de"]]

@@ -8,45 +8,86 @@
     <p class="mt-2 text-sm text-gray-500">
       LabButler keeps your lab's inventory and purchasing in one place{% if lab %} —
       you are a member of <strong class="font-medium text-gray-700">{{ lab.name }}</strong>{% endif %}.
-      Here is everything you need for your first ten minutes.
+      These are the parts that matter for what you can do here.
     </p>
 
+    {% comment %}
+      Steps are chosen per member from their permissions (apps.tenancy.onboarding), so
+      nobody reads about buttons they don't have. Numbering follows what's shown.
+    {% endcomment %}
     <ol class="mt-6 space-y-4 text-sm text-gray-700">
-      <li class="rounded-lg border border-gray-200 bg-white p-4">
-        <h2 class="font-semibold text-gray-900">1 · Introduce yourself</h2>
-        <p class="mt-1">
-          Set a <a href="{% url 'tenancy:settings' %}" class="font-medium text-teal-700 hover:underline">display name</a>
-          so colleagues see your name instead of your email address in lists, comments, and emails.
-        </p>
-      </li>
-      <li class="rounded-lg border border-gray-200 bg-white p-4">
-        <h2 class="font-semibold text-gray-900">2 · Find things</h2>
-        <p class="mt-1">
-          The <a href="{% url 'inventory:item_list' %}" class="font-medium text-teal-700 hover:underline">Inventory</a>
-          holds every item in the lab. Search by name, CAS number, or the item ID printed on the
-          container label — that ID never changes, so an old label always finds its record.
-        </p>
-      </li>
-      {% if can_view_requests %}
+      {% for step in steps %}
         <li class="rounded-lg border border-gray-200 bg-white p-4">
-          <h2 class="font-semibold text-gray-900">3 · Order things</h2>
-          <p class="mt-1">
-            Need something the lab doesn't have? Raise a
-            <a href="{% url 'procurement:request_list' %}" class="font-medium text-teal-700 hover:underline">request</a>.
-            It moves through approval, ordering, and delivery — your dashboard shows where it stands,
-            and check-in puts the delivered item straight into the inventory.
-          </p>
+          {% if step == "profile" %}
+            <h2 class="font-semibold text-gray-900">{{ forloop.counter }} · Introduce yourself</h2>
+            <p class="mt-1">
+              Set a <a href="{% url 'tenancy:settings' %}" class="font-medium text-teal-700 hover:underline">display name</a>
+              so colleagues see your name instead of your email address in lists, comments, and emails.
+            </p>
+          {% elif step == "find" %}
+            <h2 class="font-semibold text-gray-900">{{ forloop.counter }} · Find things</h2>
+            <p class="mt-1">
+              The <a href="{% url 'inventory:item_list' %}" class="font-medium text-teal-700 hover:underline">Inventory</a>
+              holds every item in the lab. Search by name, CAS number, or the item ID printed on the
+              container label — that ID never changes, so an old label always finds its record.
+            </p>
+          {% elif step == "scan" %}
+            <h2 class="font-semibold text-gray-900">{{ forloop.counter }} · Scan a label</h2>
+            <p class="mt-1">
+              On your phone, open <a href="{% url 'inventory:scan_page' %}" class="font-medium text-teal-700 hover:underline">Scan</a>
+              and point the camera at a container's Data Matrix label to jump straight to the item.
+            </p>
+          {% elif step == "request" %}
+            <h2 class="font-semibold text-gray-900">{{ forloop.counter }} · Order things</h2>
+            <p class="mt-1">
+              Need something the lab doesn't have? Raise a
+              <a href="{% url 'procurement:request_create' %}" class="font-medium text-teal-700 hover:underline">request</a>
+              — paste the product link from the shop and LabButler fills in what it can. The request
+              moves through approval, ordering, and delivery; your dashboard shows where it stands.
+            </p>
+          {% elif step == "approve" %}
+            <h2 class="font-semibold text-gray-900">{{ forloop.counter }} · Approve requests</h2>
+            <p class="mt-1">
+              New requests land in <strong>Requests to approve</strong> on your dashboard (and in
+              your inbox — tune that in Account settings). Approve or reject them right there.
+            </p>
+          {% elif step == "order" %}
+            <h2 class="font-semibold text-gray-900">{{ forloop.counter }} · Place orders</h2>
+            <p class="mt-1">
+              Approved requests you're responsible for — your own, or ones forwarded to you — show
+              up under <strong>Requests to order</strong>. Mark them ordered once the order is out.
+            </p>
+          {% elif step == "receive" %}
+            <h2 class="font-semibold text-gray-900">{{ forloop.counter }} · Receive deliveries</h2>
+            <p class="mt-1">
+              When a parcel arrives, open the request and <strong>Check in</strong>: the item lands in
+              the inventory with its location, and you can print its label straight away.
+            </p>
+          {% elif step == "sign" %}
+            <h2 class="font-semibold text-gray-900">{{ forloop.counter }} · Sign order forms</h2>
+            <p class="mt-1">
+              Orders through central purchasing need a signed order form. When one waits for you, it
+              appears under <strong>Purchase orders to sign</strong> and you get an email.
+            </p>
+          {% elif step == "setup" %}
+            <h2 class="font-semibold text-gray-900">{{ forloop.counter }} · Set up your lab</h2>
+            <p class="mt-1">
+              You manage this lab. The <strong>Getting started</strong> list on your dashboard walks
+              you through locations, suppliers, budgets, importing your inventory, and inviting your
+              team — including a <a href="{% url 'manage:members' %}#join-link" class="font-medium text-teal-700 hover:underline">join link</a>
+              people can use to ask for access.
+            </p>
+          {% elif step == "rights" %}
+            <h2 class="font-semibold text-gray-900">{{ forloop.counter }} · Know what you can do</h2>
+            <p class="mt-1">
+              What you see is governed by the roles your lab manager gave you. If something mentioned
+              in the docs is missing, check your
+              <a href="{% url 'tenancy:settings' %}" class="font-medium text-teal-700 hover:underline">effective permissions</a>
+              in Account settings — that page also tunes which emails LabButler sends you.
+            </p>
+          {% endif %}
         </li>
-      {% endif %}
-      <li class="rounded-lg border border-gray-200 bg-white p-4">
-        <h2 class="font-semibold text-gray-900">{% if can_view_requests %}4{% else %}3{% endif %} · Know what you can do</h2>
-        <p class="mt-1">
-          What you see is governed by the roles your lab manager gave you. If a button mentioned in
-          the docs is missing, check your
-          <a href="{% url 'tenancy:settings' %}" class="font-medium text-teal-700 hover:underline">effective permissions</a>
-          in Account settings — that page also tunes which emails LabButler sends you.
-        </p>
-      </li>
+      {% endfor %}
     </ol>
 
     <div class="mt-8 flex flex-wrap items-center gap-4">

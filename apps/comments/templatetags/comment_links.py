@@ -19,14 +19,15 @@ def linkify_comment(body):
 
     System comments (e.g. "Checked in from [Request #7](/requests/7/).") use this to
     cross-link records. Only site-relative URLs become links; protocol-relative
-    ``//host`` URLs are rejected and render as literal text like everything else.
+    ``//host`` URLs — and ``/\\host``, which browsers normalise to ``//host`` — are
+    rejected and render as literal text like everything else.
     """
     parts = []
     position = 0
     for match in _LINK_RE.finditer(body):
         parts.append(conditional_escape(body[position : match.start()]))
         text, url = match.group(1), match.group(2)
-        if url.startswith("//"):
+        if url[1:2] in ("/", "\\"):
             parts.append(conditional_escape(match.group(0)))
         else:
             parts.append(

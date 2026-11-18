@@ -191,6 +191,14 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.notifications.tasks.send_notification_digests",
         "schedule": crontab(hour=env.int("NOTIFY_DIGEST_HOUR", default=7), minute=30),
     },
+    "login-records-retention-daily": {
+        "task": "apps.tenancy.tasks.purge_old_login_records",
+        "schedule": crontab(hour=3, minute=15),
+    },
+    "join-requests-retention-daily": {
+        "task": "apps.tenancy.tasks.purge_old_join_requests",
+        "schedule": crontab(hour=3, minute=20),
+    },
 }
 
 # --- Email ----------------------------------------------------------------------------
@@ -208,6 +216,10 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="labbutler@localhost")
 # --- Notifications --------------------------------------------------------------------
 # Absolute base URL used to build links in emails (blank omits links, e.g. in dev).
 LABBUTLER_BASE_URL = env("LABBUTLER_BASE_URL", default="")
+
+# Who to contact about personal data (shown on the privacy notice), e.g.
+# "AG Example, University of X — privacy@example.org". Blank shows a generic hint.
+LABBUTLER_PRIVACY_CONTACT = env("LABBUTLER_PRIVACY_CONTACT", default="")
 
 # --- Central purchasing (Zentraleinkauf) ------------------------------------------------
 # Instance-wide defaults for the route/PO suggestion engine; labs can override the two
@@ -250,6 +262,28 @@ LABBUTLER_EU_COUNTRIES = env.list(
     ],
 )
 
+# --- Logging --------------------------------------------------------------------------
+# Everything goes to stdout (→ `docker logs`). Without this, Django's defaults only log
+# to the console when DEBUG is on and otherwise mail tracebacks to ADMINS — which is
+# empty here, so production 500s would vanish without a trace.
+LOG_LEVEL = env("DJANGO_LOG_LEVEL", default="INFO").upper()
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "plain": {"format": "{asctime} {levelname} {name}: {message}", "style": "{"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "plain"},
+    },
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+    "loggers": {
+        # propagate=False: the root logger already has the console handler; letting
+        # Django's own (DEBUG-only) handlers run too would double every line in dev.
+        "django": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
+    },
+}
+
 # --- Login brute-force protection (django-axes) ----------------------------------------
 AXES_ENABLED = env.bool("AXES_ENABLED", default=True)
 # Lock the specific (client IP, username) pair — stops targeted guessing without letting a
@@ -263,6 +297,8 @@ AXES_HTTP_RESPONSE_CODE = 429
 # Behind a reverse proxy set the number of proxies so the *client* IP is used, not the
 # proxy's (otherwise everyone shares one IP). 0 = trust REMOTE_ADDR (no proxy).
 AXES_IPWARE_PROXY_COUNT = env.int("AXES_IPWARE_PROXY_COUNT", default=0) or None
+# Sign-in records (IP, user agent) are personal data: purged daily after this many days.
+LABBUTLER_LOGIN_RECORD_RETENTION_DAYS = env.int("LABBUTLER_LOGIN_RECORD_RETENTION_DAYS", default=90)
 
 # --- Security (prod-friendly defaults, relaxed when DEBUG) -----------------------------
 # Sent on every response (see labbutler.middleware.ContentSecurityPolicyMiddleware).
