@@ -16,8 +16,19 @@
     </div>
   {% else %}
     <div class="mt-3 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-12 text-center">
-      <p class="text-sm font-medium text-gray-700">No items match</p>
-      <p class="mt-1 text-sm text-gray-500">Try a different search or clear the filters.</p>
+      {% if has_filters %}
+        <p class="text-sm font-medium text-gray-700">No items match</p>
+        <p class="mt-1 text-sm text-gray-500">Try a different search or clear the filters.</p>
+      {% else %}
+        <p class="text-sm font-medium text-gray-700">The inventory is still empty</p>
+        <p class="mt-1 text-sm text-gray-500">
+          {% if can_import or can_manage %}Bring in what the lab already has, or add items one by one.{% else %}Items show up here once your lab manager has added them.{% endif %}
+        </p>
+        <div class="mt-4 flex flex-wrap justify-center gap-2">
+          {% if can_import %}<a href="{% url 'imports:start' %}" class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Import a spreadsheet</a>{% endif %}
+          {% if can_manage %}<a href="{% url 'inventory:item_create' %}" class="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">Add an item</a>{% endif %}
+        </div>
+      {% endif %}
     </div>
   {% endif %}
 </div>

@@ -245,7 +245,7 @@ def send_zk_forward_email(req_pk: int) -> int:
 
 
 @shared_task(**SINGLE_EMAIL_RETRY)
-def send_welcome_email(user_pk: int, lab_pk: int) -> int:
+def send_welcome_email(user_pk: int, lab_pk: int, invited_by_pk: int | None = None) -> int:
     """Welcome a freshly-added member with a link to set their password. Returns 0/1.
 
     Reuses Django's password-reset-confirm route and default token generator, so the link
@@ -264,7 +264,10 @@ def send_welcome_email(user_pk: int, lab_pk: int) -> int:
     base = _base_url()
     url = f"{base.rstrip('/')}{path}" if base else path
 
-    content = emails.build_welcome(user, lab, url)
+    invited_by = User.objects.filter(pk=invited_by_pk).first() if invited_by_pk else None
+    membership = Membership.objects.filter(user=user, lab=lab).first()
+    roles = sorted(role.name for role in membership.roles.all()) if membership else []
+    content = emails.build_welcome(user, lab, url, invited_by=invited_by, roles=roles)
     _send(content, [user.email])
     return 1
 

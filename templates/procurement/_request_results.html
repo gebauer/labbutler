@@ -30,8 +30,18 @@
     </div>
   {% else %}
     <div class="mt-3 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-12 text-center">
-      <p class="text-sm font-medium text-gray-700">No requests match</p>
-      <p class="mt-1 text-sm text-gray-500">Try different filters, or clear them to see all.</p>
+      {% if has_filters %}
+        <p class="text-sm font-medium text-gray-700">No requests match</p>
+        <p class="mt-1 text-sm text-gray-500">Try different filters, or clear them to see all.</p>
+      {% else %}
+        <p class="text-sm font-medium text-gray-700">No requests yet</p>
+        <p class="mt-1 text-sm text-gray-500">
+          A request is how the lab orders something: it's approved, ordered, and checked into the inventory on arrival.
+        </p>
+        {% if can_create %}
+          <a href="{% url 'procurement:request_create' %}" class="mt-4 inline-block rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Raise the first request</a>
+        {% endif %}
+      {% endif %}
     </div>
   {% endif %}
 </div>

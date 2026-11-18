@@ -198,9 +198,9 @@ def approve(join_request: JoinRequest, *, actor, roles) -> Membership:
 
     from apps.notifications.tasks import send_join_decision, send_welcome_email
 
-    user_pk, lab_pk, jr_pk = user.pk, lab.pk, join_request.pk
+    user_pk, lab_pk, jr_pk, actor_pk = user.pk, lab.pk, join_request.pk, actor.pk
     if user_created:
-        transaction.on_commit(lambda: send_welcome_email.delay(user_pk, lab_pk))
+        transaction.on_commit(lambda: send_welcome_email.delay(user_pk, lab_pk, actor_pk))
     else:
         transaction.on_commit(lambda: send_join_decision.delay(jr_pk))
     return membership

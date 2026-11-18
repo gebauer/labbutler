@@ -5,6 +5,7 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from apps.procurement import product_lookup
+from apps.tenancy import onboarding
 from apps.tenancy.scoping import get_current_lab
 
 from . import dashboard
@@ -24,7 +25,11 @@ def home(request: HttpRequest) -> HttpResponse:
             return render(
                 request,
                 "dashboard.html",
-                {"widgets": dashboard.build(request.user, lab), "today": timezone.localdate()},
+                {
+                    "widgets": dashboard.build(request.user, lab),
+                    "checklist": onboarding.checklist_for_dashboard(request.user, lab),
+                    "today": timezone.localdate(),
+                },
             )
     return render(request, "home.html")
 

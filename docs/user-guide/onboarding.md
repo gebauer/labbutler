@@ -5,6 +5,12 @@ one. LabButler shows it to you **in the app the first time you sign in** (and it
 stays reachable there under `/welcome/`); the chapters linked below hold the
 details when you need them.
 
+The tour is **tailored to your roles** — an approver reads about approving, a lab
+manager about setting up the lab — so the in-app version may show fewer or more steps
+than this page. Your **dashboard** also shows a short **Getting started** list whose
+steps tick themselves off as you complete them (managers additionally get the lab
+setup: locations, suppliers, budgets, importing, inviting the team). Hide it anytime.
+
 ## 1 · Introduce yourself
 
 Set a **display name** under Account settings (your name in the navigation bar),

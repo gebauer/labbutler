@@ -7,6 +7,7 @@ app_name = "tenancy"
 urlpatterns = [
     path("welcome/", views.onboarding, name="onboarding"),
     path("settings/", views.account_settings, name="settings"),
+    path("welcome/checklist/hide/", views.checklist_dismiss, name="checklist_dismiss"),
     path("impersonate/", views.impersonate, name="impersonate"),
     path("impersonate/stop/", views.stop_impersonating, name="stop_impersonating"),
     # Public: the confirm route first, so "confirm" is never read as a join token.

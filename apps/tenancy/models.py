@@ -237,6 +237,8 @@ class Membership(TimeStampedModel):
         choices=ExpiryAdvanceDays.choices,
         default=ExpiryAdvanceDays.ONE_MONTH,
     )
+    # Set when the member hides the dashboard's getting-started list for this lab.
+    checklist_dismissed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [

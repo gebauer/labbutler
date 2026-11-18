@@ -405,8 +405,8 @@ def member_add(request: HttpRequest) -> HttpResponse:
         # added to another lab already have credentials, so they get nothing here.
         from apps.notifications.tasks import send_welcome_email
 
-        lab_pk = request.lab.pk
-        transaction.on_commit(lambda: send_welcome_email.delay(user.pk, lab_pk))
+        lab_pk, actor_pk = request.lab.pk, request.user.pk
+        transaction.on_commit(lambda: send_welcome_email.delay(user.pk, lab_pk, actor_pk))
     AuditEntry.record(
         lab=request.lab,
         actor=request.user,

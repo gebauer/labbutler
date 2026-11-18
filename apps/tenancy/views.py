@@ -17,6 +17,7 @@ from django.views.decorators.http import require_POST
 from apps.audit.models import AuditEntry
 
 from . import join as join_flow
+from . import onboarding as onboarding_flow
 from .catalog import ALL_PERMISSION_CODES, PERMISSION_CATALOG
 from .forms import JoinRequestForm, NotificationSettingsForm, ProfileForm
 from .middleware import SESSION_KEY
@@ -69,11 +70,28 @@ def onboarding(request: HttpRequest) -> HttpResponse:
         next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
     ):
         next_url = "/"
+    lab = get_current_lab(request)
     return render(
         request,
         "tenancy/onboarding.html",
-        {"lab": get_current_lab(request), "next_url": next_url},
+        {
+            "lab": lab,
+            "next_url": next_url,
+            "steps": onboarding_flow.tour_steps(user, lab),
+        },
     )
+
+
+@login_required
+@require_POST
+def checklist_dismiss(request: HttpRequest) -> HttpResponse:
+    """Hide the dashboard's getting-started list for the current lab."""
+    lab = get_current_lab(request)
+    if lab is not None:
+        Membership.objects.filter(user=request.user, lab=lab).update(
+            checklist_dismissed_at=timezone.now()
+        )
+    return redirect("home")
 
 
 @login_required
