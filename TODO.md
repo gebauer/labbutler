@@ -39,11 +39,11 @@ green, ruff clean, no missing migrations, `check --deploy` clean). Work top-down
 each fix is its own commit with tests.
 
 ### P1 — blockers (before go-live)
-- [ ] **Upgrade Django 5.1 → 5.2 LTS.** 5.1 is out of security support since Dec 2025;
+- [x] **Upgrade Django 5.1 → 5.2 LTS.** 5.1 is out of security support since Dec 2025;
       pin is `django>=5.0,<5.2` in `pyproject.toml`. Run `--runslow` after.
-- [ ] **Add `LOGGING` config.** With `DEBUG=False` and no `ADMINS`, 500 tracebacks are
+- [x] **Add `LOGGING` config.** With `DEBUG=False` and no `ADMINS`, 500 tracebacks are
       dropped silently. Log to console (→ `docker logs`), `django.request` at ERROR.
-- [ ] **Pass all settings through `docker-compose.yml`.** Read by settings but never
+- [x] **Pass all settings through `docker-compose.yml`.** Read by settings but never
       reach the containers: `EXPIRY_DIGEST_WEEKDAY`, `PASSWORD_RESET_TIMEOUT_DAYS`,
       `LABBUTLER_CENTRAL_PURCHASING_THRESHOLD_NET`, `LABBUTLER_PO_DEVIATION_THRESHOLD_PCT`,
       `LABBUTLER_EU_COUNTRIES`, `AXES_ENABLED`, `DJANGO_SECURE_HSTS_SECONDS`,
@@ -52,40 +52,45 @@ each fix is its own commit with tests.
 - [ ] **Verify the real LabSuit import.** The 4 real-export tests skip without
       `sample_data/`; run `uv run pytest --runslow` with the export in place, then a
       dry-run import on a DB copy.
-- [ ] **Update the privacy notice.** Add the product-URL prefill (server fetches from
+- [x] **Update the privacy notice.** Add the product-URL prefill (server fetches from
       Sigma, Roth, Fisher, Cytiva, Amazon); mention successful-login records; add the
       controller contact for this installation.
-- [ ] **Retention for login records.** django-axes keeps `AccessLog` (IP + user agent of
+- [x] **Retention for login records.** django-axes keeps `AccessLog` (IP + user agent of
       every login) and `AccessAttempt` forever — schedule a cleanup (e.g. 90 days).
 
 ### P2 — should fix soon after
-- [ ] **Retry email tasks.** No Celery task retries; a transient SMTP failure silently
+- [x] **Retry email tasks.** No Celery task retries; a transient SMTP failure silently
       drops mail, including the ZK forward email with the signed PO. Add
       `autoretry_for` SMTP/OS errors with backoff.
-- [ ] **Lock requests during transitions.** `perform_transition` / `receive` check the
+- [x] **Lock requests during transitions.** `perform_transition` / `receive` check the
       status on the view's stale object — double submits send duplicate emails or 500 on
       check-in. Re-fetch with `select_for_update()`; add a global double-submit guard
       in `app.js`.
-- [ ] **Clean up on item delete.** Attachments (rows + files) and comments are orphaned
+- [x] **Clean up on item delete.** Attachments (rows + files) and comments are orphaned
       (no `GenericRelation`) — storage leak and GDPR issue.
-- [ ] **Never leave a lab without a manager.** Block removing `manage_lab` from the last
+- [x] **Never leave a lab without a manager.** Block removing `manage_lab` from the last
       holder via member edit, role edit, and role delete.
-- [ ] **Fail loudly without `LABBUTLER_BASE_URL`.** Blank → invitation emails carry a
+- [x] **Fail loudly without `LABBUTLER_BASE_URL`.** Blank → invitation emails carry a
       relative, unusable link. Add a system check when `DEBUG=False`.
 
 ### P3 — minor
-- [ ] Comment links: reject `/\host` (browsers read it as `//host`) in
+- [x] Comment links: reject `/\host` (browsers read it as `//host`) in
       `comment_links.py`.
-- [ ] Product lookup: don't follow redirects off the vendor allowlist.
-- [ ] Branded `403.html` / `404.html` / `500.html`.
-- [ ] Vendors/budgets in use: archive instead of delete (delete nulls history).
-- [ ] Pin the `uv` image in the `Dockerfile` (currently `:latest`).
-- [ ] Docs: Buildspec §15 still lists shipped features as roadmap; README says the expiry
+- [x] Product lookup: don't follow redirects off the vendor allowlist.
+- [x] Branded `403.html` / `404.html` / `500.html`.
+- [x] Vendors/budgets in use: archive instead of delete (delete nulls history).
+      *Done as: deletion refused while referenced (suppliers → merge, others → rename);
+      a real archive flag can follow if needed.*
+- [x] Pin the `uv` image in the `Dockerfile` (currently `:latest`).
+- [x] Docs: Buildspec §15 still lists shipped features as roadmap; README says the expiry
       digest is daily (it is weekly).
 - [ ] Run a dependency CVE audit (`uvx pip-audit`) against `uv.lock`.
+- [ ] Carl Roth product lookup returns the shop title ("Carlrothstore") as the item
+      name — page markup changed; fix `_roth_from_page` (found 2026-11-18).
 
 ### Deployment checklist (ops, no code)
 - [ ] Automated `pg_dump` + media-volume backup; **test a restore**.
+- [ ] `LABBUTLER_PRIVACY_CONTACT` set (data-controller contact on the privacy notice).
 - [ ] Strong `DJANGO_SECRET_KEY` and `POSTGRES_PASSWORD` (default is `labbutler`).
 - [ ] `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `LABBUTLER_BASE_URL` set.
 - [ ] Uni SMTP relay + accepted `DEFAULT_FROM_EMAIL`; send a test email.
