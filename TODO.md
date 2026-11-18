@@ -101,43 +101,46 @@ each fix is its own commit with tests.
 ## Feature — onboarding & join requests
 
 ### Join link (self-service membership requests)
+*Shipped on `rollout-1.0` (approval uses `manage_lab`; per-lab DB-based rate cap instead
+of per-IP).*
 Today only a manager can add members (types the email, picks roles, welcome email goes
 out). Goal: a shareable link people use to *ask* to join; the manager approves and
 picks the role(s).
 
-- [ ] **Model `JoinRequest`** (tenancy): lab, email, name, optional message, status
+- [x] **Model `JoinRequest`** (tenancy): lab, email, name, optional message, status
       (pending / approved / rejected), decided_by, decided_at, created_at. Unique
       pending request per (lab, lower(email)).
-- [ ] **Join link per lab**: random token on `Lab` (or a `JoinLink` model), manager can
+- [x] **Join link per lab**: random token on `Lab` (or a `JoinLink` model), manager can
       enable/disable and **regenerate** it (revokes old link). Optional expiry.
-- [ ] **Public request page** `/join/<token>/`: name, email, message → creates a pending
+- [x] **Public request page** `/join/<token>/`: name, email, message → creates a pending
       request. No account is created and no existence leak ("request received" either
       way). Rate-limit + honeypot; CSRF as usual.
-- [ ] **Email confirmation** of the requester's address before managers see it (stops
+- [x] **Email confirmation** of the requester's address before managers see it (stops
       spam / typo'd addresses).
-- [ ] **Manager review**: "Join requests" tab under Manage → Members with a badge count;
+- [x] **Manager review**: "Join requests" tab under Manage → Members with a badge count;
       approve with role checkboxes (pre-select the lab's default role) or reject.
       Dashboard widget for pending requests; notify managers by email.
-- [ ] **Approve = existing invite path**: reuse `add_member` + `send_welcome_email`, so
+- [x] **Approve = existing invite path**: reuse `add_member` + `send_welcome_email`, so
       the user sets a password via the welcome link. Existing users just gain the
       membership. Rejection sends a short neutral email.
-- [ ] **Audit** every request/approve/reject; new permission (or reuse `manage_lab`).
-- [ ] Tests: token validity/regeneration, duplicate requests, existing user, permission
+- [x] **Audit** every request/approve/reject; new permission (or reuse `manage_lab`).
+- [x] Tests: token validity/regeneration, duplicate requests, existing user, permission
       gating, no account enumeration. Docs in the user + admin guides.
 
 ### Better onboarding
+*Shipped on `rollout-1.0`; German wording of the welcome email still to review.*
 Builds on the existing first-login tour (`/welcome/`, `onboarding_seen_at`).
 
-- [ ] **Role-aware tour**: steps adapt to the roles granted (requester vs. orderer vs.
+- [x] **Role-aware tour**: steps adapt to the roles granted (requester vs. orderer vs.
       manager vs. signer), so nobody reads about buttons they don't have.
-- [ ] **Setup checklist on the dashboard** for new members (set display name, tune
+- [x] **Setup checklist on the dashboard** for new members (set display name, tune
       notifications, find your first item, raise a test request) — dismissible, ticks
       itself off.
-- [ ] **Manager first-run checklist**: locations, suppliers, budgets, shipping
+- [x] **Manager first-run checklist**: locations, suppliers, budgets, shipping
       addresses, roles, join link, import LabSuit data.
-- [ ] **Welcome email polish**: who invited you, your roles, the lab name, link to the
+- [x] **Welcome email polish**: who invited you, your roles, the lab name, link to the
       tour; German/English wording check.
-- [ ] Empty states with next-step hints on inventory/requests for a brand-new lab.
+- [x] Empty states with next-step hints on inventory/requests for a brand-new lab.
 
 ## Later / roadmap
 
