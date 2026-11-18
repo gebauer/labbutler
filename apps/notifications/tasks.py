@@ -6,6 +6,7 @@ the message text comes from the pure builders in :mod:`apps.notifications.emails
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 from celery import shared_task
@@ -32,6 +33,21 @@ from . import emails
 
 Frequency = NotificationFrequency
 
+logger = logging.getLogger(__name__)
+
+# Tasks that send exactly one message retry on mail-transport errors (smtplib's
+# exceptions and socket errors are all OSError), so a brief SMTP outage delays mail
+# instead of dropping it: backoff 1, 2, 4 … min (jittered, capped at 1 h), ~2 h total.
+# Digests loop over many recipients and must not retry as a whole (that would resend
+# the ones already delivered) — they isolate failures per recipient instead.
+SINGLE_EMAIL_RETRY = {
+    "autoretry_for": (OSError,),
+    "retry_backoff": 60,
+    "retry_backoff_max": 3600,
+    "retry_jitter": True,
+    "max_retries": 6,
+}
+
 
 def _base_url() -> str:
     return getattr(settings, "LABBUTLER_BASE_URL", "")
@@ -57,6 +73,17 @@ def _send(
     for filename, data, mimetype in attachments or []:
         message.attach(filename, data, mimetype)
     message.send()
+
+
+def _send_digest(content: emails.EmailContent, recipient: str) -> bool:
+    """Send one digest email; log and report ``False`` on a transport error so a single
+    bad mailbox or a hiccup doesn't cost every later member their digest."""
+    try:
+        _send(content, [recipient])
+    except OSError:
+        logger.exception("Digest email to %s failed", recipient)
+        return False
+    return True
 
 
 def _frequency(user: User, lab: Lab, field: str) -> str:
@@ -104,7 +131,7 @@ def approval_recipients(
     return sorted({user.email for user in users})
 
 
-@shared_task
+@shared_task(**SINGLE_EMAIL_RETRY)
 def notify_request_transition(req_pk: int, previous: str, new: str) -> int:
     """Email the requester/orderer that request ``req_pk`` changed status. Returns count sent."""
     req = (
@@ -126,7 +153,7 @@ def notify_request_transition(req_pk: int, previous: str, new: str) -> int:
     return len(recipients)
 
 
-@shared_task
+@shared_task(**SINGLE_EMAIL_RETRY)
 def notify_request_created(req_pk: int) -> int:
     """Email the lab's approvers that a new request ``req_pk`` awaits approval.
 
@@ -144,7 +171,7 @@ def notify_request_created(req_pk: int) -> int:
     return len(recipients)
 
 
-@shared_task
+@shared_task(**SINGLE_EMAIL_RETRY)
 def notify_request_assigned(req_pk: int, forwarded_by_pk: int | None = None) -> int:
     """Email the coordinator a request was forwarded to, naming who forwarded it.
     Returns count sent (0/1)."""
@@ -161,7 +188,7 @@ def notify_request_assigned(req_pk: int, forwarded_by_pk: int | None = None) -> 
     return 1
 
 
-@shared_task
+@shared_task(**SINGLE_EMAIL_RETRY)
 def notify_po_signature_needed(req_pk: int) -> int:
     """Email the lab's ``sign_po`` holders that a purchase order awaits their signature.
 
@@ -181,7 +208,7 @@ def notify_po_signature_needed(req_pk: int) -> int:
     return len(recipients)
 
 
-@shared_task
+@shared_task(**SINGLE_EMAIL_RETRY)
 def send_zk_forward_email(req_pk: int) -> int:
     """Send the forward-ready ZK email (signed PDF attached) to the request's manager.
 
@@ -216,7 +243,7 @@ def send_zk_forward_email(req_pk: int) -> int:
     return 1
 
 
-@shared_task
+@shared_task(**SINGLE_EMAIL_RETRY)
 def send_welcome_email(user_pk: int, lab_pk: int) -> int:
     """Welcome a freshly-added member with a link to set their password. Returns 0/1.
 
@@ -305,8 +332,7 @@ def send_expiry_digests(days_ahead: int | None = None) -> int:
                 owned_only=owned_only,
                 base_url=_base_url(),
             )
-            _send(content, [user.email])
-            emails_sent += 1
+            emails_sent += _send_digest(content, user.email)
     return emails_sent
 
 
@@ -353,6 +379,5 @@ def send_notification_digests(since=None) -> int:
             content = emails.build_daily_digest(
                 lab, approvals, updates, today, base_url=_base_url()
             )
-            _send(content, [user.email])
-            emails_sent += 1
+            emails_sent += _send_digest(content, user.email)
     return emails_sent
