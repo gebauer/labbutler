@@ -35,7 +35,6 @@ x-app-environment: &app-environment
   EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
   DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-labbutler@localhost}
   LABBUTLER_BASE_URL: ${LABBUTLER_BASE_URL:-}
-  EXPIRY_DIGEST_DAYS: ${EXPIRY_DIGEST_DAYS:-30}
   EXPIRY_DIGEST_HOUR: ${EXPIRY_DIGEST_HOUR:-7}
   NOTIFY_DIGEST_HOUR: ${NOTIFY_DIGEST_HOUR:-7}
   AXES_FAILURE_LIMIT: ${AXES_FAILURE_LIMIT:-5}
@@ -45,6 +44,22 @@ x-app-environment: &app-environment
   AXES_IPWARE_PROXY_COUNT: ${AXES_IPWARE_PROXY_COUNT:-1}
   # Superuser "view as another user" — keep off in production unless deliberately needed.
   LABBUTLER_IMPERSONATION_ENABLED: ${LABBUTLER_IMPERSONATION_ENABLED:-false}
+  # Optional overrides, passed through only when set (value-less = unset in the
+  # container otherwise, so the defaults in settings.py apply). Deliberately not
+  # `${VAR:-}`: an empty string would e.g. blank the CSP or the EU country list.
+  DJANGO_LOG_LEVEL:
+  DJANGO_SECURE_HSTS_SECONDS:
+  DJANGO_CONTENT_SECURITY_POLICY:
+  PASSWORD_RESET_TIMEOUT_DAYS:
+  EXPIRY_DIGEST_WEEKDAY:
+  AXES_ENABLED:
+  LABBUTLER_CENTRAL_PURCHASING_THRESHOLD_NET:
+  LABBUTLER_PO_DEVIATION_THRESHOLD_PCT:
+  LABBUTLER_EU_COUNTRIES:
+  # Outbound proxy for PubChem / vendor product lookups, if the network requires one.
+  HTTPS_PROXY:
+  HTTP_PROXY:
+  NO_PROXY:
 
 # Shared base for the app services (web / worker / beat): same image, env, restart policy
 # and startup ordering. Each service only overrides its command (and web its healthcheck).

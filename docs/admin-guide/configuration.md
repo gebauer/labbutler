@@ -14,6 +14,11 @@ the image. There are no secrets in the repository.
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | (empty) | Comma-separated origins incl. scheme, e.g. `https://labbutler.your.domain`. |
 | `DJANGO_TIME_ZONE` | `Europe/Berlin` | Display/default time zone. |
 | `DJANGO_MEDIA_ROOT` | `/data/media` | Where uploaded attachments are stored (the compose media volume). |
+| `DJANGO_LOG_LEVEL` | `INFO` | Log level for everything written to stdout (`docker compose logs`), incl. server-error tracebacks. |
+| `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` | (unset) | Outbound proxy for the PubChem GHS lookup and vendor product lookups, if your network requires one. |
+
+Optional variables shown with a default but left out of `.env` stay unset in the
+containers, so the built-in default applies.
 
 ## Database
 
@@ -69,6 +74,15 @@ can use plain HTTP.
 |---|---|---|
 | `DJANGO_SECURE_SSL_REDIRECT` | `true` | Redirect http→https in the app. Set `false` if the proxy already does it (e.g. Coolify) and you hit a redirect loop. |
 | `DJANGO_SECURE_HSTS_SECONDS` | `31536000` | HSTS max-age (1 year), incl. subdomains + preload. |
+| `DJANGO_CONTENT_SECURITY_POLICY` | strict same-origin policy | Full `Content-Security-Policy` header value; override only if you know why. |
+
+## Central purchasing (Zentraleinkauf)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `LABBUTLER_CENTRAL_PURCHASING_THRESHOLD_NET` | `1000` | Net order value from which the central-purchasing route is suggested (labs can override in their settings). |
+| `LABBUTLER_PO_DEVIATION_THRESHOLD_PCT` | `15` | Price deviation (%) that flags a purchase order (labs can override). |
+| `LABBUTLER_EU_COUNTRIES` | EU-27 | Comma-separated ISO country codes treated as EU for the non-EU vendor signal. |
 
 Secure session/CSRF cookies are always on outside debug.
 
