@@ -469,9 +469,10 @@ Three paths, all gated on `import_inventory`, all with a **dry-run preview** ("1
 - **Per-member preferences** on each membership: approval notifications and
   request-update notifications are each configurable, shown on the settings page only for
   categories the member can act on.
-- Daily **expiry digest** (expired + expiring within `EXPIRY_DIGEST_DAYS`) to members with
-  `manage_inventory`, on the Celery beat schedule (also runnable via the
-  `send_expiry_digests` command). Expiry dates are optional — set only for items that
+- Weekly **expiry report** (expired + expiring items) on the Celery beat schedule (also
+  runnable via the `send_expiry_digests` command). Content is a per-member setting:
+  all items or only what changed since last week, a 7/14/30-day look-ahead, and
+  owned-items-only (forced for members without `view_inventory`). Expiry dates are optional — set only for items that
   matter.
 - **Welcome email** with a set-password link for newly created members; standard
   password-reset flow. Links honour `LABBUTLER_BASE_URL`.
@@ -524,24 +525,23 @@ lockout via django-axes, superuser-only audited impersonation for role testing.
 
 ## 15. Roadmap / future work
 
-Planned, in no particular order (nothing here has shipped yet):
+**Shipped since the first release** (kept here for context; detail in git history):
+mobile Data Matrix scanner with scan log · Avery label-sheet printing · GHS lookup by CAS
+via PubChem · vendor normalisation, duplicate detection and merge · central purchasing
+(Zentraleinkauf) route with the PO workflow · product-URL prefill · first-login
+onboarding tour.
+
+Planned, in no particular order:
 
 - **Cross-lab inventory sharing** — owner-side `SharingGrant` (recipient labs + visibility
   level + scope) AND searcher-side `cross_lab_search` permission; **read-only discovery**,
   both sides must consent.
 - **Institute tier** above `Lab` · **low-stock alerts** · **batch container generation**
-  ("generate N containers").
-- **Auto H-P lookup by CAS** via PubChem / ECHA free APIs (likely no paid AI needed) ·
-  **vendor & tag cleanup/merge tools**.
-- **Mobile Data Matrix scanner** — scan the preprinted label on a phone to look up /
-  check in / check out an item, in-browser via the `BarcodeDetector` API (Android/Chrome)
-  with a ZXing fallback (iOS Safari). Decodes only the human ID; no native app. A later
-  **"convert" tool** may re-label legacy imported serials onto the new `{PREFIX}-NNNN` +
+  ("generate N containers") · **tag merge tool**.
+- **ECHA** as a second H/P source next to PubChem.
+- A **"convert" tool** that re-labels legacy imported serials onto the `{PREFIX}-NNNN` +
   Data Matrix scheme.
-- **Label-sheet generator (admin)** — a printable template for off-the-shelf sticker
-  sheets (e.g. HERMA 189-up), each cell Data Matrix (left) + human-readable ID (right)
-  for a chosen range of reserved IDs. Complements (does not replace) buying preprinted
-  sheets.
+- **Join links & richer onboarding** — see [TODO.md](TODO.md).
 - **SSO/LDAP** · scheduled email data-backup/export · configurable ordering workflow ·
   actual-invoice reconciliation field.
 - **Import gaps:** CSV input for the generic mapper (currently xlsx-only) · optional

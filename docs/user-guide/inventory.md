@@ -24,7 +24,7 @@ at the bench or in front of the fridge.
 | **Vendor** | Supplier, from the lab's supplier list |
 | **Owner** | The responsible member |
 | **Price & currency** | Informational, e.g. from the originating order |
-| **Expiration date** | Drives the [expiry digest](notifications.md#expiry-digest) |
+| **Expiration date** | Drives the [weekly expiry report](notifications.md#weekly-expiry-report) |
 | **Lot / catalog / CAS number** | For reordering and identification |
 | **Hazard data** | GHS statements, signal word, WGK, storage class — see below |
 | **Tags** | Free-form labels, e.g. `antibody`, `2022` — an item can have many |
