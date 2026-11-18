@@ -44,3 +44,10 @@ def test_output_renders_unescaped_through_a_template():
     html = template.render(Context({"body": "see [Request #7](/requests/7/) & <i>note</i>"}))
     assert '<a href="/requests/7/"' in html
     assert "&amp;" in html and "&lt;i&gt;" in html
+
+
+def test_backslash_protocol_relative_url_stays_plain_text():
+    # Browsers treat "/\host" like "//host" — an off-site link disguised as relative.
+    out = linkify_comment(r"see [SDS](/\evil.example/x)")
+    assert "<a" not in out
+    assert "evil.example" in out
