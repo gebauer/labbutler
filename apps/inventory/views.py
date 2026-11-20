@@ -57,8 +57,48 @@ _FACETS = {
 }
 
 
-def _filtered_items(lab, query: str, facets: dict[str, str]):
-    """Return the lab's items narrowed by free-text query and any active facet filters."""
+_FILTERABLE_HAZARD_KINDS = (HazardStatement.Kind.H, HazardStatement.Kind.EUH)
+
+
+def _hazard_sort_key(code: str) -> tuple[int, int, str]:
+    """Order H before EUH, then by number, then by suffix (H360F before H360FD)."""
+    prefix = "EUH" if code.startswith("EUH") else "H"
+    digits = "".join(ch for ch in code[len(prefix) :] if ch.isdigit())
+    return (0 if prefix == "H" else 1, int(digits or 0), code)
+
+
+def _hazard_filter_options(lab) -> list[tuple[str, str]]:
+    """(code, statement text) for each single H/EUH code carried by the lab's items.
+
+    Combined statements (``H301+H311``) are split into their parts, so the filter offers
+    each number once and picking H301 also finds items labelled ``H301+H311``.
+    """
+    stored = HazardStatement.objects.filter(
+        items__lab=lab, kind__in=_FILTERABLE_HAZARD_KINDS
+    ).values_list("code", flat=True)
+    codes = {part for code in stored.distinct() for part in code.split("+")}
+    texts = dict(HazardStatement.objects.filter(code__in=codes).values_list("code", "text_en"))
+    return [(code, texts.get(code, "")) for code in sorted(codes, key=_hazard_sort_key)]
+
+
+def _hazard_lookup(codes: list[str]) -> Q:
+    """Items carrying ANY of ``codes`` — alone or as part of a combined statement."""
+    lookup = Q()
+    for code in codes:
+        lookup |= (
+            Q(hazards__code=code)
+            | Q(hazards__code__startswith=f"{code}+")
+            | Q(hazards__code__endswith=f"+{code}")
+            | Q(hazards__code__contains=f"+{code}+")
+        )
+    return lookup
+
+
+def _filtered_items(lab, query: str, facets: dict[str, str], hazard_codes=()):
+    """Return the lab's items narrowed by free-text query and any active facet filters.
+
+    ``hazard_codes`` are OR-ed: an item matches if it carries at least one of them.
+    """
     items = (
         Item.objects.filter(lab=lab)
         .select_related("location", "vendor", "owner")
@@ -81,6 +121,8 @@ def _filtered_items(lab, query: str, facets: dict[str, str]):
                 items = items.filter(location_id__in=Location.subtree_pks(lab, int(value)))
         else:
             items = items.filter(**{lookup_field: value})
+    if hazard_codes:
+        items = items.filter(_hazard_lookup(hazard_codes))
     return items.distinct()
 
 
@@ -112,8 +154,9 @@ def item_list(request: HttpRequest) -> HttpResponse:
     lab = request.lab
     query = request.GET.get("q", "")
     facets = {param: request.GET.get(param, "") for param in _FACETS}
+    hazard_codes = [code for code in request.GET.getlist("hazard") if code]
     view_mode = _resolve_view_mode(request)
-    items = _filtered_items(lab, query, facets)
+    items = _filtered_items(lab, query, facets, hazard_codes)
 
     page = Paginator(items, PAGE_SIZE).get_page(request.GET.get("page"))
     # One bulk pass so each row can render its location's full path without extra queries.
@@ -124,7 +167,9 @@ def item_list(request: HttpRequest) -> HttpResponse:
         "facets": facets,
         "view_mode": view_mode,
         "filter_qs": _filter_querystring(request),
-        "has_filters": bool(query.strip()) or any(facets.values()),
+        "has_filters": bool(query.strip()) or any(facets.values()) or bool(hazard_codes),
+        "hazard_codes": hazard_codes,
+        "hazard_options": _hazard_filter_options(lab),
         "tags": Tag.objects.filter(lab=lab).order_by("name"),
         "locations": Location.tree_for_lab(lab),
         "vendors": Vendor.objects.filter(lab=lab).order_by("name"),

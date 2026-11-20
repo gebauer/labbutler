@@ -81,3 +81,10 @@ document.addEventListener('click', function (event) {
     setTimeout(function () { button.textContent = original; }, 1200);
   });
 });
+
+// Checkbox dropdowns (<details data-hazard-filter>) close when clicking anywhere else.
+document.addEventListener('click', function (event) {
+  document.querySelectorAll('details[data-hazard-filter][open]').forEach(function (details) {
+    if (!details.contains(event.target)) details.removeAttribute('open');
+  });
+});

@@ -576,3 +576,77 @@ def test_item_ghs_label_pdf_rejects_out_of_range_position(client, lab, viewer):
     client.force_login(viewer)
     resp = client.get(reverse("inventory:item_ghs_label_pdf", args=[item.pk]), {"row": 9})
     assert resp.status_code == 400
+
+
+def _with_hazards(item: Item, *codes: str) -> Item:
+    item.hazards.add(*HazardStatement.objects.filter(code__in=codes))
+    return item
+
+
+@pytest.mark.django_db
+def test_hazard_filter_ors_ticked_codes(client, lab, manager):
+    _with_hazards(_make_item(lab, name="Toxic A"), "H301")
+    _with_hazards(_make_item(lab, name="Harmful B"), "H302")
+    _with_hazards(_make_item(lab, name="Flammable C"), "H225")
+    _make_item(lab, name="Harmless D")
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_list"), {"hazard": ["H301", "H302"]})
+    assert b"Toxic A" in resp.content
+    assert b"Harmful B" in resp.content
+    assert b"Flammable C" not in resp.content
+    assert b"Harmless D" not in resp.content
+
+
+@pytest.mark.django_db
+def test_hazard_filter_matches_part_of_combined_statement(client, lab, manager):
+    _with_hazards(_make_item(lab, name="Combined"), "H301+H311")
+    _with_hazards(_make_item(lab, name="Lookalike"), "H311")
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_list"), {"hazard": "H301"})
+    assert b"Combined" in resp.content
+    assert b"Lookalike" not in resp.content
+
+
+@pytest.mark.django_db
+def test_hazard_filter_combines_with_other_filters(client, lab, manager):
+    _with_hazards(_make_item(lab, name="Ethanol absolute"), "H225")
+    _with_hazards(_make_item(lab, name="Acetone"), "H225")
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_list"), {"hazard": "H225", "q": "ethanol"})
+    assert b"Ethanol absolute" in resp.content
+    assert b"Acetone" not in resp.content
+
+
+@pytest.mark.django_db
+def test_hazard_filter_offers_only_codes_present_in_lab(client, lab, other_lab, manager):
+    _with_hazards(_make_item(lab, name="Mine"), "H301+H311", "EUH066", "P280")
+    _with_hazards(_make_item(other_lab, name="Theirs"), "H350")
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_list"))
+    content = resp.content.decode()
+    for code in ("H301", "H311", "EUH066"):
+        assert f'name="hazard" value="{code}"' in content
+    assert 'value="H301+H311"' not in content  # offered as its parts
+    assert 'value="P280"' not in content  # precautionary statements aren't hazards
+    assert 'value="H350"' not in content  # another lab's codes stay hidden
+    # H codes are listed before EUH codes.
+    assert content.index('value="H311"') < content.index('value="EUH066"')
+
+
+@pytest.mark.django_db
+def test_hazard_filter_keeps_ticked_boxes_and_counts_as_filter(client, lab, manager):
+    _with_hazards(_make_item(lab, name="Toxic"), "H301", "H302")
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_list"), {"hazard": "H302"})
+    content = resp.content.decode()
+    assert 'value="H302" checked' in content
+    assert 'value="H301" checked' not in content
+    assert "Clear filters" in content
+
+
+@pytest.mark.django_db
+def test_hazard_filter_hidden_when_lab_has_no_hazards(client, lab, manager):
+    _make_item(lab, name="Plain")
+    client.force_login(manager)
+    resp = client.get(reverse("inventory:item_list"))
+    assert b'name="hazard"' not in resp.content

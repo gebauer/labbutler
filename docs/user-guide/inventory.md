@@ -11,7 +11,12 @@ and deleting items (and locations, tags, custom fields) requires `manage_invento
 
 **Inventory** in the navigation bar shows the item list for the current lab. The
 search box filters live as you type — free-text search across items — and you can
-narrow by **tag**. On a phone the table collapses to stacked cards, so lookups work
+narrow by **tag**, location, supplier, and owner.
+
+**Hazards** filters by GHS hazard statements: tick one or more codes (e.g. H301 and
+H302) to see every item carrying *any* of them. The list offers only the H and EUH codes
+that actually occur in your lab, and a combined statement counts for each of its parts
+— ticking H301 also finds items labelled H301+H311. On a phone the table collapses to stacked cards, so lookups work
 at the bench or in front of the fridge.
 
 ## What an item records

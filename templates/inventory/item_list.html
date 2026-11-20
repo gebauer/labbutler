@@ -26,7 +26,7 @@
     </div>
   </div>
 
-  {# One HTMX form (search, tag combobox, facet selects) — controls live outside #item-results, so state survives partial swaps. #}
+  {# One HTMX form (search, tag combobox, facet selects, hazard checkboxes) — controls live outside #item-results, so state survives partial swaps. #}
   <form class="mt-5 flex flex-wrap items-center gap-2"
         hx-get="{% url 'inventory:item_list' %}"
         hx-target="#item-results" hx-select="#item-results" hx-swap="outerHTML"
@@ -52,6 +52,7 @@
     {% include "inventory/_facet_select.html" with name="location" label="All locations" options=locations selected=facets.location %}
     {% include "inventory/_facet_select.html" with name="vendor" label="All suppliers" options=vendors selected=facets.vendor %}
     {% include "inventory/_facet_select.html" with name="owner" label="All owners" options=owners selected=facets.owner person=1 %}
+    {% include "inventory/_hazard_filter.html" %}
     <noscript><button type="submit" class="rounded-lg border px-3 py-1.5 text-sm">Apply</button></noscript>
   </form>
 
