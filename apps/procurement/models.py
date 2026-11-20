@@ -5,6 +5,8 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericRelation
 from django.db import IntegrityError, models, transaction
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 from apps.tenancy.models import Lab
 from labbutler.abstract import TimeStampedModel
@@ -374,3 +376,13 @@ class PurchaseOrder(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"PO for request #{self.request_id} ({self.get_status_display()})"
+
+
+@receiver(post_delete, sender=PurchaseOrder)
+def _remove_po_files(sender, instance: PurchaseOrder, **kwargs) -> None:
+    """Delete the stored PDFs once the row's deletion is committed (also on cascade from
+    a deleted request). Mirrors the attachment hook: a rolled-back delete keeps files."""
+    for field_file in (instance.unsigned_pdf, instance.signed_pdf):
+        storage, name = field_file.storage, field_file.name
+        if name:
+            transaction.on_commit(lambda storage=storage, name=name: storage.delete(name))

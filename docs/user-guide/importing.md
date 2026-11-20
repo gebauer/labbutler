@@ -40,6 +40,9 @@ exports:
 Crucially, each item's **original LabSuit serial becomes its frozen LabButler ID**,
 and re-importing the same export updates existing items instead of duplicating them
 (upsert on the legacy serial). Existing labels on physical containers stay valid.
+Items deleted in LabSuit are *not* removed by a re-import. To replace the inventory
+with a fresh export instead, first use **Admin → Danger zone → Delete inventory…**
+(see [Lab administration](lab-administration.md#danger-zone-start-over)), then import.
 
 ## The generic mapper
 

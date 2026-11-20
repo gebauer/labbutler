@@ -125,6 +125,22 @@ managing these requires `manage_inventory` rather than `manage_lab`.
   (19% by default).
 - **Default currency** — preselected on new requests.
 
+## Danger zone: start over
+
+At the bottom of **Admin** are two buttons for wiping data, typically before a fresh
+LabSuit import. Each opens a page that lists exactly what will be deleted; you confirm
+by typing the lab's name. Neither can be undone — take a database backup first (see
+the maintenance guide). The audit log keeps a record of who deleted what and how much.
+
+- **Delete inventory…** removes every item (with its attachments, comments and scan
+  history), all locations, and the tags no request uses. Requests, suppliers, budgets,
+  custom fields and members stay. Item IDs that were used are never reissued, and a
+  LabSuit re-import brings items back under their original IDs, so existing labels
+  stay valid.
+- **Delete requests…** removes every request — open ones and the order history,
+  including imported LabSuit orders — with their purchase-order forms, attachments and
+  comments. The inventory, suppliers, budgets and shipping addresses stay.
+
 ## Superuser: "View as" impersonation
 
 Installation superusers can temporarily **view the app as another user** to verify

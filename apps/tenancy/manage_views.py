@@ -25,6 +25,7 @@ from apps.procurement.models import Budget, Request, ShippingAddress, Vendor
 from apps.procurement.services import find_duplicate_vendors, merge_vendors
 
 from . import join as join_flow
+from . import lab_reset
 from .manage_forms import (
     BudgetForm,
     FieldDefinitionForm,
@@ -195,6 +196,58 @@ def crud_delete(request: HttpRequest, kind: str, pk: int) -> HttpResponse:
         "manage/confirm_delete.html",
         {"kind": kind, "config": config, "object": obj, "delete_warning": delete_warning},
     )
+
+
+# --- Danger zone: delete the whole inventory / all requests ------------------------
+
+# What each bulk delete removes, how it's described, and where to go afterwards.
+_RESETS = {
+    "inventory": (lab_reset.inventory_counts, lab_reset.delete_inventory, "inventory:item_list"),
+    "requests": (lab_reset.request_counts, lab_reset.delete_requests, "procurement:request_list"),
+}
+
+
+def _confirmed(request: HttpRequest) -> bool:
+    """The manager typed the lab's name — a deliberate act, not a stray click."""
+    typed = " ".join(request.POST.get("confirm_name", "").split())
+    return typed.casefold() == " ".join(request.lab.name.split()).casefold()
+
+
+def _reset_view(request: HttpRequest, what: str) -> HttpResponse:
+    count, delete, done_url = _RESETS[what]
+    error = ""
+    if request.method == "POST":
+        if _confirmed(request):
+            counts = delete(request.lab, actor=request.user)
+            messages.success(request, f"Deleted {_describe(counts)}.")
+            return redirect(done_url)
+        error = "The name doesn't match. Nothing was deleted."
+    return render(
+        request,
+        "manage/reset_confirm.html",
+        {"what": what, "counts": count(request.lab), "error": error},
+        status=400 if error else 200,
+    )
+
+
+def _describe(counts) -> str:
+    parts = [
+        f"{value} {name if value != 1 else name.rstrip('s')}"
+        for name, value in vars(counts).items()
+    ]
+    return ", ".join(parts)
+
+
+@require_permission("manage_lab")
+def reset_inventory(request: HttpRequest) -> HttpResponse:
+    """Confirm, then delete every item, location and unused tag of the current lab."""
+    return _reset_view(request, "inventory")
+
+
+@require_permission("manage_lab")
+def reset_requests(request: HttpRequest) -> HttpResponse:
+    """Confirm, then delete every request (incl. imported order history) of the lab."""
+    return _reset_view(request, "requests")
 
 
 # --- Suppliers: merge duplicates ---------------------------------------------------

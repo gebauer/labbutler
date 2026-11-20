@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Delete {{ what }} · Admin · LabButler{% endblock %}
+
+{% block content %}
+  <div class="mx-auto max-w-xl">
+    <a href="{% url 'manage:index' %}" class="text-sm text-teal-700 hover:underline">← Admin</a>
+    <h1 class="mt-1 text-2xl font-semibold tracking-tight">Delete {% if what == "inventory" %}the inventory{% else %}all requests{% endif %}</h1>
+
+    <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+      <p class="font-medium">This permanently deletes from <strong>{{ current_lab.name }}</strong>:</p>
+      <ul class="mt-2 list-disc space-y-1 pl-5">
+        {% if what == "inventory" %}
+          <li><strong>{{ counts.items }}</strong> item{{ counts.items|pluralize }}, with their attachments, comments and scan history</li>
+          <li><strong>{{ counts.locations }}</strong> location{{ counts.locations|pluralize }}</li>
+          <li><strong>{{ counts.tags }}</strong> tag{{ counts.tags|pluralize }} not used by any request</li>
+        {% else %}
+          <li><strong>{{ counts.requests }}</strong> request{{ counts.requests|pluralize }} — open ones and the order history, including imported LabSuit orders — with their purchase-order forms, attachments and comments</li>
+        {% endif %}
+      </ul>
+      <p class="mt-3 text-red-800">
+        {% if what == "inventory" %}
+          Kept: requests, suppliers, budgets, custom fields, members. Item IDs already used are never handed out again, so existing labels can't point at a different item; re-importing a LabSuit export brings items back under their original IDs.
+        {% else %}
+          Kept: the inventory (items received through a request stay), suppliers, budgets, shipping addresses, members.
+        {% endif %}
+        The audit log records who deleted what.
+      </p>
+    </div>
+
+    <form method="post" class="mt-5">
+      {% csrf_token %}
+      <label for="confirm_name" class="block text-sm font-medium text-gray-700">Type <strong>{{ current_lab.name }}</strong> to confirm</label>
+      <input type="text" id="confirm_name" name="confirm_name" autocomplete="off" required
+             class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500">
+      {% if error %}<p class="mt-1 text-xs text-red-600">{{ error }}</p>{% endif %}
+      <div class="mt-4 flex gap-2">
+        <button type="submit" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+          Delete {% if what == "inventory" %}inventory{% else %}requests{% endif %}
+        </button>
+        <a href="{% url 'manage:index' %}" class="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}
